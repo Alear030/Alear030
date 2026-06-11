@@ -8,3 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
+.env
+
+# 配置文件
+config.yaml
+
+# 测试缓存
+.pytest_cache/
+
+# IDE配置
+.idea/
