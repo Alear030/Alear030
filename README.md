@@ -12,6 +12,9 @@
 
 ## memory
 
+basic tools
+general tools
+
 大体分为  
 
  - 基础记忆(read-only)：system_soul、Agents……
