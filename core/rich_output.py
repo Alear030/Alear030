@@ -25,15 +25,19 @@ output_theme = Theme({
 console = Console(theme=output_theme)
 
 # 后续需要增加agent的name、role、type
-def rich_print(message:set,type:str=None):
+def rich_print(message:str,type:str=None):
     match type:
-        case 'thinking':
-            console.print(Panel(message,title='Thinking',title_align='left',style='#7ab8f3'))
-        case 'content':
-            console.print(Panel(Markdown(message),title='Assistant',title_align='left',style='#4a90d9'))
+        case 'agent_thinking':
+            console.print(Panel(message,title='Thinking',title_align='left',style="#C1EEFF",border_style='dim',padding=(0,1)))
+        case 'agent_content':
+            console.print(Panel(Markdown(message),title='Assistant',title_align='left',style="#62aeff"))
         case 'tool_call':
-            console.print(Panel(message,title='tool_call',title_align='left',style='#EEFF6D'))
+            console.print(Panel(message,title='tool_call',title_align='left',style="#F9FFD0"))
         case 'tool_result':
-            console.print(Panel(message,title='tool_result',title_align='left',style="#C9DD42"))
+            console.print(Panel(message,title='tool_result',title_align='left',style="#DBE0B4"))
+        case 'system_message':
+            console.print(Panel(message,title='system_message',title_align='left',style="#B1B1B1"))
         case 'system_error':
             console.print(Panel(message,title='system_error',title_align='left',style="#ED3A3A"))
+        case _:
+            console.print(Panel(message,title='none',title_align='left',style="#FFFFFF"))

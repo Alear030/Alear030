@@ -1,6 +1,4 @@
-def main():
-    print("Hello from alear030!")
+from core import loop
 
-
-if __name__ == "__main__":
-    main()
+while True:
+    loop()
