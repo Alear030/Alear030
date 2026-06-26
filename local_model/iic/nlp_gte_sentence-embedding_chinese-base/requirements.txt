@@ -1,0 +1,2 @@
+huggingface-hub==0.25.*
+transformers==4.48.3

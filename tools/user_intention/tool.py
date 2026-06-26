@@ -92,7 +92,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='user_intention',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,role=['main'])
+@register_tool(tool_name='user_intention',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=False,role=['main'])
 def user_intention(user_content:str)->dict:
     print('\nuser_intentionsing....\n')
     print('\nuser_intention-s key_word is :'+user_content+'\n')

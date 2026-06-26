@@ -1,7 +1,7 @@
 import json
 import inspect
 
-from core import *
+from core import rich_print
 
 class _ToolRegister:
 

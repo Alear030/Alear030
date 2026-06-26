@@ -20,6 +20,6 @@ config.yaml
 .idea/
 
 # 历史项目
-Alear_test/
 z_ccstudy/
 workspace/
+local_model/
