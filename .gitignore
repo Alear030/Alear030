@@ -23,3 +23,10 @@ config.yaml
 z_ccstudy/
 workspace/
 z_old_code/
+
+# 过程文件
+session/session_detail/
+session/session_plan
+
+# CLAUDE_CODE
+CLAUDE.md

@@ -2,7 +2,7 @@ import os
 import json
 
 from dotenv import load_dotenv
-from core import rich_print
+from rich_output import rich_print
 from tool.tool_core import register_tool
 from json import JSONDecodeError
 from openai import OpenAI

@@ -4,7 +4,7 @@ import time
 from dotenv import load_dotenv
 from tool.tool_core import register_tool
 from ddgs import DDGS
-from core import *
+from rich_output import rich_print
 from pathlib import Path
 
 load_dotenv()

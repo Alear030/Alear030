@@ -1,8 +1,9 @@
-from core import loop
+from loop import loop
 from session import Session
 from hook.hook_core import hooks
 
 from agent import agents
+from loop import Loop
 
 # 创建slice_subagent & summary_subagent
 # main_agent = Agent(agent_id=int(0),agent_name='main',agent_role='main',agent_mode='auto')
@@ -12,6 +13,8 @@ from agent import agents
 # 创建新的session
 session = Session(slice_agent=agents.agents['slice'],summary_agent=agents.agents['summary'])
 
+# 创建新的Loop
+loop = Loop(agents=agents,session=session,hooks=hooks)
 
 try:
     while True:
@@ -19,13 +22,10 @@ try:
         user_message = input('please enter your message: ')
         
         # 开启本轮循环
-        loop(session=session,agents=agents,user_message=user_message,hooks=hooks)
-        
-        # 一轮对话完毕之后，对话round增加
-        session.round += 1
+        loop.loop_run(agent_name='main',message=user_message)
         
         # 一轮对话完毕之后，执行回合完毕的hooker：session_slice,session_compress
-        hooks.trigger(hook_point='round_finished',session=session,agents=agents)
+        hooks.trigger(hook_point='after_round',session=session,agents=agents)
         hooks.collect()
 
 except KeyboardInterrupt:

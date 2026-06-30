@@ -5,7 +5,8 @@ from datetime import datetime
 
 
 from config import SESSION_PLAN_FILE_PATH
-from tool.tool_core import register_tool,subagent_loop
+from tool.tool_core import register_tool
+from loop import Loop
 
 
 # 设置tool的基本描述和prompt信息
@@ -27,12 +28,16 @@ def plan_create(plan_title:str,task_description:str,agents=None):
 
     # plan_agent生成plan
     try:
-        # 清空plan_agent的message list 并将新的plan信息注入
+        # 重置plan_agent的message_list，保留 system prompt，message 交给 Loop 拼接
         plan_agent.message_list = [plan_agent.message_list[0]]
-        plan_agent.message_list.append({'role':'user','content':json.dumps({"plan_title":plan_title,"plan_background":task_description},ensure_ascii=False)})
-        
-        # 循环处理plan_agent工具调用问题
-        plan_content = subagent_loop(agent=plan_agent)
+        user_content = json.dumps(
+            {"plan_title": plan_title, "plan_background": task_description},
+            ensure_ascii=False
+        )
+
+        # 用 Loop 跑 plan_agent 的 ReAct 循环
+        loop = Loop(agents=agents)
+        plan_content = loop.loop_run(agent_name='plan', message=user_content)
 
         # 解析plan_content 是否为JSON格式
         def _extract_json(text):
@@ -64,7 +69,7 @@ def plan_create(plan_title:str,task_description:str,agents=None):
     # 解析plan_content
     plan_detail = {
         "plan_title":plan_title,
-        "plan_status":"undo",
+        "plan_status":"pending",
         "created_time":datetime.now().strftime('%Y%m%d_%H%M%S'),
         "update_time":datetime.now().strftime('%Y%m%d_%H%M%S'),
         "plan_steps":[

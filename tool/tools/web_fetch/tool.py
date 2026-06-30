@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from tool.tool_core import register_tool
 from pathlib import Path
-from core import *
+from loop import *
 
 tool_desc = '用于抓取指定URL的网页内容'
 

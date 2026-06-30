@@ -2,7 +2,7 @@ from pathlib import Path
 from tool.tool_core import register_tool
 
 from config import WORK_SPACE
-from core import rich_print
+from rich_output import rich_print
 
 tool_desc = '创建或覆盖本地文本文件，会自动创建父目录'
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'

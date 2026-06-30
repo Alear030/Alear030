@@ -1,7 +1,7 @@
 import json
 import inspect
 
-from core import rich_print
+from rich_output import rich_print
 
 class _ToolRegister:
 
@@ -93,36 +93,3 @@ _register = _ToolRegister()
 register_tool = _register.tool_register
 get_tool = _register.get_tools
 match_tool = _register.match_tool
-
-# 处理tool内的subagent_loop问题
-def subagent_loop(agent):
-    loop_round = 1
-    while loop_round <= agent.max_toolcalls:
-        rq = agent.agent_ai.chat.completions.create(
-            model = agent.model_name,
-            messages = agent.message_list,
-            tools = agent.tool_list,
-            tool_choice = 'auto',
-            extra_body={'thinking':{'type':'enabled'}}
-        ).choices[0].message
-        rich_print(message=rq.reasoning_content, type='subagent_thinking')
-
-        if rq.content and not rq.tool_calls:
-            return rq.content
-        
-        else:
-            agent.message_list.append(rq)
-            loop_round+=1
-            for func in rq.tool_calls:
-                tool_result = agent.match_tool(func)
-                agent.message_list.append(tool_result)
-    if loop_round > agent.max_toolcalls:
-        if rq.tool_calls:
-            agent.message_list.pop()
-        agent.message_list.append({'role':'user','content':'系统提示：已达到工具调用次数上限，请根据已有信息进行回复'})
-        rq = agent.agent_ai.chat.completions.create(
-            model = agent.model_name,
-            messages = agent.message_list,
-        ).choices[0].message
-        rich_print(message=rq.reasoning_content, type='subagent_thinking')
-        return rq.content

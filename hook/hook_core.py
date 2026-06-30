@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any,Callable
 
-from core.rich_output import rich_print
+from rich_output import rich_print
 
 # HookResult —— 钩子的返回值，决定主流程怎么响应
 @dataclass

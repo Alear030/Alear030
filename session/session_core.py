@@ -58,6 +58,11 @@ class Session:
         # session 读写锁
         self.json_lock = threading.Lock()
 
+        # session 状态控制
+        self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
+        self.plan_file = None
+        self.goal = None
+
 
     def _json_update(self,updater):
         # json文件锁进行并行异步管控
@@ -133,6 +138,7 @@ class Session:
                     slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
                     slice_embedding = _get_embedding_model().encode([slice_text])[0]
                     slice_data = {
+                        "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
                         "worthy_summary":slice['worthy_summary'],
                         "topic": slice['topic'],
                         "start_round": slice['start_round'],
