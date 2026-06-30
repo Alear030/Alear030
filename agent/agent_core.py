@@ -1,52 +1,73 @@
-import os
+import yaml
 
-from tools import get_tool,match_tool
-from core import rich_print
-from dotenv import load_dotenv
+from pathlib import Path
 from openai import OpenAI
 
+from tool import get_tool,match_tool
 from .prompt_structor import prompt_structor
+from config import MAX_TOOLCALLS,MODEL_LEVEL
 
-load_dotenv()
+# 得到agent_group配置文件
+agents_file = Path(__file__).parent/'agents.yaml'
+if agents_file.exists():
+    agents_text = agents_file.read_text(encoding='utf-8').strip()
+    agents_yaml = yaml.safe_load(agents_file.read_text(encoding='utf-8')) if agents_text else None
+
 
 class Agent:
+    def __init__(self,agent_profile:dict):
+        # agent 基础信息
+        self.agent_id:int = agent_profile['agent_id']
+        self.agent_name:str = agent_profile['agent_name']
+        self.agent_mode:str = agent_profile['agent_mode']
+        self.agent_level:str = agent_profile['agent_level']
+        self.agent_priority:int = agent_profile['agent_priority']
+        self.agent_desc:str = agent_profile['agent_desc']
 
-    ## 后续补充关于agent_mode的内容，暂定auto、plan、goal
-    def __init__(self,agent_id:int,agent_name:str,agent_role:str,agent_mode:str='auto'):
+        # agent model相关信息 openai实例
+        self.base_url = MODEL_LEVEL[agent_profile['agent_level']]['base_url']
+        self.api_key = MODEL_LEVEL[agent_profile['agent_level']]['api_key']
+        self.model_name = MODEL_LEVEL[agent_profile['agent_level']]['model_name']
+        self.agent_ai = OpenAI(base_url=self.base_url,api_key=self.api_key)
         
-        self.agent_id = agent_id
-        self.agent_name = agent_name
-        self.agent_role = agent_role
-        self.agent_mode = agent_mode
-
-        self.base_url = os.getenv(f'{agent_role}_BASE_URL')
-        self.api_key = os.getenv(f'{agent_role}_API_KEY')
-        self.model_name = os.getenv(f'{agent_role}_MODEL_NAME')
-
-        self.tool_list = get_tool(role=agent_role)
-        self.message_list = self._message_init()
-
+        # agent tools 信息
+        self.tool_autho:list[str] = self._get_tool_autho(agent_tool_autho=agent_profile['agent_tool_autho'])
+        self.tool_list:list = get_tool(self.tool_autho)
+        self.max_toolcalls = MAX_TOOLCALLS
         self.match_tool = match_tool
 
-    def _message_init(self)->list:
-
-        system_prompt = ''
-
-        system_prompt = prompt_structor(type='agent',role=self.agent_role)
+        # agent message_list 信息
+        self.message_list:list = self._messages_init(agent_name=self.agent_name)
 
 
-        return [{'role':'system','content':system_prompt}]
+    # 得到agent的tool_autho
+    def _get_tool_autho(self,agent_tool_autho:dict):
+        tool_autho_list =[]
+        for key,value in agent_tool_autho.items():
+            if value:
+                tool_autho_list.append(key)
+        return tool_autho_list
+    
+    # agent message list 初始化
+    def _messages_init(self,agent_name:str)->list:
+        message_init_list = prompt_structor(type='agent',agent_name=agent_name)
+        return [{'role':'system','content':message_init_list}]
 
-# main agent init
-main_agent = Agent(agent_id=int(0),agent_name='main',agent_role='main',agent_mode='auto')
-main_agent_ai = OpenAI(base_url=main_agent.base_url,api_key=main_agent.api_key)
-rich_print(message='main_agent created...',type='system_message')
+class Agents:
+    def __init__(self,agents_yaml:dict):
+        self.agents:dict[str,Agent] = self._agents_init(agents_yaml = agents_yaml['agents'])
+    
+    # 初始化批量创建agents
+    def _agents_init(self,agents_yaml:dict)->dict:
+        agents_dict = {}
+        for agent in agents_yaml:
+            agents_dict[agent['agent_name']] = Agent(agent_profile=agent)
+        return agents_dict
+    
+    # 为后续agent自主创建agent后，更新agents预留
+    def _agents_reload(self):
+        pass
 
-slice_agent = Agent(agent_id=int(1),agent_name='slice',agent_role='slice',agent_mode='auto')
-slice_agent_ai = OpenAI(base_url=main_agent.base_url,api_key=main_agent.api_key)
-rich_print(message='slice_agent created...',type='system_message')
 
-# summary agent init
-summary_agent = Agent(agent_id=int(1),agent_name='summary',agent_role='summary',agent_mode='auto')
-summary_agent_ai = OpenAI(base_url=main_agent.base_url,api_key=main_agent.api_key)
-rich_print(message='summary_agent created...',type='system_message')
+# 创建全局Agents实例
+agents = Agents(agents_yaml=agents_yaml)

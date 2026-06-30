@@ -22,4 +22,4 @@ config.yaml
 # 历史项目
 z_ccstudy/
 workspace/
-local_model/
+z_old_code/

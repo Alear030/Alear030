@@ -29,6 +29,8 @@ def rich_print(message:str,type:str=None):
     match type:
         case 'agent_thinking':
             console.print(Panel(message,title='Thinking',title_align='left',style="#C1EEFF",border_style='dim',padding=(0,1)))
+        case 'subagent_thinking':
+            console.print(Panel(message,title='Subagent Thinking',title_align='left',style="#b8f0b8",border_style='dim',padding=(0,1)))
         case 'agent_content':
             console.print(Panel(Markdown(message),title='Assistant',title_align='left',style="#62aeff"))
         case 'tool_call':

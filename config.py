@@ -1,23 +1,44 @@
-from pathlib import Path
+import os
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 ROOT_DIRECTORY = Path(__file__).parent
 WORK_SPACE = Path(__file__).parent/'workspace'
 
-# agent config 
-MAX_TOOLCALLS = int(15)
+# agent_max_tool_call config 
+MAX_TOOLCALLS = int(20)
 
-# main_MODEL_NAME="deepseek-v4-pro"
-# slice_MODEL_NAME="deepseek-v4-flash"
-# summary_MODEL_NAME="deepseek-v4-flash"
-# subagent_MODEL_NAME='deepseek-v4-flash'
+# agent_model config
+MODEL_LEVEL = {
+    "max_level":{
+        "base_url":os.getenv('MAX_LEVEL_BASE_URL'),
+        "api_key":os.getenv('MAX_LEVEL_API_KEY'),
+        "model_name":os.getenv('MAX_LEVEL_MODEL_NAME')
+    },
+    "medium_level":{
+        "base_url":os.getenv('MEDIUM_LEVEL_BASE_URL'),
+        "api_key":os.getenv('MEDIUM_LEVEL_API_KEY'),
+        "model_name":os.getenv('MEDIUM_LEVEL_MODEL_NAME')
+    },
+    "low_level":{
+        "base_url":os.getenv('LOW_LEVEL_BASE_URL'),
+        "api_key":os.getenv('LOW_LEVEL_API_KEY'),
+        "model_name":os.getenv('LOW_LEVEL_MODEL_NAME')
+    }
+}
 
 
 #session config
-SESSION_SUMMARY_PATH = Path(__file__).parent/'session/session_summary.json'
-SESSION_MEMORTY_DETAIL_PATH = Path(__file__).parent/'session/session_detail'
 
+# session 对话详情文件夹路径
+SESSION_MEMORTY_DETAIL_PATH = Path(__file__).parent/'session/session_detail'
+# session plan文件夹路径
+SESSION_PLAN_FILE_PATH = Path(__file__).parent/'session/session_plan'
+# session 对话最大token值
 MAX_SESSION_TOKEN = 300000
 
 

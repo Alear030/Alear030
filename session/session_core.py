@@ -1,23 +1,18 @@
 import json
+import tiktoken
+import threading
 
 from datetime import datetime
 from pathlib import Path
+from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor,as_completed
 
-
-from core.rich_output import rich_print
-from config import SESSION_MEMORTY_DETAIL_PATH
-from agent.agent_core import main_agent
-
-
-def _session_id_generate()->str:
-    time_now = datetime.now()
-    time_part = time_now.strftime('%Y%m%d_%H%M%S')
-    return time_part
-
+from config import SESSION_MEMORTY_DETAIL_PATH,MAX_SESSION_TOKEN
+from local_model import _get_embedding_model,embedding_to_b64
 
 def _json_read(file_path:Path):
     if file_path.is_dir():
-        rich_print(message='error:path is dir',type='system_error')
+        # rich_print(message='error:path is dir',type='system_error')
         return
     file_text = file_path.read_text(encoding='utf-8')
 
@@ -43,98 +38,230 @@ def _json_write(content:str=None,file_path:Path=None):
     )
 
 
-def _get_sessison_detail_ids()->list:
-    session_detail_ids = sorted(file.stem for file in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))
-    return session_detail_ids
+class Session:
+    
+    def __init__(self,slice_agent,summary_agent):
+        # session class 基础信息
+        self.session_id = self._generate_session_id()
+        self.round = 0
+        self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
+        self.max_tokens = MAX_SESSION_TOKEN
+        self.session_path = self._generate_session_json()
+
+        # session subagent 信息
+        self.slice_agent = slice_agent
+        self.slice_ai = OpenAI(base_url=self.slice_agent.base_url,api_key=self.slice_agent.api_key)
+
+        self.summary_agent = summary_agent
+        self.summary_ai = OpenAI(base_url=self.summary_agent.base_url,api_key=self.summary_agent.api_key)
+
+        # session 读写锁
+        self.json_lock = threading.Lock()
 
 
-def _get_session_detail_slice(session_id:str=None)->list[dict]:
-    if not session_id:
-        return None
-    session_json = _json_read(file_path=SESSION_MEMORTY_DETAIL_PATH/f'{session_id}.json')
-    return session_json['session_slice']
+    def _json_update(self,updater):
+        # json文件锁进行并行异步管控
+        with self.json_lock:
+            # 1-读取json内容 2-用updater func 处理data 3-写回json内容
+            data = json.loads(self.session_path.read_text(encoding='utf-8'))
+            updater(data)
+            self.session_path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
-def _get_unslice_content(session_id:str,has_tool:bool)->list[dict]:
-    session_json = _json_read(file_path=SESSION_MEMORTY_DETAIL_PATH/f'{session_id}.json')
-    session_unslice_content = []
-    for msg in session_json['session_messages']:
-        if msg['message_round'] > session_json['unslice_pointer']:
-            if has_tool:
-                session_unslice_content.append(msg)
+    def _generate_session_id(self):
+        time_now = datetime.now()
+        time_part = time_now.strftime('%Y%m%d_%H%M%S')
+        return time_part
+    
+
+    def _generate_session_json(self):
+
+        session_json_detail = {
+            "session_id":self.session_id,
+            # "unslice_pointer":0,
+            "session_slice":[],
+            "session_messages":[]
+        }
+        _json_write(content=session_json_detail,file_path=SESSION_MEMORTY_DETAIL_PATH/f'{self.session_id}.json')
+        return SESSION_MEMORTY_DETAIL_PATH/f'{self.session_id}.json'
+    
+    
+    def _session_count_tokens(self)->int:
+        session_json = _json_read(file_path=self.session_path)
+        count_pointer = session_json['session_slice'][-1]['start_round'] if session_json['session_slice'] else int(0)
+        
+        #处理需要计算tokens的message list
+        count_messages = []
+        #将需要计数的messages取出
+        for msg in session_json['session_messages']:
+            if msg['message_round'] >= count_pointer or msg['message_role'] == 'system':
+                count_messages.append(msg['message_content'])
+        
+        #开始计算
+        token_count = 0
+        token_encoding = tiktoken.encoding_for_model(model_name='gpt-4o')
+        for msg in count_messages:
+            token_count+=4
+            token_count += len(token_encoding.encode(msg))
+        
+        return token_count
+    
+    
+    def _session_slice(self):
+        def do_slice(data):
+            # 处理slice的基础数据
+            session_slice = data['session_slice']
+            session_messages = data['session_messages'][1:]
+            slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
+            
+            # 得到没有slice的messages
+            unslice_messages = []
+            for msg in session_messages:
+                if msg['message_round'] >= slice_pointer and msg['message_role'] != 'tool_calls' and msg['message_role'] != 'tool_result':
+                    unslice_messages.append(msg)
+
+            # 处理slice subagent 的message list
+            message_list = []
+            message_list.append(self.slice_agent.message_list[0])
+            message_list.append({'role':'user','content':json.dumps(unslice_messages,ensure_ascii=False,indent=2)})
+
+            # 开始slice 并对sessionjson的session_slice进行覆盖
+            slice_rqs = self.slice_ai.chat.completions.create(model=self.slice_agent.model_name,messages = message_list).choices[0].message.content
+            try:
+                for slice in json.loads(slice_rqs):
+                    # 添加embedding数据
+                    slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
+                    slice_embedding = _get_embedding_model().encode([slice_text])[0]
+                    slice_data = {
+                        "worthy_summary":slice['worthy_summary'],
+                        "topic": slice['topic'],
+                        "start_round": slice['start_round'],
+                        "end_round": slice['end_round'],
+                        "key_words": slice['key_words'],
+                        "slice_embedding":embedding_to_b64(slice_embedding),
+                        "summary_detail":""
+                    }
+                    # 判断当前slice是否存在数据
+                    if not session_slice:
+                        session_slice = [slice_data]
+                    # 判断新的切片的起始round和最后切片的round是否一样
+                    elif session_slice[-1]['start_round'] == slice_data['start_round']:
+                        session_slice[-1] = slice_data
+                    else:
+                        session_slice.append(slice_data)
+
+                data['session_slice'] = session_slice
+            except (json.JSONDecodeError,IndexError,KeyError):
+                print('slice json 存在问题 跳过本轮 slice')
+
+        self._json_update(updater=do_slice)
+        
+    
+    def _session_slice_summary(self,session_slice:dict,session_messages:list)->dict:
+        #判断是否需要进行summary
+        if not session_slice['worthy_summary'] or session_slice['summary_detail']:
+            return session_slice
+        
+        #取到需要进行summary的messages
+        summary_messages = []
+        for msg in session_messages:
+            if msg['message_round'] >= session_slice['start_round'] and msg['message_round'] <= session_slice['end_round']:
+                if msg['message_role'] == 'user' or msg['message_role'] == 'assistant':
+                    summary_messages.append(msg)
+        
+        #处理summary subagent 的message list 并得到结果
+        message_list = []
+        message_list.append(self.summary_agent.message_list[0])
+        message_list.append({'role':'user','content':json.dumps(summary_messages,ensure_ascii=False)})
+        summary_rqs = self.summary_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
+        try:
+            summary_json = json.loads(summary_rqs)
+            summary_result = summary_json[0]['summary_detail']
+        except (json.JSONDecodeError,IndexError,KeyError):
+            summary_result = summary_rqs
+        
+        # 处理session_slice的summary
+        session_slice['summary_detail'] = summary_result
+
+        # 更新slice的embedding
+        slice_text = f"{session_slice['topic']} {' '.join(session_slice['key_words'])} {session_slice['summary_detail']}"
+        slice_embedding = _get_embedding_model().encode([slice_text])[0]
+        session_slice['slice_embedding'] = embedding_to_b64(slice_embedding)
+
+        return session_slice
+
+
+    def _session_summary(self):
+        def do_summary(data):
+        # 得到session的slice 和 session的session_messages
+            session_messages = data['session_messages']
+            session_slices = data['session_slice']
+
+            # 创建多线程处理需要summary的slice
+            with ThreadPoolExecutor(max_workers=5) as tp:
+                # 创建summary队列
+                slice_summary_queue = {
+                    tp.submit(self._session_slice_summary,slice,session_messages):slice for slice in session_slices
+                }
+
+                # 取得summary队列的返回结果
+                slices_results = []
+                for thread in as_completed(slice_summary_queue):
+                    result = thread.result()
+                    slices_results.append(result)
+                
+            # 对得到的slices_results 进行排序
+            slices_results.sort(key=lambda x:x['start_round'])
+
+            # 对session json 进行复写并覆盖
+            data['session_slice'] = slices_results
+
+        self._json_update(updater=do_summary)
+
+
+    def session_message_reform(self):
+        session_json = _json_read(file_path=self.session_path)
+        messages = []
+        
+        # 得到system_prompt
+        if session_json['session_messages'][0]['message_role'] == 'system':
+            messages.append(session_json['session_messages'][0])
+
+        # 得到最后一个slice的messages
+        session_last_slice = session_json['session_slice'][-1]
+        for msg in session_json['session_messages']:
+            if msg['message_round'] >= session_last_slice['start_round'] and msg['message_round'] <= session_last_slice['end_round']:
+                messages.append(msg)
+
+        # 将messages转化成message_list
+        message_list =[]
+        for msg in messages:
+            if msg['message_role'] in ['system','user','assistant']:
+                message_list.append({'role':msg['message_role'],'content':msg['message_content']})
+            elif msg['message_role'] == 'tool_calls':
+                message_list[-1]['tool_calls'] = json.loads(msg['message_content'])
             else:
-                if  msg['message_role'] != 'tool_calls' and msg['message_role'] != 'tool_result':
-                    session_unslice_content.append(msg)
-    return session_unslice_content
+                message_list.append(json.loads(msg['message_content']))
+        
+        return message_list
 
 
-def _session_memory_recently(current_sesssion_id:str=None)->list:
-    session_detail_ids = _get_sessison_detail_ids()
-    if current_sesssion_id in session_detail_ids:
-        session_detail_ids.remove(current_sesssion_id)
+    def session_compress(self,agent):
+        # 判断是否需要进行压缩，如果需要进行压缩则将mainagent的messagelist进行重构
+        if self._session_count_tokens() >= self.max_tokens:
+            self._session_summary()
+            agent.message_list = self.session_message_reform()
+        
 
-    session_detail_ids = session_detail_ids[:3]
-    session_memory_recently = []
+    def session_message_insert(self,role,content):
 
-    for session_detail_id in session_detail_ids:
-        session_detail_json = _json_read(file_path=SESSION_MEMORTY_DETAIL_PATH/f'{session_detail_id}.json')
-        session_slice = session_detail_json['session_slice']
-
-        if session_slice:
-            for slice in session_slice:
-                if slice['summary_detail']:
-                    session_memory_recently.append({
-                        "session_id":session_detail_json['session_id'],
-                        "start_round":slice['start_round'],
-                        "end_round":slice['end_round'],
-                        "topic":slice['topic'],
-                        "key_words":slice['key_words'],
-                        "summary_detail":slice['summary_detail']
-                    })
-                else:
-                    session_memory_recently.append({
-                        "session_id":session_detail_json['session_id'],
-                        "start_round":slice['start_round'],
-                        "end_round":slice['end_round'],
-                        "slice_reference":slice['slice_reference']
-                    })
-    return session_memory_recently
-
-
-def session_init()->str:
-
-    session_id_time = _session_id_generate()
-    if not SESSION_MEMORTY_DETAIL_PATH.exists():
-        rich_print(message='error:session memory file does not exist',type='system_error')
-        return None
-    
-    session_detail_init = {
-        "session_id": session_id_time,
-        "unslice_pointer":0,
-        "session_slice":[],
-        "session_messages": []
-    }
-    _json_write(content=session_detail_init,file_path=SESSION_MEMORTY_DETAIL_PATH/f'{session_id_time}.json')
-
-    rich_print(message=f'session {session_id_time} has been inited',type='system_message')
-
-    # main_agent.message_list[0]['content']+=f'\n\n#历史近期三轮对话摘要\n\n以下是最近对话的摘要，请注意：摘要中的「用户」即 Alear030 大人，摘要中的「助手」即你自己.\n\n{str(_session_memory_recently(current_sesssion_id=session_id_time))}'
-    main_agent.message_list[0]['content'] += f'\n\n #系统提示:当前时间是:{session_id_time}当前session_id是:{session_id_time}'
-    
-    return session_id_time 
-
-
-def session_message_insert(session_id:str,role:str='',message:str='',session_round:int=None):
-    session_file_path = Path(__file__).parent/f'session_detail/{session_id}.json'
-    if not session_file_path:
-        rich_print(message='session file does not exist',type='system_error')
-        return
-    
-    session_json = _json_read(file_path=session_file_path)
-    session_json['session_messages'].append({
-        "message_round":session_round,
-        "message_role":role,
-        "message_content":message
-    })
-
-    _json_write(content=session_json,file_path=session_file_path)
+        def do_insert(data):
+            # 在session json中的session_messages插入新的message
+            data['session_messages'].append({
+                "message_round": self.round,
+                "message_role": str(role),
+                "message_content":str(content)
+            })
+            # 将新的sessionjson写回文件
+        
+        self._json_update(updater=do_insert)
