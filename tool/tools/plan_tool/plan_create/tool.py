@@ -58,7 +58,10 @@ def plan_create(plan_title:str,task_description:str,agents=None):
         try:
             plan_json = json.loads(plan_content_stripped)
         except json.JSONDecodeError:
-            return plan_content
+            return json.dumps({
+                "plan_error": "plan_agent 返回了非 JSON 格式内容，信息不足。请根据以下提示补充。",
+                "plan_agent_response": plan_content
+            }, ensure_ascii=False)
         
     except Exception as ee:
         return json.dumps({"error":f"plan_create tool调用失败:{ee}"},ensure_ascii=False)

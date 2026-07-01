@@ -178,7 +178,15 @@ class Loop:
             return final_rq
         
     def loop_run(self,agent_name:str,message:str=None):
-        
-        self._normal_loop(agent_name='main',message=message)
 
+        # # 检查session_mode
+        # if self.session.mode and self.session.mode == 'plan' and self.plan_file:
+
+        result = self._normal_loop(agent_name=agent_name,message=message)
+
+        if self.hooks:
+            self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents)
+            self.hooks.collect()
+
+        return result
     

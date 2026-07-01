@@ -12,7 +12,8 @@ agents:
       file_write_tool: true
       command_tool: true
       config_tool: true
-    agent_level: max_level
+      memory_tool: true
+    agent_level: medium_level
     agent_priority: 0
     agent_switch: true
     agent_desc: "身份:主agent 负责 主要交流调用工具&对外感知对外对话"
@@ -27,6 +28,7 @@ agents:
       file_write_tool: false
       command_tool: false
       config_tool: false
+      memory_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -42,6 +44,7 @@ agents:
       file_write_tool: false
       command_tool: false
       config_tool: false
+      memory_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -57,6 +60,7 @@ agents:
       file_write_tool: false
       command_tool: false
       config_tool: false
+      memory_tool: true
     agent_level: max_level
     agent_priority: 1
     agent_switch: true

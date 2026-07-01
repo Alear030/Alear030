@@ -181,7 +181,13 @@ class Session:
         message_list.append({'role':'user','content':json.dumps(summary_messages,ensure_ascii=False)})
         summary_rqs = self.summary_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
         try:
-            summary_json = json.loads(summary_rqs)
+            # 剥离可能的 markdown 代码块
+            import re
+            cleaned = summary_rqs.strip()
+            m = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$', cleaned, re.DOTALL)
+            if m:
+                cleaned = m.group(1).strip()
+            summary_json = json.loads(cleaned)
             summary_result = summary_json[0]['summary_detail']
         except (json.JSONDecodeError,IndexError,KeyError):
             summary_result = summary_rqs
