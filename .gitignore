@@ -30,3 +30,5 @@ session/session_plan
 
 # CLAUDE_CODE
 CLAUDE.md
+.claude/
+

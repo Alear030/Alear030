@@ -18,7 +18,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='session_slice',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='basic_tool')
+@register_tool(tool_name='session_slice',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
 def session_slice(session_id:str,start_round:int,end_round:int)->str:
 
     # 得到对应的session detail json 数据

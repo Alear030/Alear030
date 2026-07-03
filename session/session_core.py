@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 
 from config import SESSION_MEMORTY_DETAIL_PATH,MAX_SESSION_TOKEN
 from local_model import _get_embedding_model,embedding_to_b64
+from .session_plan import Plan
 
 def _json_read(file_path:Path):
     if file_path.is_dir():
@@ -60,8 +61,9 @@ class Session:
 
         # session 状态控制
         self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
-        self.plan_file = None
-        self.goal = None
+        
+        # session_plan 类
+        self.plan:Plan = None
 
 
     def _json_update(self,updater):
@@ -277,3 +279,11 @@ class Session:
             # 将新的sessionjson写回文件
         
         self._json_update(updater=do_insert)
+
+
+# plan 函数方法集群
+    # 初始化session中的plan类，并将当前session进入plan模式用于后续loop使用
+    def _plan_init(self,plan_file):
+        self.plan = Plan(plan_file=plan_file)
+        self.mode = 'plan'
+

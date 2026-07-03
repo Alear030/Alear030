@@ -69,7 +69,8 @@ class HookManager:
         
         return add_hook
     
-
+    
+    # trigger触发时机：after_round、pre_toolUse
     def trigger(self,hook_point:str,match_ctx:dict|None=None,**kwargs)->list[HookResult]:
         # hook_point：触发时机  match_ctx：匹配条件  **kwargs：冗余参数垃圾袋
         results:list[HookResult] = []

@@ -16,7 +16,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='basic_tool')
+@register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_fetch(url: str) -> str:
     print(f'web_fetching {url}...')
     error = None

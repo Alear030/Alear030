@@ -12,7 +12,7 @@ if skill_list_prompt_file.exists():
 else:
     skill_list_prompt = None
 
-@register_tool(tool_name='skill_list',tool_desc=skill_list_desc,tool_prompt=skill_list_prompt,tool_enabled=True,tool_autho='basic_tool')
+@register_tool(tool_name='skill_list',tool_desc=skill_list_desc,tool_prompt=skill_list_prompt,tool_enabled=True,tool_autho='skill_tool')
 def skill_list()->list:
     skill_path = ROOT_DIRECTORY/'skill'
     skill_list = list(skill_path.rglob('skill.md'))
@@ -32,7 +32,7 @@ def skill_list()->list:
 
 skill_list_desc = "用于加载目标技能"
 
-@register_tool(tool_name='skill_load',tool_desc=skill_list_desc,tool_enabled=True,tool_autho='basic_tool')
+@register_tool(tool_name='skill_load',tool_desc=skill_list_desc,tool_enabled=True,tool_autho='skill_tool')
 def skill_load(skill_name:str)->str:
     skill_path = ROOT_DIRECTORY/'skill'
     skill_md_list = list(skill_path.rglob(f'{skill_name}/skill.md'))

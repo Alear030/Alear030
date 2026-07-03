@@ -21,7 +21,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='basic_tool')
+@register_tool(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_search(key_word:str):
     for round in range(3):
         try:

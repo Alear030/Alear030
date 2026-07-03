@@ -26,6 +26,7 @@ console = Console(theme=output_theme)
 
 # 后续需要增加agent的name、role、type
 def rich_print(message:str,type:str=None):
+    message = message if message else ''
     match type:
         case 'agent_thinking':
             console.print(Panel(message,title='Thinking',title_align='left',style="#C1EEFF",border_style='dim',padding=(0,1)))

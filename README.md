@@ -14,15 +14,13 @@ Alear030 不是一个"Python Agent 框架"，它是一个完整的 Agent 基础�
 Alear030/
 ├── main.py                     # 入口：创建 Session → 进入 loop → 触发 Hook
 ├── config.py                   # 集中配置（MODEL_LEVEL / 路径 / 常量）
+├── rich_output.py              # Rich 终端输出（thinking/content/tool/system）
 ├── __init__.py                 # 导出常量
 ├── pyproject.toml              # 项目元数据
 ├── .env                        # API key & 模型配置（不纳入版本控制）
-├── memory.db                   # 旧版记忆系统遗留（SQLite）
 │
-├── core/                       # 核心运行时
-│   ├── loop.py                 # ReAct 推理循环：消息发送 → 工具调用 → 兜底
-│   ├── rich_output.py          # Rich 终端输出（thinking/content/tool/system）
-│   ├── local_model.py          # 本地模型配置引用
+├── loop/                       # ReAct 推理循环
+│   ├── loop_core.py            # Loop 类 — 全项目唯一推理引擎（main/subagent 共用，含 plan 分步循环）
 │   └── __init__.py
 │
 ├── agent/                      # Agent 集群
@@ -38,20 +36,20 @@ Alear030/
 │       └── plan_agent.md       # 计划 Agent
 │
 ├── session/                    # 会话生命周期
-│   ├── session_core.py         # Session 类（持久化 / 切片 / 压缩 / message_list 重建）
+│   ├── session_core.py         # Session 类（持久化 / 切片 / 压缩 / message_list 重建 / plan 初始化）
+│   ├── session_plan.py         # Plan / Plan_step 类（读取/刷新 plan 状态）
 │   ├── __init__.py
-│   ├── session_summary.json    # 跨会话摘要索引
-│   ├── session_detail/         # 每个会话的完整 JSON（切片 + 消息流，~8.5MB）
-│   └── session_plan/           # plan_create 落盘的计划文件
+│   ├── session_detail/         # 每个会话的完整 JSON（切片 + 消息流，不纳入版本控制）
+│   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
 │
 ├── hook/                       # 事件驱动 Hook 系统
 │   ├── hook_core.py            # HookManager：注册 / 触发 / 匹配 / 异步
 │   ├── __init__.py             # 自动发现 hook/hooks/*/
 │   └── hooks/
 │       ├── __init__.py
-│       ├── session_slice/      # 每轮后异步切片（LLM + 嵌入）
-│       ├── session_compress/   # Token 超限时同步压缩
-│       └── plan_hook/          # pre_toolUse 注入 agents 容器
+│       ├── session_slice/      # after_round 后台钩子：异步切片（LLM + 嵌入）
+│       ├── session_compress/   # after_round 同步钩子：Token 超限时压缩
+│       └── plan_hook/          # pre_toolUse 匹配 plan_design/plan_mode_on/plan_mode_off，注入 agents/session
 │
 ├── tool/                       # 工具系统
 │   ├── tool_core.py            # 工具注册 / 匹配 / subagent_loop
@@ -59,34 +57,35 @@ Alear030/
 │   └── tools/
 │       ├── __init__.py
 │       ├── command/            # 命令行执行（8 层安全检查白名单 + security.py）
-│       ├── file_read/          # 文件读取（带行号）
-│       ├── file_write/         # 文件写入（workspace 隔离）
+│       ├── file_tool/          # 文件读写工具集群
+│       │   ├── file_read/      # 文件读取（带行号）
+│       │   ├── file_write/     # 文件写入/新建（workspace 隔离，整体覆盖）
+│       │   ├── file_edit/      # 文件局部编辑（唯一字符串替换，不覆盖全文件）
+│       │   ├── file_glob/      # 按文件名 glob 模式查找文件
+│       │   └── file_grep/      # 按正则表达式搜索文件内容
 │       ├── web_search/         # DuckDuckGo 搜索
 │       ├── web_fetch/          # 网页内容抓取
 │       ├── memory_recall/      # 语义搜索历史会话切片
 │       ├── session_slice/      # 读取特定会话原文
-│       ├── plan_tool/
-│       │   └── plan_create/    # 分步执行计划
+│       ├── plan_tool/          # plan 工具集群（调用 Loop 跑 plan_agent）
+│       │   ├── plan_design/    # 创建/修改分步计划
+│       │   ├── plan_update/    # 更新指定 step 的状态和结果
+│       │   ├── plan_mode_on/   # 激活 plan 执行模式
+│       │   └── plan_mode_off/  # 结束 plan 执行模式
+│       ├── subagent_tool/      # 并行子 agent 集群（仅只读工具权限）
+│       │   └── subagent_create/# 并行创建并运行多个 subagent
 │       ├── skill_list/         # 技能发现与加载
 │       └── user_intention/     # 用户意图分类（P0-P6）
 │
-├── local_model/                # 本地中文嵌入模型（GTE，~196MB）
+├── local_model/                # 本地中文嵌入模型（GTE）+ local_model_core.py
 │
-├── memory/                     # 记忆系统（待实现）
-│   ├── agent_memory/
-│   ├── experience_memory/
-│   └── user_memory/
+├── memory/                     # 记忆系统（预留空目录，待实现）
 │
 ├── skill/                      # 技能系统
+│   ├── coding-conduct/
 │   └── competitive-analysis/   # 竞品分析技能
 │
 ├── workspace/                  # 工作区（不参与项目代码）
-│   ├── Alear030_self/          # 备用的 hook_plan / main_plan / plan_loop / coding_guidelines
-│   ├── splendid_project/       # 外部技能项目
-│   ├── scripts/
-│   ├── screenshots/
-│   └── docs/
-│
 ├── z_ccstudy/                  # 学习 & 实验代码（不影响主项目）
 └── z_old_code/                 # 旧架构代码（归档）
 ```

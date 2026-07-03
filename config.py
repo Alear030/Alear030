@@ -10,7 +10,8 @@ ROOT_DIRECTORY = Path(__file__).parent
 WORK_SPACE = Path(__file__).parent/'workspace'
 
 # agent_max_tool_call config 
-MAX_TOOLCALLS = int(20)
+MAX_TOOLCALLS = int(30)
+SUB_MAX_TOOLCALLS = int(15)
 
 # agent_model config
 MODEL_LEVEL = {

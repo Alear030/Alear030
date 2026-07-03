@@ -13,6 +13,10 @@ agents:
       command_tool: true
       config_tool: true
       memory_tool: true
+      plan_tool: true
+      subagent_tool: true
+      web_tool: true
+      skill_tool: true
     agent_level: medium_level
     agent_priority: 0
     agent_switch: true
@@ -29,6 +33,10 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: false
+      plan_tool: false
+      subagent_tool: false
+      web_tool: false
+      skill_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -45,6 +53,10 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: false
+      plan_tool: false
+      subagent_tool: false
+      web_tool: false
+      skill_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -61,6 +73,10 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: true
+      plan_tool: false
+      subagent_tool: true
+      web_tool: true
+      skill_tool: true
     agent_level: max_level
     agent_priority: 1
     agent_switch: true

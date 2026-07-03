@@ -1,5 +1,6 @@
 import json
 import inspect
+import typing
 
 from rich_output import rich_print
 
@@ -40,18 +41,33 @@ class _ToolRegister:
         func_required = []
 
         for name,arg in func_sig.parameters.items():
-            if name == 'self' or name == 'agents':
+            if name == 'self' or name == 'agents' or name == 'session':
                 continue
-            
+
             if arg.default is inspect.Parameter.empty:
                 func_required.append(name)
 
             arg_type = arg.annotation if arg.annotation is not inspect.Parameter.empty else str
             func_properties[name] = {
-                'type':type_map.get(arg_type,'string'),
+                **self._make_type_schema(arg_type,type_map),
                 'description':f'参数{name}'
             }
         return {'type':'object','properties':func_properties,'required':func_required}
+
+
+    # 处理list[X]/dict等复合类型标注，映射为JSON Schema的array/object，避免被兜底成string
+    def _make_type_schema(self,arg_type,type_map:dict)->dict:
+        origin = typing.get_origin(arg_type)
+
+        if origin is list:
+            item_args = typing.get_args(arg_type)
+            item_type = item_args[0] if item_args else str
+            return {'type':'array','items':self._make_type_schema(item_type,type_map)}
+
+        if origin is dict or arg_type is dict:
+            return {'type':'object'}
+
+        return {'type':type_map.get(arg_type,'string')}
     
     def match_tool(self,tool_call,**extra)->dict:
         tool_name = tool_call.function.name
@@ -69,7 +85,7 @@ class _ToolRegister:
         return {'role':'tool','tool_call_id':tool_call.id,'content':str(tool_result)}
 
 
-    def get_tools(self,tool_autho:list='main')->list:
+    def get_tools(self,tool_autho:list=None)->list:
         tools = []
 
         for tool in self.tool_list.values():
