@@ -4,8 +4,8 @@ from pathlib import Path
 from openai import OpenAI
 
 from tool import get_tool,match_tool
-from .prompt_structor import prompt_structor
 from config import MAX_TOOLCALLS,MODEL_LEVEL
+from prompt.prompt_core import Prompt
 
 # 得到agent_group配置文件
 agents_file = Path(__file__).parent/'agents.yaml'
@@ -36,8 +36,9 @@ class Agent:
         self.max_toolcalls = MAX_TOOLCALLS
         self.match_tool = match_tool
 
-        # agent message_list 信息
-        self.message_list:list = self._messages_init(agent_name=self.agent_name)
+        # agent prompt&message_list 信息
+        self.prompt:Prompt = Prompt(self)
+        self.message_list:list = [{'role':'system','content':self.prompt.prompt_content}]
 
 
     # 得到agent的tool_autho
@@ -47,11 +48,7 @@ class Agent:
             if value:
                 tool_autho_list.append(key)
         return tool_autho_list
-    
-    # agent message list 初始化
-    def _messages_init(self,agent_name:str)->list:
-        message_init_list = prompt_structor(type='agent',agent_name=agent_name)
-        return [{'role':'system','content':message_init_list}]
+
 
 class Agents:
     def __init__(self,agents_yaml:dict):

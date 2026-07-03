@@ -101,11 +101,26 @@ class _ToolRegister:
                         'parameters':tool['parameters']
                     }
                 })
-        
+
         return tools
-    
+
+
+    # 只返回name+简短description，不含tool_prompt全文，用于system prompt里罗列工具时避免和function-calling schema里的完整description重复
+    def get_tool_briefs(self,tool_autho:list=None)->list:
+        briefs = []
+
+        for tool in self.tool_list.values():
+            if not tool['enabled']:
+                continue
+
+            if tool['tool_autho'] in tool_autho:
+                briefs.append({'name':tool['name'],'description':tool['description']})
+
+        return briefs
+
 _register = _ToolRegister()
 
 register_tool = _register.tool_register
 get_tool = _register.get_tools
+get_tool_brief = _register.get_tool_briefs
 match_tool = _register.match_tool
