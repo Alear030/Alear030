@@ -26,14 +26,20 @@ Alear030/
 ├── agent/                      # Agent 集群
 │   ├── agent_core.py           # Agent 类 + Agents 容器（YAML 驱动）
 │   ├── agents.yaml             # 4 个 Agent 定义：main/slice/summary/plan
-│   ├── prompt_structor.py      # Prompt 分层组合：系统/身份/记忆/时间
+│   └── __init__.py
+│
+├── prompt/                     # Prompt 分层组合
+│   ├── prompt_core.py          # Prompt 类：按语义分块拼装 system prompt
 │   ├── __init__.py
-│   └── agent_prompt/           # Markdown 格式的 Agent system prompt
-│       ├── system_prompt.md    # 认知架构
-│       ├── main_agent.md       # 主 Agent 身份
-│       ├── slice_agent.md      # 切片 Agent
-│       ├── summary_agent.md    # 摘要 Agent
-│       └── plan_agent.md       # 计划 Agent
+│   ├── agent_prompt/
+│   │   ├── system_prompt.md    # 认知架构（仅 main agent 注入）
+│   │   └── agents/             # 各 Agent 自身身份/职责
+│   │       ├── main_agent.md
+│   │       ├── slice_agent.md
+│   │       ├── summary_agent.md
+│   │       └── plan_agent.md
+│   ├── tool_prompt/            # 工具使用原则（+ 已持有工具的 name+简短描述）
+│   └── skill_prompt/           # 技能使用原则（+ 已注册技能列表，仅 skill_tool 权限注入）
 │
 ├── session/                    # 会话生命周期
 │   ├── session_core.py         # Session 类（持久化 / 切片 / 压缩 / message_list 重建 / plan 初始化）
@@ -112,7 +118,7 @@ Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → 
 
 ### 5. Prompt 分层组合
 
-`system_prompt.md`（认知架构）+ `main_agent.md`（身份）+ 最近 3 个 session 的 slice 摘要（动态记忆）+ 当前时间戳 = 最终 system prompt。每层独立，改一不伤三。
+`prompt/` 包按语义分块拼装：`system_prompt.md`（认知架构，仅 main）+ `tool_prompt`（工具原则 + 已持有工具的 name+简短描述）+ `skill_prompt`（技能原则 + 已注册技能列表，仅 skill_tool 权限）+ 最近 3 个 session 的 slice 摘要（动态记忆）+ `{agent_name}_agent.md`（身份）+ 当前时间戳 = 最终 system prompt。每层独立，改一不伤三。
 
 ### 6. 模块解耦
 
