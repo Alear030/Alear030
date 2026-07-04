@@ -9,9 +9,12 @@ load_dotenv()
 ROOT_DIRECTORY = Path(__file__).parent
 WORK_SPACE = Path(__file__).parent/'workspace'
 
-# agent_max_tool_call config 
+# agent_max_tool_call config
 MAX_TOOLCALLS = int(30)
 SUB_MAX_TOOLCALLS = int(15)
+
+# plan 编排无进展熔断:连续这么多轮拿到同一 step(没推进)就退出
+PLAN_STALL_LIMIT = int(3)
 
 # agent_model config
 MODEL_LEVEL = {

@@ -31,10 +31,18 @@ class Plan:
         # plan的执行过程信息
         self.first_step = self._get_first_step()
 
-        # 卡控用：本轮 plan_loop 允许更新的唯一 step_number
-        # 只由 loop_core._plan_loop 在拿到 first_step 时写入，_refresh() 故意不清空它
-        # 目的：防止 agent 跳步更新，或者在同一轮里把后面几个 step 一起标 done
+        # 卡控用：本轮允许被 plan_update 更新的唯一 step_number，由 advance() 写入
+        # 目的：防止 agent 跳步更新，或在同一轮里把后面几个 step 一起标 done
         self.active_step_number = None
+
+
+    # 刷新磁盘状态，锁定并返回下一个待执行 step，全部完成返回 None
+    def advance(self)->'Plan_step':
+        self._refresh()
+        step = self.first_step
+        if step is not None:
+            self.active_step_number = step.step_number
+        return step
 
 
     # 从磁盘重新加载 plan 状态（plan_update 后调用）
@@ -47,12 +55,13 @@ class Plan:
         self.first_step = self._get_first_step()
 
 
-    # 取出plan_file内容
-    # for claudecode - 增加json类型防护，修改完删除此行备注
+    # 取出plan_file内容，读取或解析失败抛出带文件名的清晰错误
     def _get_plan_detail(self,plan_file):
         plan_path = SESSION_PLAN_FILE_PATH/f'{plan_file}.json'
-        plan_json = json.loads(plan_path.read_text(encoding='utf-8'))
-        return plan_json
+        try:
+            return json.loads(plan_path.read_text(encoding='utf-8'))
+        except (OSError,json.JSONDecodeError) as e:
+            raise ValueError(f'plan 文件读取/解析失败: {plan_path} — {e}') from e
     
     # 得到全部的steps
     def _get_steps(self)->list[Plan_step]:
