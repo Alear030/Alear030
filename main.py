@@ -6,7 +6,11 @@ from loop import Loop
 
 
 # 创建新的session
-session = Session(slice_agent=agents.agents['slice'],summary_agent=agents.agents['summary'])
+session = Session(
+    slice_agent=agents.agents['slice'],
+    summary_agent=agents.agents['summary'],
+    system_prompt=agents.agents['main'].message_list[0]['content']
+)
 
 # 创建新的Loop
 loop = Loop(agents=agents,session=session,hooks=hooks)

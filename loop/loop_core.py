@@ -228,10 +228,6 @@ class Loop:
         # 取出agent
         agent = agent
 
-        # 判断是否是第一轮对话，如果是session插入system_prompt信息 并且判断是否传入session
-        if self.session and self.session.round == 0:
-            self.session.session_message_insert(role='system',content=agent.message_list[0]['content'])
-
         # 首轮循环发送信息
         agent_rq = self._sent_message_api(agent=agent,message_content=message)
 

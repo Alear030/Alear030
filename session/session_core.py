@@ -41,20 +41,19 @@ def _json_write(content:str=None,file_path:Path=None):
 
 class Session:
     
-    def __init__(self,slice_agent,summary_agent):
+    def __init__(self,slice_agent,summary_agent,system_prompt:str):
         # session class 基础信息
         self.session_id = self._generate_session_id()
-        self.round = 0
+        self.round = 1
         self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
         self.max_tokens = MAX_SESSION_TOKEN
+        self.system_prompt = system_prompt
         self.session_path = self._generate_session_json()
 
         # session subagent 信息
         self.slice_agent = slice_agent
-        self.slice_ai = OpenAI(base_url=self.slice_agent.base_url,api_key=self.slice_agent.api_key)
 
         self.summary_agent = summary_agent
-        self.summary_ai = OpenAI(base_url=self.summary_agent.base_url,api_key=self.summary_agent.api_key)
 
         # session 读写锁
         self.json_lock = threading.Lock()
@@ -87,7 +86,11 @@ class Session:
             "session_id":self.session_id,
             # "unslice_pointer":0,
             "session_slice":[],
-            "session_messages":[]
+            "session_messages":[{
+                "message_round": 0,
+                "message_role": "system",
+                "message_content": str(self.system_prompt)
+            }]
         }
         _json_write(content=session_json_detail,file_path=SESSION_MEMORTY_DETAIL_PATH/f'{self.session_id}.json')
         return SESSION_MEMORTY_DETAIL_PATH/f'{self.session_id}.json'
@@ -118,7 +121,7 @@ class Session:
         def do_slice(data):
             # 处理slice的基础数据
             session_slice = data['session_slice']
-            session_messages = data['session_messages'][1:]
+            session_messages = [m for m in data['session_messages'] if m['message_role'] != 'system']
             slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
             
             # 得到没有slice的messages
@@ -133,7 +136,7 @@ class Session:
             message_list.append({'role':'user','content':json.dumps(unslice_messages,ensure_ascii=False,indent=2)})
 
             # 开始slice 并对sessionjson的session_slice进行覆盖
-            slice_rqs = self.slice_ai.chat.completions.create(model=self.slice_agent.model_name,messages = message_list).choices[0].message.content
+            slice_rqs = self.slice_agent.agent_ai.chat.completions.create(model=self.slice_agent.model_name,messages = message_list).choices[0].message.content
             try:
                 for slice in json.loads(slice_rqs):
                     # 添加embedding数据
@@ -181,7 +184,7 @@ class Session:
         message_list = []
         message_list.append(self.summary_agent.message_list[0])
         message_list.append({'role':'user','content':json.dumps(summary_messages,ensure_ascii=False)})
-        summary_rqs = self.summary_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
+        summary_rqs = self.summary_agent.summary_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
         try:
             # 剥离可能的 markdown 代码块
             import re
