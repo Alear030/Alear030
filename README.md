@@ -55,7 +55,8 @@ Alear030/
 │       ├── __init__.py
 │       ├── session_slice/      # after_round 后台钩子：异步切片（LLM + 嵌入）
 │       ├── session_compress/   # after_round 同步钩子：Token 超限时压缩
-│       └── plan_hook/          # pre_toolUse 匹配 plan_design/plan_mode_on/plan_mode_off，注入 agents/session
+│       └── pre_toolUse/
+│           └── inject_import_args/ # pre_toolUse 无条件注入，给全部工具塞 agents/session/hooks/Loop
 │
 ├── tool/                       # 工具系统
 │   ├── tool_core.py            # 工具注册 / 匹配 / subagent_loop
@@ -110,7 +111,7 @@ Alear030/
 
 ### 3. 事件驱动 Hook 系统
 
-Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需新建 `hook.py`。
+Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需新建 `hook.py`。`pre_toolUse` 目前只挂一个无条件钩子（`inject_import_args`），给全部工具调用统一注入 `agents`/`session`/`hooks`/`Loop` 四个对象，工具自己决定用不用，不再需要按工具名逐一注册匹配规则。
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
