@@ -270,6 +270,21 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
             "--help": "none", "--version": "none",
         },
     ),
+    "systeminfo": CommandConfig(name="systeminfo", category="read", safe_flags={"/FO": "string", "/NH": "none", "/?": "none"}),
+    "wmic": CommandConfig(
+        name="wmic", category="read", safe_flags={},
+        # wmic 非 flag 式语法，逐 flag 白名单不适用，改用 additional_check 的动词/开关黑名单
+        additional_check=lambda cmd, args: _check_wmic_safe(cmd, args),
+    ),
+    "nvidia-smi": CommandConfig(
+        name="nvidia-smi", category="read",
+        safe_flags={
+            "-L": "none", "--list-gpus": "none",
+            "--query-gpu": "string", "--format": "string",
+            "-q": "none", "--query": "none",
+            "--help": "none", "-h": "none", "--version": "none", "-v": "none",
+        },
+    ),
 
     # ═══════════════════════════════════════════════════════
     #  网络（只读）
@@ -998,26 +1013,38 @@ def _expand_short_flags(arg: str, config: CommandConfig) -> list[str]:
     return expanded
 
 
+def _flag_style(config: CommandConfig) -> tuple[str, str]:
+    """按该命令自己声明的 flag 前缀风格返回 (前缀, 分隔符)：Windows 命令用 '/' + ':'，其余用 '-' + '='"""
+    if any(k.startswith("/") for k in config.safe_flags):
+        return ("/", ":")
+    return ("-", "=")
+
+
 def _validate_flags(args: list[str], config: CommandConfig) -> tuple[bool, str]:
-    """逐 flag 白名单验证"""
-    expanded_args = []
-    for arg in args:
-        expanded_args.extend(_expand_short_flags(arg, config))
+    """逐 flag 白名单验证：前缀/分隔符按命令自身风格判断，避免 '/' 风格的 Windows flag 绕过校验"""
+    prefix, sep = _flag_style(config)
+
+    if prefix == "-":
+        expanded_args = []
+        for arg in args:
+            expanded_args.extend(_expand_short_flags(arg, config))
+    else:
+        expanded_args = args
 
     i = 0
     while i < len(expanded_args):
         arg = expanded_args[i]
 
-        if arg == "--" and config.respects_double_dash:
+        if prefix == "-" and arg == "--" and config.respects_double_dash:
             break
 
-        if not arg.startswith("-"):
+        if not arg.startswith(prefix):
             i += 1
             continue
 
         flag_name = arg
-        if "=" in arg:
-            flag_name = arg.split("=", 1)[0]
+        if sep in arg:
+            flag_name = arg.split(sep, 1)[0]
 
         if flag_name not in config.safe_flags:
             return (False, f"flag '{arg}' 不在 {config.name} 的安全白名单中")
@@ -1025,11 +1052,11 @@ def _validate_flags(args: list[str], config: CommandConfig) -> tuple[bool, str]:
         arg_type = config.safe_flags[flag_name]
 
         if arg_type == "none":
-            if "=" in arg:
+            if sep in arg:
                 return (False, f"flag '{flag_name}' 不接受参数")
             i += 1
         elif arg_type in ("number", "string", "path", "EOF", "{}"):
-            if "=" in arg:
+            if sep in arg:
                 i += 1
             else:
                 if i + 1 >= len(expanded_args):
@@ -1071,6 +1098,23 @@ def _check_date_positional(args: list[str]) -> bool:
                 return True  # 危险
             i += 1
     return False
+
+
+def _check_wmic_safe(cmd: str, args: list[str]) -> bool:
+    """wmic 语法非 flag 式，改用动词白名单：只允许 get/list 查询，堵住 call/set/delete/create 及 /format(XSL注入)/output/append"""
+    WMIC_DENY_VERBS = {"call", "set", "delete", "create", "assoc"}
+    WMIC_DENY_SWITCHES = {"/format", "/output", "/append", "/namespace"}
+    has_query_verb = False
+    for arg in args:
+        low = arg.lower()
+        if low in WMIC_DENY_VERBS:
+            return True
+        if low in ("get", "list"):
+            has_query_verb = True
+        for switch in WMIC_DENY_SWITCHES:
+            if low == switch or low.startswith(switch + ":"):
+                return True
+    return not has_query_verb
 
 
 def _check_subcommand_denylist(args: list[str], denylist: set[str], reason: str) -> bool:
