@@ -22,7 +22,7 @@ else:
 
 
 @register_tool(tool_name='command',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='command_tool')
-def command(command:str,timeout:int=120)->str:
+def command(command:str,timeout:int=120,**kwargs)->str:
     safe, reason, category, destructive_warning = validate_command(command)
 
     if not safe:

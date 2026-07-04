@@ -13,7 +13,7 @@ else:
     skill_list_prompt = None
 
 @register_tool(tool_name='skill_list',tool_desc=skill_list_desc,tool_prompt=skill_list_prompt,tool_enabled=False,tool_autho='skill_tool')
-def skill_list()->list:
+def skill_list(**kwargs)->list:
     skill_path = ROOT_DIRECTORY/'skill'
     skill_list = list(skill_path.rglob('skill.md'))
     skill_data = []
@@ -33,7 +33,7 @@ def skill_list()->list:
 skill_list_desc = "用于加载目标技能"
 
 @register_tool(tool_name='skill_load',tool_desc=skill_list_desc,tool_enabled=True,tool_autho='skill_tool')
-def skill_load(skill_name:str)->str:
+def skill_load(skill_name:str,**kwargs)->str:
     skill_path = ROOT_DIRECTORY/'skill'
     skill_md_list = list(skill_path.rglob(f'{skill_name}/skill.md'))
     if not skill_md_list:

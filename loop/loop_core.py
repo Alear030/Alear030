@@ -47,6 +47,8 @@ class Loop:
             match_ctx={'tool':tool_name},
             session = self.session,
             agents = self.agents,
+            hooks = self.hooks,
+            Loop = Loop,
             tool_args = dict(tool_args)
         )
 
@@ -159,7 +161,7 @@ class Loop:
 
             tool_call += 1
             rich_print(message=self._get_reasoning(agent_rq),type=think_type)
-            
+
             # 执行工具调用 + 通过 diff session.mode 检测模式是否真的切换（不信任提示词自觉性）
             mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
 
@@ -190,6 +192,7 @@ class Loop:
             self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents)
             self.hooks.collect()
 
+        # 这里是不是应该检查agent的名字？ @claude
         if self.session:
             rich_print(message=result,type='agent_content')
 

@@ -13,7 +13,7 @@ else:
     tool_prompt = None
 
 @register_tool(tool_name='file_read',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_read_tool')
-def file_read(file_path:str,offset:int=0,limit:int=2000)->str:
+def file_read(file_path:str,offset:int=0,limit:int=2000,**kwargs)->str:
     file_path = Path(file_path)
 
     if not file_path.absolute():

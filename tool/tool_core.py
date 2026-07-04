@@ -41,7 +41,7 @@ class _ToolRegister:
         func_required = []
 
         for name,arg in func_sig.parameters.items():
-            if name == 'self' or name == 'agents' or name == 'session':
+            if name in ('self','agents','session') or arg.kind == inspect.Parameter.VAR_KEYWORD:
                 continue
 
             if arg.default is inspect.Parameter.empty:

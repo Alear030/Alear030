@@ -47,7 +47,7 @@ def _fetch_one(url:str)->dict:
 
 
 @register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
-def web_fetch(urls: list[str]) -> str:
+def web_fetch(urls: list[str], **kwargs) -> str:
     with ThreadPoolExecutor(max_workers=min(len(urls),5)) as tp:
         fetch_queue = {
             tp.submit(_fetch_one,url):url for url in urls

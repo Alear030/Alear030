@@ -14,7 +14,7 @@ else:
     tool_prompt = None
 
 @register_tool(tool_name='file_edit',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_write_tool')
-def file_edit(file_path:str,old_string:str,new_string:str,replace_all:bool=False)->str:
+def file_edit(file_path:str,old_string:str,new_string:str,replace_all:bool=False,**kwargs)->str:
     path = Path(file_path)
 
     if not path.absolute():

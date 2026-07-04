@@ -16,7 +16,7 @@ else:
 
 
 @register_tool(tool_name='plan_mode_off', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
-def plan_mode_off(plan_file: str, session=None):
+def plan_mode_off(plan_file: str, session=None, **kwargs):
     plan_path: Path = SESSION_PLAN_FILE_PATH / f'{plan_file}.json'
 
     if not plan_path.exists():

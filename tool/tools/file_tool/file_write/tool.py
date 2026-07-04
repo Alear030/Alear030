@@ -14,7 +14,7 @@ else:
     tool_prompt = None
 
 @register_tool(tool_name='file_write',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_write_tool')
-def file_write(file_path:str,content:str)->str:
+def file_write(file_path:str,content:str,**kwargs)->str:
     path = Path(file_path)
 
     if not path.absolute():

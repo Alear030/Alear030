@@ -49,7 +49,7 @@ def _search_one(key_word:str)->dict:
 
 
 @register_tool(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
-def web_search(key_words:list[str])->str:
+def web_search(key_words:list[str],**kwargs)->str:
     with ThreadPoolExecutor(max_workers=min(len(key_words),5)) as tp:
         search_queue = {
             tp.submit(_search_one,key_word):key_word for key_word in key_words

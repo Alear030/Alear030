@@ -93,7 +93,7 @@ else:
 
 
 @register_tool(tool_name='user_intention',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=False,tool_autho='basic_tool')
-def user_intention(user_content:str)->dict:
+def user_intention(user_content:str,**kwargs)->dict:
     print('\nuser_intentionsing....\n')
     print('\nuser_intention-s key_word is :'+user_content+'\n')
     user_intentions = []

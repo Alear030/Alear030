@@ -86,7 +86,7 @@ def _extract_json(text):
 
 
 @register_tool(tool_name='plan_design', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
-def plan_design(plan_title: str, task_description: str, plan_file: str = None, output_file: str = None, agents=None):
+def plan_design(plan_title: str, task_description: str, plan_file: str = None, output_file: str = None, agents=None, **kwargs):
 
     # 判断hook是否成功注入agents
     if agents is None:

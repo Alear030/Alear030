@@ -16,7 +16,7 @@ else:
 
 
 @register_tool(tool_name='plan_update', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
-def plan_update(plan_file: str, step_number: int, status: str = None, result: str = None, session=None):
+def plan_update(plan_file: str, step_number: int, status: str = None, result: str = None, session=None, **kwargs):
     # 之前只在 system prompt 里口头约束"一轮只能更新当前 step"，agent 不听话就没辙
     # 这里换成硬校验：step_number 必须等于 plan_loop 锁定的 active_step_number，否则直接拒绝、不写盘
     if session and session.plan:

@@ -50,7 +50,7 @@ def _get_slices():
 
 
 @register_tool(tool_name='memory_recall',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
-def memory_recall(key_words:list[str],search_target:str,top_k:int):
+def memory_recall(key_words:list[str],search_target:str,top_k:int,**kwargs):
 
     # 拼接输入的keywords和search target 并得到向量值
     target_text = f"{' '.join(key_words)}  {search_target}"
