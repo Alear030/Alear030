@@ -49,8 +49,9 @@ class PlanRunner:
             f"{step.description}\n\n"
             f"验收标准：{step.acceptance_criteria}\n\n"
             f"产出物请放置于：{self.session.plan.output_file}\n\n"
-            f"当前处于 plan 执行阶段。请执行此 step，完成后使用 plan_update 工具更新状态为 done 并记录结果。"
-            f"注意：请勿自行调用 plan_mode_off，等待所有 step 执行完毕后系统会自动提示使用此工具。"
-            f"注意：本轮循环使用plan_update需要严格执行仅更新本轮系统提示step，不可连续调用更新其他非本轮系统提示step\n\n"
+            f"当前处于 plan 执行阶段。请执行此 step，完成后使用 plan_update 工具更新状态为 done 并记录结果。\n\n"
+            f"注意：\n"
+            f"1. 请勿自行调用 plan_mode_off，等待所有 step 执行完毕后系统会自动提示使用此工具。\n"
+            f"2. 本轮循环使用 plan_update 需严格仅更新本轮系统提示对应的 step，不可连续调用更新其他 step。\n\n"
             f"提示：如果本 step 可拆解为多个互相独立、不依赖彼此结果的子任务，可考虑使用 subagent_create 并行处理；否则直接执行，无需强行拆分。"
         )
