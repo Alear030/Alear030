@@ -20,7 +20,8 @@ Alear030/
 ├── .env                        # API key & 模型配置（不纳入版本控制）
 │
 ├── loop/                       # ReAct 推理循环
-│   ├── loop_core.py            # Loop 类 — 全项目唯一推理引擎（main/subagent 共用，含 plan 分步循环）
+│   ├── loop_core.py            # Loop 类 — 纯 ReAct 引擎（main/subagent 共用，对 plan 编排零感知）
+│   ├── orchestrator.py         # PlanRunner — plan 分步编排器，独立于 Loop（无进展熔断）
 │   └── __init__.py
 │
 ├── agent/                      # Agent 集群
@@ -28,18 +29,17 @@ Alear030/
 │   ├── agents.yaml             # 4 个 Agent 定义：main/slice/summary/plan
 │   └── __init__.py
 │
-├── prompt/                     # Prompt 分层组合
-│   ├── prompt_core.py          # Prompt 类：按语义分块拼装 system prompt
-│   ├── __init__.py
-│   ├── agent_prompt/
-│   │   ├── system_prompt.md    # 认知架构（仅 main agent 注入）
-│   │   └── agents/             # 各 Agent 自身身份/职责
-│   │       ├── main_agent.md
-│   │       ├── slice_agent.md
-│   │       ├── summary_agent.md
-│   │       └── plan_agent.md
-│   ├── tool_prompt/            # 工具使用原则（+ 已持有工具的 name+简短描述）
-│   └── skill_prompt/           # 技能使用原则（+ 已注册技能列表，仅 skill_tool 权限注入）
+├── prompt/                     # Prompt 分层组合（装饰器 + 目录自动发现注册，对齐 tool/hook 惯例）
+│   ├── prompt_core.py          # Prompt 类：薄封装，调用 build_prompt(agent)
+│   ├── prompt_register.py      # @register_prompt 装饰器 + build_prompt（order 排序/condition 过滤/enabled 开关）
+│   ├── __init__.py             # 自动发现并 import prompt/prompts/*/prompt.py
+│   └── prompts/                # 各分块独立注册
+│       ├── system_prompt/      # 认知架构（仅 main agent 注入）
+│       ├── agent_prompt/       # {agent_name}_agent.md 身份（main/slice/summary/plan）
+│       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（动态记忆，仅 main）
+│       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name+简短描述
+│       ├── skill_prompt/       # 技能使用原则 + 已注册技能列表（仅 skill_tool 权限）
+│       └── basic_prompt/       # 当前时间戳
 │
 ├── session/                    # 会话生命周期
 │   ├── session_core.py         # Session 类（持久化 / 切片 / 压缩 / message_list 重建 / plan 初始化）
@@ -118,7 +118,7 @@ Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → 
 
 ### 5. Prompt 分层组合
 
-`prompt/` 包按语义分块拼装：`system_prompt.md`（认知架构，仅 main）+ `tool_prompt`（工具原则 + 已持有工具的 name+简短描述）+ `skill_prompt`（技能原则 + 已注册技能列表，仅 skill_tool 权限）+ 最近 3 个 session 的 slice 摘要（动态记忆）+ `{agent_name}_agent.md`（身份）+ 当前时间戳 = 最终 system prompt。每层独立，改一不伤三。
+`prompt/prompts/` 下每个分块用 `@register_prompt(order, condition, enabled)` 独立注册，`build_prompt(agent)` 按 order 排序、按 condition/enabled 过滤后拼接：`system_prompt`（认知架构，仅 main）+ `tool_prompt`（工具原则 + 已持有工具的 name+简短描述）+ `skill_prompt`（技能原则 + 已注册技能列表，仅 skill_tool 权限）+ `session_recent`（最近 3 个 session 的 slice 摘要，动态记忆，仅 main）+ `agent_prompt`（`{agent_name}_agent.md` 身份）+ `basic_prompt`（当前时间戳）= 最终 system prompt。新增分块只需在 `prompts/` 下建目录写 `prompt.py`，自动发现注册，不改其他分块。
 
 ### 6. 模块解耦
 

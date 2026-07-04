@@ -184,7 +184,7 @@ class Session:
         message_list = []
         message_list.append(self.summary_agent.message_list[0])
         message_list.append({'role':'user','content':json.dumps(summary_messages,ensure_ascii=False)})
-        summary_rqs = self.summary_agent.summary_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
+        summary_rqs = self.summary_agent.agent_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
         try:
             # 剥离可能的 markdown 代码块
             import re
