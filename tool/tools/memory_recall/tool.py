@@ -69,11 +69,11 @@ def memory_recall(key_words:list[str],search_target:str,top_k:int,**kwargs):
     for slice in slices:
         slices_results.append({
             "session_id":slice['session_id'],
-            "topic":slice['topic'],
+            "topic":slice['slice_anchor']['topic'],
             "start_round":slice['start_round'],
             "end_round":slice['end_round'],
-            "key_words":slice['key_words'],
-            "summary_detail":slice['summary_detail'],
+            "key_words":slice['slice_anchor']['key_words'],
+            "summary_detail":slice['slice_anchor']['summary_detail'],
             "score":slice['score']
         })
 

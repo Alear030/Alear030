@@ -17,6 +17,6 @@ def build(agent)->str:
         session_json = json.loads((SESSION_MEMORTY_DETAIL_PATH/f'{id}.json').read_text(encoding='utf-8'))
         session_slices = session_json['session_slice']
         for slice in session_slices:
-            session_prompt += f'片段所属session_id:{id}  片段主题:{slice["topic"]} 片段详情:{slice["summary_detail"]} 片段开始round:{slice["start_round"]} 片段结束round:{slice["end_round"]}' + '\n\n'
+            session_prompt += f'片段所属session_id:{id}  片段主题:{slice["slice_anchor"]["topic"]} 片段详情:{slice["slice_anchor"]["summary_detail"]} 片段开始round:{slice["start_round"]} 片段结束round:{slice["end_round"]}' + '\n\n'
 
     return session_prompt

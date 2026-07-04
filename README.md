@@ -86,7 +86,7 @@ Alear030/
 │
 ├── local_model/                # 本地中文嵌入模型（GTE）+ local_model_core.py
 │
-├── memory/                     # 记忆系统（预留空目录，待实现）
+├── memory/                     # 记忆系统（开发中，`memory_core.py` 为空白骨架）
 │
 ├── skill/                      # 技能系统
 │   ├── coding-conduct/

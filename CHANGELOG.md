@@ -4,6 +4,18 @@
 
 按时间倒序排列，最新改动在最上面。
 
+## 2026-07-05
+
+### v0.3.0 — slice 结构收敛：topic/key_words/summary_detail 收拢进 slice_anchor，正式进入 memory 框架阶段
+
+契机：slice 的元数据字段（session_id/time_stamp/start_round/end_round/slice_embedding/worthy_summary）和内容锚点字段（topic/key_words/summary_detail）职责不同，扁平结构混在一起不利于后续 memory 系统给 anchor 扩展字段，先收拢分层。
+
+- `session_core.py::_session_slice` 构造 slice_data 时把 `topic`/`key_words`/`summary_detail` 收拢进新的 `slice_anchor` 子字典；`_session_slice_summary` 同步改为读写 `slice_anchor` 路径
+- 同步适配两处读取存储态 slice 的下游代码：`memory_recall` 工具返回结果的字段读取、`session_recent` prompt 分块的渲染逻辑（对外返回/渲染的字段形状不变，只改内部读取路径）
+- 一次性脚本迁移历史 34 个 `session_detail/*.json` 文件（33 个含 slice，共 200 条）：旧扁平结构转成 `slice_anchor` 嵌套结构，同时补齐旧数据里缺失的 `session_id` 字段（此前该字段没有落盘，是 `memory_recall` 读取时动态注入的）
+
+后续计划：架构巩固到此告一段落，正式进入 memory（自涌现记忆）框架开发阶段。
+
 ## 2026-07-04
 
 ### v0.2.2 — 杂项修复：summary_agent 属性名 bug + hook_core 注释补充 + README 同步

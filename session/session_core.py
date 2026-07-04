@@ -141,16 +141,19 @@ class Session:
                 for slice in json.loads(slice_rqs):
                     # 添加embedding数据
                     slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
-                    slice_embedding = _get_embedding_model().encode([slice_text])[0]
+                    slice_embedding = _get_embedding_model().encode([slice_text])[0]# @claude 后续这里坐上了memory类，需要移除，保证收口，保证处理速度效率
                     slice_data = {
-                        "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
                         "worthy_summary":slice['worthy_summary'],
-                        "topic": slice['topic'],
+                        "session_id":self.session_id,
+                        "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
                         "start_round": slice['start_round'],
                         "end_round": slice['end_round'],
-                        "key_words": slice['key_words'],
-                        "slice_embedding":embedding_to_b64(slice_embedding),
-                        "summary_detail":""
+                        "slice_embedding": embedding_to_b64(slice_embedding),
+                        "slice_anchor":{
+                            "topic": slice['topic'],
+                            "key_words": slice['key_words'],
+                            "summary_detail":""
+                        }
                     }
                     # 判断当前slice是否存在数据
                     if not session_slice:
@@ -170,7 +173,7 @@ class Session:
     
     def _session_slice_summary(self,session_slice:dict,session_messages:list)->dict:
         #判断是否需要进行summary
-        if not session_slice['worthy_summary'] or session_slice['summary_detail']:
+        if not session_slice['worthy_summary'] or session_slice['slice_anchor']['summary_detail']:
             return session_slice
         
         #取到需要进行summary的messages
@@ -198,10 +201,10 @@ class Session:
             summary_result = summary_rqs
         
         # 处理session_slice的summary
-        session_slice['summary_detail'] = summary_result
+        session_slice['slice_anchor']['summary_detail'] = summary_result
 
         # 更新slice的embedding
-        slice_text = f"{session_slice['topic']} {' '.join(session_slice['key_words'])} {session_slice['summary_detail']}"
+        slice_text = f"{session_slice['slice_anchor']['topic']} {' '.join(session_slice['slice_anchor']['key_words'])} {session_slice['slice_anchor']['summary_detail']}"
         slice_embedding = _get_embedding_model().encode([slice_text])[0]
         session_slice['slice_embedding'] = embedding_to_b64(slice_embedding)
 
