@@ -4,7 +4,6 @@ from openai.types.chat import ChatCompletionMessage
 
 
 from rich_output import rich_print
-
 from .orchestrator import PlanRunner
 
 
@@ -127,6 +126,8 @@ class Loop:
             agent.message_list.pop()
 
         agent.message_list.append({'role':'user','content':notice})
+        if self.session:
+            self.session.session_message_insert(role='user',content=notice)
         final_rq = self._chat(agent,with_tools=False)
         agent.message_list.append(final_rq)
 
@@ -158,6 +159,8 @@ class Loop:
 
             tool_call += 1
             rich_print(message=self._get_reasoning(agent_rq),type=think_type)
+            
+            # 执行工具调用 + 通过 diff session.mode 检测模式是否真的切换（不信任提示词自觉性）
             mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
 
             # plan_mode_on/off 生效后代码层强制结束本轮，不再给模型可调工具的机会
