@@ -124,10 +124,11 @@ class Session:
             session_messages = [m for m in data['session_messages'] if m['message_role'] != 'system']
             slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
             
-            # 得到没有slice的messages
+            # 得到没有slice的messages（保留 tool_calls/tool_result：工具调用是对话中真实发生的动作，
+            # 是切片 agent 判断任务型片段边界、以及下游消费端提炼 task/工作流的关键依据，不能在切片阶段丢弃）
             unslice_messages = []
             for msg in session_messages:
-                if msg['message_round'] >= slice_pointer and msg['message_role'] != 'tool_calls' and msg['message_role'] != 'tool_result':
+                if msg['message_round'] >= slice_pointer:
                     unslice_messages.append(msg)
 
             # 处理slice subagent 的message list
@@ -138,7 +139,13 @@ class Session:
             # 开始slice 并对sessionjson的session_slice进行覆盖
             slice_rqs = self.slice_agent.agent_ai.chat.completions.create(model=self.slice_agent.model_name,messages = message_list).choices[0].message.content
             try:
-                for slice in json.loads(slice_rqs):
+                # 剥离可能的 markdown 代码块（与 summary 处一致，防止模型裹 ```json 导致解析崩溃）
+                import re
+                cleaned = slice_rqs.strip()
+                m = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$', cleaned, re.DOTALL)
+                if m:
+                    cleaned = m.group(1).strip()
+                for slice in json.loads(cleaned):
                     # 添加embedding数据
                     slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
                     slice_embedding = _get_embedding_model().encode([slice_text])[0]# @claude 后续这里坐上了memory类，需要移除，保证收口，保证处理速度效率
