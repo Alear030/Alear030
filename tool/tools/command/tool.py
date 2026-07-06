@@ -2,7 +2,7 @@ import subprocess
 import locale
 from pathlib import Path
 from tool.tool_core import register_tool
-from .security import validate_command,is_destructive_category,is_write_category
+from .security import validate_command,is_destructive_category,is_write_category,COMMAND_WHITELIST
 
 MAX_TIMEOUT = 120
 
@@ -19,6 +19,11 @@ if tool_prompt_file.exists():
     tool_prompt = tool_prompt_content.strip() if tool_prompt_content.strip() else None
 else:
     tool_prompt = None
+
+# 白名单命令清单直接从 COMMAND_WHITELIST 生成并拼进 tool_prompt，避免文档与代码脱节导致模型盲猜命令名
+_whitelist_names = ', '.join(sorted(COMMAND_WHITELIST.keys()))
+_whitelist_block = f'\n\n当前系统可用命令（白名单，未列出的命令名会被拒绝）:\n{_whitelist_names}'
+tool_prompt = (tool_prompt or '') + _whitelist_block
 
 
 @register_tool(tool_name='command',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='command_tool')

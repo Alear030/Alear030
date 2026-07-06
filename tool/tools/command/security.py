@@ -1045,6 +1045,9 @@ def _validate_flags(args: list[str], config: CommandConfig) -> tuple[bool, str]:
         flag_name = arg
         if sep in arg:
             flag_name = arg.split(sep, 1)[0]
+        if prefix == "/":
+            # Windows 命令的 / flag 大小写不敏感（dir /b 等价于 dir /B），白名单键统一按大写登记
+            flag_name = flag_name.upper()
 
         if flag_name not in config.safe_flags:
             return (False, f"flag '{arg}' 不在 {config.name} 的安全白名单中")
