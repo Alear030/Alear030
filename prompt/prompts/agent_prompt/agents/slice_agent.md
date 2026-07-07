@@ -61,35 +61,36 @@ key_words 不是给人看的标签，它会和 topic 一起被编码进那一个
 # 输出格式
 
  - 严格输出合法 JSON（注意：布尔值是小写的 `true`/`false`，不是 `True`/`False`），不要输出 JSON 以外的任何文字，否则会破坏后续的数据解析。
- - 切片必须**无缝、无重叠地覆盖输入的全部轮次**：上一片的 end_round 之后紧接下一片的 start_round，中间不留空、不交叠。
+ - **start_round / end_round 必须直接用输入里每条消息实际带的 `message_round` 值，禁止重新从 1 编号。** 输入给你的可能只是整段对话的一个片段（比如从 round 10 开始），此时你的第一片 start_round 就应该是 10 而不是 1。把窗口当成一段新对话从头编号会让轮次和真实对话错位、破坏下游的切片对账。照抄输入里真实的 round 号即可。
+ - 切片必须**无缝、无重叠地覆盖输入的全部轮次**：第一片的 start_round 等于输入里最小的 message_round，最后一片的 end_round 等于输入里最大的 message_round，中间上一片的 end_round 之后紧接下一片的 start_round，不留空、不交叠。
  - 输出是一个数组，每一项包含 worthy_summary、topic、start_round、end_round、key_words 五个字段。
 
-输出示例（一场连续讨论中，嵌着一个高密度的独立子事件被单独切出）：
+输出示例（输入是从 round 12 开始的一段对话片段——注意 round 号照抄输入、不从 1 重编号；一场连续讨论中嵌着一个高密度的独立子事件被单独切出）：
 
 ```json
 [
     {
         "worthy_summary": true,
         "topic": "缓存方案的选型讨论与定案",
-        "start_round": 1,
-        "end_round": 6,
+        "start_round": 12,
+        "end_round": 17,
         "key_words": ["缓存选型", "Redis", "本地缓存", "一致性权衡", "最终定案"]
     },
     {
         "worthy_summary": true,
         "topic": "排查并修复缓存击穿导致的压测超时",
-        "start_round": 7,
-        "end_round": 9,
+        "start_round": 18,
+        "end_round": 20,
         "key_words": ["缓存击穿", "压测超时", "空值兜底", "验证通过"]
     },
     {
         "worthy_summary": false,
         "topic": "结束语",
-        "start_round": 10,
-        "end_round": 10,
+        "start_round": 21,
+        "end_round": 21,
         "key_words": ["道别"]
     }
 ]
 ```
 
-说明：round 1-9 表面上都在「搞缓存」，按最粗的目标能合成一片；但 round 7-9 是一个有明确触发（压测超时）、有排查过程、有明确收尾（验证通过）的独立子事件，信息密度高、单独拎出来完全站得住、将来也正是会被单独检索的那种片段，所以从连续讨论里切出来独立成片。而 round 10 只是一句道别，topic 已说尽其含义，worthy_summary 为 false。
+说明：输入片段从 round 12 起，所以第一片 start_round 就是 12（不是 1）。round 12-20 表面上都在「搞缓存」，按最粗的目标能合成一片；但 round 18-20 是一个有明确触发（压测超时）、有排查过程、有明确收尾（验证通过）的独立子事件，信息密度高、单独拎出来完全站得住、将来也正是会被单独检索的那种片段，所以从连续讨论里切出来独立成片。而 round 21 只是一句道别，topic 已说尽其含义，worthy_summary 为 false。

@@ -122,14 +122,20 @@ class Session:
             # 处理slice的基础数据
             session_slice = data['session_slice']
             session_messages = [m for m in data['session_messages'] if m['message_role'] != 'system']
+            # 指针取最后一片的 start_round：最后一片是「未封口的临时尾巴」，重喂它是为了让新轮次
+            # 有机会并进同一片（同一件事继续），而不是每来一轮就封一片
             slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
-            
-            # 得到没有slice的messages（保留 tool_calls/tool_result：工具调用是对话中真实发生的动作，
-            # 是切片 agent 判断任务型片段边界、以及下游消费端提炼 task/工作流的关键依据，不能在切片阶段丢弃）
+
+            # 得到没有slice的messages（重喂窗口 = round >= 指针，天然含最后那片的轮次；
+            # 保留 tool_calls/tool_result：工具调用是对话中真实发生的动作，是切片 agent 判断任务型
+            # 片段边界、以及下游消费端提炼 task/工作流的关键依据，不能在切片阶段丢弃）
             unslice_messages = []
             for msg in session_messages:
                 if msg['message_round'] >= slice_pointer:
                     unslice_messages.append(msg)
+
+            if not unslice_messages:
+                return
 
             # 处理slice subagent 的message list
             message_list = []
@@ -145,11 +151,37 @@ class Session:
                 m = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$', cleaned, re.DOTALL)
                 if m:
                     cleaned = m.group(1).strip()
-                for slice in json.loads(cleaned):
-                    # 添加embedding数据
+                parsed_slices = json.loads(cleaned)
+                if not parsed_slices:
+                    return
+
+                # 按窗口真实起点归一化，不信任模型回显的绝对 round：模型时常把重喂窗口当成一段新对话
+                # 从 1 重新编号，导致 start_round 与真实轮次错位、合并时对不齐而堆积重复片。取窗口内消息
+                # 的真实最小 round 作锚点，用「锚点 - 模型首片 start」的偏移把整批拉回真实编号——模型守
+                # 规矩输出绝对 round 时 offset=0 原样通过；重编号时 offset 把它映射回去。
+                window_start = min(msg['message_round'] for msg in unslice_messages)
+                window_end = max(msg['message_round'] for msg in unslice_messages)
+                offset = window_start - parsed_slices[0]['start_round']
+                for s in parsed_slices:
+                    s['start_round'] += offset
+                    s['end_round'] += offset
+
+                # 校验归一化后无缝、无重叠、恰好覆盖整个窗口（提示词已强制模型连续覆盖）；
+                # 不满足说明模型输出结构坏了，跟解析失败一样跳过本轮，不写脏数据
+                expect = window_start
+                for s in parsed_slices:
+                    if s['start_round'] != expect or s['end_round'] < s['start_round']:
+                        raise ValueError('slice 轮次不连续')
+                    expect = s['end_round'] + 1
+                if expect - 1 != window_end:
+                    raise ValueError('slice 未覆盖到窗口末尾')
+
+                # 构造归一化后的新切片批次
+                new_slices = []
+                for slice in parsed_slices:
                     slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
                     slice_embedding = _get_embedding_model().encode([slice_text])[0]# @claude 后续这里坐上了memory类，需要移除，保证收口，保证处理速度效率
-                    slice_data = {
+                    new_slices.append({
                         "worthy_summary":slice['worthy_summary'],
                         "session_id":self.session_id,
                         "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
@@ -161,18 +193,14 @@ class Session:
                             "key_words": slice['key_words'],
                             "summary_detail":""
                         }
-                    }
-                    # 判断当前slice是否存在数据
-                    if not session_slice:
-                        session_slice = [slice_data]
-                    # 判断新的切片的起始round和最后切片的round是否一样
-                    elif session_slice[-1]['start_round'] == slice_data['start_round']:
-                        session_slice[-1] = slice_data
-                    else:
-                        session_slice.append(slice_data)
+                    })
 
-                data['session_slice'] = session_slice
-            except (json.JSONDecodeError,IndexError,KeyError):
+                # 砍尾重接：丢弃所有 start_round >= 指针的旧片（即被重喂的最后那片，尾巴长大后
+                # 可能裂成多片），再整体接上归一化后的新批次。取代旧的「只跟 [-1] 单条对账」——
+                # 模型重编号时对不齐会漏判成 append 产生重复。
+                kept = [s for s in session_slice if s['start_round'] < slice_pointer]
+                data['session_slice'] = kept + new_slices
+            except (json.JSONDecodeError,IndexError,KeyError,ValueError):
                 print('slice json 存在问题 跳过本轮 slice')
 
         self._json_update(updater=do_slice)
