@@ -24,10 +24,11 @@ class Agent:
         self.agent_priority:int = agent_profile['agent_priority']
         self.agent_desc:str = agent_profile['agent_desc']
 
-        # agent model相关信息 openai实例
-        self.base_url = MODEL_LEVEL[agent_profile['agent_level']]['base_url']
-        self.api_key = MODEL_LEVEL[agent_profile['agent_level']]['api_key']
-        self.model_name = MODEL_LEVEL[agent_profile['agent_level']]['model_name']
+        # agent model相关信息 openai实例、
+        self.agent_level = agent_profile['agent_level']
+        self.base_url = MODEL_LEVEL[self.agent_level]['base_url']
+        self.api_key = MODEL_LEVEL[self.agent_level]['api_key']
+        self.model_name = MODEL_LEVEL[self.agent_level]['model_name']
         self.agent_ai = OpenAI(base_url=self.base_url,api_key=self.api_key)
         
         # agent tools 信息
@@ -48,6 +49,16 @@ class Agent:
             if value:
                 tool_autho_list.append(key)
         return tool_autho_list
+    
+    # 处理agent_level
+    def refresh_agent_level(self,agent_level = None):
+        agent_level_set = {'max_level','medium_level','low_level'}
+        if agent_level is not None and agent_level in agent_level_set:
+            self.agent_level = agent_level
+        self.base_url = MODEL_LEVEL[self.agent_level]['base_url']
+        self.api_key = MODEL_LEVEL[self.agent_level]['api_key']
+        self.model_name = MODEL_LEVEL[self.agent_level]['model_name']
+
 
 
 class Agents:

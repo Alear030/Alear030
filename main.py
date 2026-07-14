@@ -3,7 +3,7 @@ from hook.hook_core import hooks
 
 from agent import agents
 from loop import Loop
-
+from memory import Memory
 
 # 创建新的session
 session = Session(
@@ -15,6 +15,9 @@ session = Session(
 # 创建新的Loop
 loop = Loop(agents=agents,session=session,hooks=hooks)
 
+# 创建新的memory
+memory = Memory(memory_agent=agents.agents['memory'],loop=Loop())
+
 # 主循环入口执行程序
 try:
     while True:
@@ -23,6 +26,7 @@ try:
         
         # 开启本轮循环
         loop.loop_run(agent_name='main',message=user_message)
+        hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory)
 
 except KeyboardInterrupt:
     # 检测到退出动作，进行收尾
@@ -31,6 +35,9 @@ except KeyboardInterrupt:
 finally:
     # 在推出之前进行保险环节操作
     print('[system_quit] 等待后台任务完成...')
+    # after_session hooks engage
+    hooks.trigger(hook_point='after_session',session=session,agents=agents,memory=memory)
+    
     hooks.wait_all()
     hooks.shutdown()
     print('[system_quit] 任务全部完成，Alear030期待与您下次相见')

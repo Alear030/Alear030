@@ -17,11 +17,13 @@ agents:
       subagent_tool: true
       web_tool: true
       skill_tool: true
+      interaction_tool: true
     agent_level: medium_level
     agent_priority: 0
     agent_switch: true
     agent_desc: "身份:主agent 负责 主要交流调用工具&对外感知对外对话"
   
+  # slice agent 身份 切片agent 负责 对经历流进行slice切分
   - agent_id: 002
     agent_name: slice
     agent_mode: auto
@@ -42,6 +44,7 @@ agents:
     agent_switch: true
     agent_desc: "身份 切片agent 负责 对经历流进行slice切分"
 
+  # summary agent 身份 总结agent 负责 对已确定的slice进行summary总结
   - agent_id: 003
     agent_name: summary
     agent_mode: auto
@@ -62,6 +65,7 @@ agents:
     agent_switch: true
     agent_desc: "身份 总结agent 负责 对已确定的slice进行summary总结"
 
+  # plan agent 身份 计划agent 负责 对任务目标制定计划
   - agent_id: 004
     agent_name: plan
     agent_mode: auto
@@ -77,7 +81,30 @@ agents:
       subagent_tool: true
       web_tool: true
       skill_tool: true
-    agent_level: max_level
+    agent_level: medium_level
     agent_priority: 1
     agent_switch: true
     agent_desc: "身份 计划agent 负责 对任务目标制定计划"
+
+  # memory_type agent 身份 slice分类agent 负责 对slice进行分类
+  - agent_id: 005
+    agent_name: memory
+    agent_mode: auto
+    agent_tool_autho:
+      basic_tool: false
+      advance_tool: false
+      file_read_tool: false
+      file_write_tool: false
+      command_tool: false
+      config_tool: false
+      memory_tool: true
+      plan_tool: false
+      subagent_tool: false
+      web_tool: false
+      skill_tool: false
+    agent_level: low_level
+    agent_priority: 1
+    agent_switch: true
+    agent_desc: "身份 slice分类agent 负责 对slice进行分类"
+
+

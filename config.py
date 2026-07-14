@@ -46,6 +46,11 @@ SESSION_PLAN_FILE_PATH = Path(__file__).parent/'session/session_plan'
 MAX_SESSION_TOKEN = 300000
 
 
+# memory config
+MEMORY_STORAGE_PATH = Path(__file__).parent/'memory'/'memory_storage'/'memory_storages'
+
+
+
 # loacal model
 LOCAL_MODEL_PATH = Path(__file__).parent/'local_model'
 LOCAL_EMBEDDING_MODEL = Path(__file__).parent/'local_model/iic/nlp_gte_sentence-embedding_chinese-base'

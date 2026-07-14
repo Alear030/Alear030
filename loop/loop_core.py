@@ -37,6 +37,7 @@ class Loop:
 
 
     # pre_toolUse hooks 处理，返回需透传给工具的非 JSON 参数
+    # @claude(ignore) 后续钩子需要都合并到hooks下进行解耦，先记录
     def _pre_tool_use_hooks(self,tool_name:str,tool_args:dict)->dict:
         extra_args = {}
         if not self.hooks:
@@ -188,11 +189,10 @@ class Loop:
         if plan_result is not None:
             result = plan_result
 
-        if self.hooks:
-            self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents)
-            self.hooks.collect()
-
-        # 这里是不是应该检查agent的名字？ @claude
+        # @claude bug:loop_run 用 if self.session 当打印 agent_content 的条件不精确
+        # memory agent 复用全局 loop 也带 session,后台记忆提炼 JSON 被误打印成主回复干扰用户
+        # plan/subagent 仅因用无 session 新 Loop 巧合未暴露;修复:条件改为 agent.agent_name=='main'
+        # 测试阶段暂不修--需要观察各 subagent 产出,测试结束再收口
         if self.session:
             rich_print(message=result,type='agent_content')
 

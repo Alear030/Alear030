@@ -7,7 +7,7 @@ PROMPT_DIR = Path(__file__).parent
 
 
 # 工具使用原则 + agent自身持有的每个工具的名称和简短说明（完整tool_prompt已在function-calling schema中传给模型，这里不重复）
-@register_prompt(prompt_name='tool_prompt',order=10)
+@register_prompt(prompt_name='tool_prompt',order=10,condition=lambda agent:agent.tool_autho)
 def build(agent)->str:
     tools_prompt = ''
     tool_briefs = get_tool_brief(agent.tool_autho)

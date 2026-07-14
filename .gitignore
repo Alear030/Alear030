@@ -28,6 +28,10 @@ z_old_code/
 session/session_detail/
 session/session_plan
 
+# 召回 benchmark 语料(含真实 session slice,可能有私人内容,不进版本控制)
+test/recall_benchmark/corpus/
+test/recall_benchmark/candidates.md
+
 # CLAUDE_CODE
 CLAUDE.md
 .claude/
