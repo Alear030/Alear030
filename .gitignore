@@ -32,7 +32,13 @@ session/session_plan
 test/recall_benchmark/corpus/
 test/recall_benchmark/candidates.md
 
-# CLAUDE_CODE
-CLAUDE.md
+# memory 运行时记忆数据(真实画像/节点/时间线,不进版本控制)
+memory/memory_storage/memory_storages/
+
+# memory pipeline 测试语料(含真实 session slice / user_info 提取结果)
+test/memory_pipeline/slice_type_pipeline/
+test/memory_pipeline/user_info_pipeline/
+
+# Claude Code 本地配置(CLAUDE.md 已纳入跟踪,供并行 worktree 共享项目宪法)
 .claude/
 
