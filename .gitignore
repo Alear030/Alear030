@@ -28,9 +28,8 @@ z_old_code/
 session/session_detail/
 session/session_plan
 
-# 召回 benchmark 语料(含真实 session slice,可能有私人内容,不进版本控制)
-test/recall_benchmark/corpus/
-test/recall_benchmark/candidates.md
+# 测试数据与代码(含真实 session slice / 用户画像语料 / 一次性验证脚本,不进版本控制)
+test/
 
 # memory 运行时记忆数据(真实画像/节点/时间线,不进版本控制)
 memory/memory_storage/memory_storages/
@@ -40,10 +39,6 @@ memory/memory_log/memory_logs/
 
 # memory config 备份(运行时快照,不进版本控制)
 memory/memory_config/backup/
-
-# memory pipeline 测试语料(含真实 session slice / user_info 提取结果)
-test/memory_pipeline/slice_type_pipeline/
-test/memory_pipeline/user_info_pipeline/
 
 # Claude Code 本地配置(CLAUDE.md 已纳入跟踪,供并行 worktree 共享项目宪法)
 .claude/
