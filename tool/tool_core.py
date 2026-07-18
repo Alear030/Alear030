@@ -41,7 +41,8 @@ class _ToolRegister:
         func_required = []
 
         for name,arg in func_sig.parameters.items():
-            if name in ('self','agents','session') or arg.kind == inspect.Parameter.VAR_KEYWORD:
+            # memory 与 agents/session 一样是 pre_toolUse 注入的运行时对象，模型无法构造，必须从可见 schema 排除
+            if name in ('self','agents','session','memory') or arg.kind == inspect.Parameter.VAR_KEYWORD:
                 continue
 
             if arg.default is inspect.Parameter.empty:
@@ -69,15 +70,18 @@ class _ToolRegister:
 
         return {'type':type_map.get(arg_type,'string')}
     
-    def match_tool(self,tool_call,**extra)->dict:
+    # verbose 单独接收，不并入 extra：extra 会原样透传进 tool_func(**tool_args,**extra)，
+    # 混进去会污染工具实际收到的参数
+    def match_tool(self,tool_call,verbose:bool=True,**extra)->dict:
         tool_name = tool_call.function.name
         tool_args = json.loads(tool_call.function.arguments)
 
         if tool_name not in self.tool_list:
             rich_print(message=f'{tool_name} doesnt exist...',type='system_error')
             return {'role':'tool','tool_call_id':tool_call.id,'content':'错误工具不存在'}
-        
-        rich_print(message=f'{tool_name}...',type='tool_call')
+
+        if verbose:
+            rich_print(message=f'{tool_name}...',type='tool_call')
 
         tool_func = self.tool_list[tool_name]['function']
         tool_result = tool_func(**tool_args,**extra)

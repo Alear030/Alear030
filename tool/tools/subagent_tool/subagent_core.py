@@ -11,11 +11,13 @@ class Subagent:
 
     # subagent 初始化，传入系统提示词和任务描述，执行标准
     # subagent_file 需要包含：subagent_id\system_prompt\task_desc\check_standard
-    def __init__(self,subagent_file:dict = None):
+    # verbose 控制该 subagent 的 thinking 是否打印到终端，默认开，与 main/memory 用法一致
+    def __init__(self,subagent_file:dict = None,verbose:bool=True):
         # subagent 基础信息
         self.agent_id:int = subagent_file['subagent_id']
         self.agent_name:str = 'subagent'
         self.subagent_level:str = 'low_level'
+        self.verbose:bool = verbose
 
         # subagent model openai 相关信息
         self.base_url:str = MODEL_LEVEL[self.subagent_level]['base_url']
@@ -23,8 +25,8 @@ class Subagent:
         self.model_name:str = MODEL_LEVEL[self.subagent_level]['model_name']
         self.agent_ai:OpenAI = OpenAI(base_url=self.base_url,api_key=self.api_key)
         
-        # subagent tool 相关信息
-        self.tool_antho:list = ['basic_tool','file_read_tool','memory_tool','web_tool']
+        # subagent tool 相关信息：未显式传入 tool_autho 时保持原有只读四类，传入则按调用方指定类别授权
+        self.tool_antho:list = subagent_file.get('tool_autho') or ['basic_tool','file_read_tool','memory_tool','web_tool']
         self.tool_list:list = get_tool(self.tool_antho)
         self.max_toolcalls:int = SUB_MAX_TOOLCALLS
         self.match_tool = match_tool
@@ -36,7 +38,7 @@ class Subagent:
         self.task_message:str = f"请依据验收标准 {subagent_file['check_standard']}  执行任务 {subagent_file['task_desc']}"
 
     def subagent_run(self):
-        subagent_loop = Loop()
+        subagent_loop = Loop(verbose=self.verbose)
         subagent_rq = subagent_loop.loop_run(agent=self,message=self.task_message)
         subagent_result = {"subagent_id":self.agent_id,"result":subagent_rq}
         return subagent_result

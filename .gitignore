@@ -35,6 +35,12 @@ test/recall_benchmark/candidates.md
 # memory 运行时记忆数据(真实画像/节点/时间线,不进版本控制)
 memory/memory_storage/memory_storages/
 
+# memory 失败诊断日志(可能含 agent 输出与 thinking,不进版本控制；开源前删除日志模块或改为脱敏实现)
+memory/memory_log/memory_logs/
+
+# memory config 备份(运行时快照,不进版本控制)
+memory/memory_config/backup/
+
 # memory pipeline 测试语料(含真实 session slice / user_info 提取结果)
 test/memory_pipeline/slice_type_pipeline/
 test/memory_pipeline/user_info_pipeline/

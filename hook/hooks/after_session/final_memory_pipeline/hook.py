@@ -40,4 +40,5 @@ def final_memory_pipeline(session=None, memory=None, **kwargs):
     memory.slices_pipeline(
         slices=worthy_slices,
         messages=session_detail_content['session_messages'][1:],
+        session=session,
     )

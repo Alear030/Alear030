@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 from config import SESSION_MEMORTY_DETAIL_PATH,MAX_SESSION_TOKEN
 from local_model import _get_embedding_model,embedding_to_b64
 from .session_plan import Plan
+from .attachment_core import Attachment
 
 def _json_read(file_path:Path):
     if file_path.is_dir():
@@ -63,6 +64,9 @@ class Session:
         
         # session_plan 类
         self.plan:Plan = None
+
+        # attachment：当前 session 内、仅供 main agent 本轮消费的运行时提示；纯内存态，不持久化
+        self.attachment = Attachment()
 
 
     def _json_update(self,updater):

@@ -10,10 +10,13 @@ from .orchestrator import PlanRunner
 # 纯 ReAct 推理引擎：main agent 与 subagent 共用，对 plan 编排零感知
 class Loop:
 
-    def __init__(self,agents=None,session=None,hooks=None):
+    def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None):
         self.agents = agents
         self.session = session
         self.hooks = hooks
+        self.memory = memory
+        # 控制 thinking 类内容是否打印到终端；memory 等后台管线复用的 Loop 可传 False 静音
+        self.verbose = verbose
 
 
     # 从 agents 容器中取出指定 agent
@@ -37,7 +40,7 @@ class Loop:
 
 
     # pre_toolUse hooks 处理，返回需透传给工具的非 JSON 参数
-    # @claude(ignore) 后续钩子需要都合并到hooks下进行解耦，先记录
+    # @claude 后续钩子需要都合并到hooks下进行解耦，先记录
     def _pre_tool_use_hooks(self,tool_name:str,tool_args:dict)->dict:
         extra_args = {}
         if not self.hooks:
@@ -50,6 +53,7 @@ class Loop:
             agents = self.agents,
             hooks = self.hooks,
             Loop = Loop,
+            memory = self.memory,
             tool_args = dict(tool_args)
         )
 
@@ -68,9 +72,16 @@ class Loop:
 
 
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
+    # attachment 只拼进模型可见的 message_list，不落盘、不还原：一旦发出去的历史字节
+    # 改动会破坏 provider 的 prompt cache 前缀，所以宁可让它留在历史里，也不事后改写
     def _sent_message_api(self,agent,message_content:str=None)->ChatCompletionMessage:
         if message_content:
-            agent.message_list.append({'role':'user','content':message_content})
+            model_content = message_content
+            if self.session and self.session.attachment.attachment_list:
+                model_content = f'{self.session.attachment.attachment_render()}\n\n{message_content}'
+                self.session.attachment.attachment_clear()
+
+            agent.message_list.append({'role':'user','content':model_content})
             if self.session:
                 self.session.session_message_insert(role='user',content=message_content)
 
@@ -86,7 +97,7 @@ class Loop:
         return agent_rq
 
 
-    # 处理一批 tool_calls：pre hook→调工具→写 session；返回本批是否发生 mode 切换
+    # 处理一批 tool_calls：解析参数→pre hook→调工具→写 session；返回本批是否发生 mode 切换
     # 不信任提示词自觉性，靠 diff session.mode 判断 plan_mode_on/off 是否真的生效
     def _tool_calls_api(self,agent,tool_calls)->bool:
         mode_switched = False
@@ -101,20 +112,49 @@ class Loop:
                 }
             else:
                 tool_name = func.function.name
-                # 参数非法 JSON 时给空 args 兜底，不炸整个 loop
+                # 参数必须先还原为 JSON object；解析失败不能伪装成空参数继续执行工具
                 try:
                     tool_args = json.loads(func.function.arguments)
-                except json.JSONDecodeError:
-                    tool_args = {}
+                except (json.JSONDecodeError, TypeError) as ee:
+                    tool_result = {
+                        'role':'tool',
+                        'tool_call_id':func.id,
+                        'content':json.dumps({
+                            'error':'invalid_tool_arguments',
+                            'message':f'工具参数不是合法 JSON：{ee}。请修正参数后重新调用。'
+                        },ensure_ascii=False)
+                    }
+                else:
+                    # null、数组、字符串等合法 JSON 值也不能作为函数参数映射
+                    if not isinstance(tool_args,dict):
+                        tool_result = {
+                            'role':'tool',
+                            'tool_call_id':func.id,
+                            'content':json.dumps({
+                                'error':'invalid_tool_arguments',
+                                'message':'工具参数必须是 JSON object，请修正参数后重新调用。'
+                            },ensure_ascii=False)
+                        }
+                    else:
+                        try:
+                            extra_args = self._pre_tool_use_hooks(tool_name, tool_args)
+                            func.function.arguments = json.dumps(tool_args,ensure_ascii=False)
 
-                extra_args = self._pre_tool_use_hooks(tool_name, tool_args)
-                func.function.arguments = json.dumps(tool_args,ensure_ascii=False)
-
-                # 调用前后 diff mode，判断此次调用是否为 plan_mode_on/off
-                mode_before = self.session.mode if self.session else None
-                tool_result = agent.match_tool(func,**extra_args)
-                if self.session and self.session.mode != mode_before:
-                    mode_switched = True
+                            # 调用前后 diff mode，判断此次调用是否为 plan_mode_on/off
+                            mode_before = self.session.mode if self.session else None
+                            tool_result = agent.match_tool(func,verbose=self.verbose,**extra_args)
+                            if self.session and self.session.mode != mode_before:
+                                mode_switched = True
+                        except Exception as ee:
+                            # 单个工具失败仍返回同一 tool_call_id，避免异常打断整批调用和后续重试
+                            tool_result = {
+                                'role':'tool',
+                                'tool_call_id':func.id,
+                                'content':json.dumps({
+                                    'error':'tool_execution_error',
+                                    'message':f'工具执行失败：{type(ee).__name__}: {ee}。请根据错误修正后重试。'
+                                },ensure_ascii=False)
+                            }
 
             agent.message_list.append(tool_result)
             if self.session:
@@ -135,7 +175,8 @@ class Loop:
         agent.message_list.append(final_rq)
 
         if self.session:
-            rich_print(message=self._get_reasoning(final_rq),type='agent_thinking')
+            if self.verbose:
+                rich_print(message=self._get_reasoning(final_rq),type='agent_thinking')
             self.session.session_message_insert(role='assistant',content=final_rq.content or '')
         return final_rq.content
 
@@ -156,12 +197,14 @@ class Loop:
 
             # 无 tool_calls 即本轮收尾：有内容返回内容，无内容返回空串（不再空转死循环）
             if not agent_rq.tool_calls:
-                rich_print(message=self._get_reasoning(agent_rq),type=think_type)
+                if self.verbose:
+                    rich_print(message=self._get_reasoning(agent_rq),type=think_type)
                 self._close_round()
                 return agent_rq.content or ''
 
             tool_call += 1
-            rich_print(message=self._get_reasoning(agent_rq),type=think_type)
+            if self.verbose:
+                rich_print(message=self._get_reasoning(agent_rq),type=think_type)
 
             # 执行工具调用 + 通过 diff session.mode 检测模式是否真的切换（不信任提示词自觉性）
             mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)

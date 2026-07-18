@@ -9,7 +9,7 @@
 ### 何时不要使用:
 - 子任务之间有先后依赖或需要共享中间结果 → 顺序执行，不要用本工具
 - 只有一个任务 → 直接自己处理，不必创建 subagent
-- 任务需要写文件或执行命令 → subagent 只有只读工具权限（file_read/memory_recall/session_slice/web_search/web_fetch），没有 file_write/command 权限，交给它会因缺少工具而失败或答非所问，这类任务应由主 agent 自己完成
+- 任务需要写文件或执行命令 → 默认情况下 subagent 只有只读工具权限（file_read/memory_recall/session_slice/web_search/web_fetch），交给它会因缺少工具而失败或答非所问；确实需要时可通过下方 `tool_autho` 参数显式授权，但优先考虑这类任务是否该由主 agent 自己完成
 
 ### 参数说明:
 - subagent_files (必填): subagent 配置列表，每个元素为一个 dict，需包含:
@@ -17,6 +17,12 @@
   - system_prompt: 该 subagent 的角色设定
   - task_desc: 具体任务描述
   - check_standard: 验收标准，会与 task_desc 一并拼入 subagent 的任务指令，要求其依据此标准自查输出。这不是代码层面强制校验，仅是提示词层面的要求，实际执行效果取决于 subagent 是否遵循
+  - tool_autho (可选): 字符串列表，显式指定该 subagent 的工具授权类别，完全替换默认的只读四类（basic_tool/file_read_tool/memory_tool/web_tool）。可选类别：
+    - `basic_tool`/`file_read_tool`/`memory_tool`/`web_tool`：默认已包含的只读类别
+    - `file_write_tool`：写入/编辑本地文件，有副作用
+    - `command_tool`：执行本地 shell 命令，有副作用且风险最高
+    - `skill_tool`：查询与加载已有技能
+    传入前先确认任务确实需要这些权限，不要无差别授予高权限类别。`plan_tool`（计划编排）、`subagent_tool`（创建下一层 subagent）、`interaction_tool`（向真实用户提问，subagent 在后台线程执行会因等待终端输入而卡死）都不属于"独立执行一条任务"的职责范围，不要授予 subagent
 - max_subagent (不需要传入，默认 5): len(subagent_files)超出max_subagent数量上限，会报错拒绝执行
 
 ### 上下文隔离:
@@ -48,4 +54,4 @@ subagent 可用的 file_read 工具依赖精确的绝对路径读取文件，不
 
 ### 调用后:
 - 返回 JSON 数组，每个元素包含 subagent_id 和对应的 result，按 subagent_id 升序排列
-- 每个 subagent 可使用以下只读工具：文件读取（file_read）、历史记忆召回与对话片段读取（memory_recall/session_slice）、网络搜索与网页抓取（web_search/web_fetch）。无法写文件、执行命令
+- 未指定 tool_autho 的 subagent 只有只读工具：文件读取（file_read）、历史记忆召回与对话片段读取（memory_recall/session_slice）、网络搜索与网页抓取（web_search/web_fetch），无法写文件、执行命令；指定了 tool_autho 的 subagent 按其授权类别对应可用

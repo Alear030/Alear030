@@ -1,8 +1,10 @@
 from pathlib import Path
 from tool.tool_core import register_tool
 
-from config import WORK_SPACE
+from config import WORK_SPACE,ROOT_DIRECTORY
 from rich_output import rich_print
+
+SKILL_DIRECTORY = ROOT_DIRECTORY/'skill'
 
 tool_desc = '创建或覆盖本地文本文件，会自动创建父目录'
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
@@ -17,7 +19,7 @@ else:
 def file_write(file_path:str,content:str,**kwargs)->str:
     path = Path(file_path)
 
-    if not path.absolute():
+    if not path.is_absolute():
         return f"错误: file_path 必须是绝对路径，收到: {file_path}"
     
     if path.exists() and path.is_dir():
@@ -25,9 +27,10 @@ def file_write(file_path:str,content:str,**kwargs)->str:
     
     path_exist = path.exists()
 
-    if not path.resolve().is_relative_to(WORK_SPACE):
+    resolved_path = path.resolve()
+    if not resolved_path.is_relative_to(WORK_SPACE) and not resolved_path.is_relative_to(SKILL_DIRECTORY):
         rich_print(message='⚠️ AGENT正在尝试在非工作空间中写入文件',type='system_error')
-        return f'错误，当前写入路径非工作空间，学习模式下不可在工作空间外写入文件，工作空间地址：{WORK_SPACE}'
+        return f'错误，当前写入路径非工作空间，学习模式下只能在工作空间或技能目录写入文件，工作空间地址：{WORK_SPACE}，技能目录：{SKILL_DIRECTORY}'
 
     try:
         path.parent.mkdir(parents=True,exist_ok=True)

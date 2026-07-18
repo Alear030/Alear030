@@ -10,6 +10,8 @@ class Memory_storage:
     def __init__(self):
         # storages文件地址：
         self.slice_nodes_path = storages_path/'slice_node.json'
+        self.advanced_task_node_path = storages_path/'advanced_task_node.json'
+        self.timeline_path = storages_path/'timeline.json'
         self.loker = threading.Lock()
 
 
@@ -44,6 +46,27 @@ class Memory_storage:
                 json.dumps(data,ensure_ascii=False,indent=2),
                 encoding='utf-8'
             )
-            
+
+    def advanced_task_updater(self,updater):
+        with self.loker:
+            if self.advanced_task_node_path.exists():
+                raw = self.advanced_task_node_path.read_text(encoding='utf-8').strip()
+                data = json.loads(raw) if raw else []
+            else:
+                data = []
+            updater(data)
+            self.advanced_task_node_path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
+
+
+    def timeline_updater(self,updater):
+        with self.loker:
+            if self.timeline_path.exists():
+                raw = self.timeline_path.read_text(encoding='utf-8').strip()
+                data = json.loads(raw) if raw else []
+            else:
+                data = []
+            updater(data)
+            self.timeline_path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
+
 
 memory_storage = Memory_storage()

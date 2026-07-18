@@ -164,7 +164,7 @@ Tool schema 由 `inspect.signature` 生成，当前排除 `self`、`agents`、`s
 
 `session/session_plan.py` 的 `Plan.advance()` 是 step 推进的公开入口：刷新磁盘状态、取得首个未完成 step、写入 `active_step_number` 后返回该 step，全部完成时返回 `None`。`active_step_number` 限制本轮唯一允许更新的 step，防止跳步或一次连续完成多个 step。
 
-Memory 当前实际主线位于 `memory/memory_core.py`：负责 slice 分类、按 `(session_id, start_round, end_round)` 去重、`slice_node` 入库、`user_info` 提炼以及对应模板更新。`memory/memory_pipeline/` 已设立 `memory_pipeline_core.py` 承担 memory 侧操作方法的集成，但当前仍是骨架、尚未从 `memory_core` 接管主线；三模块（`memory_core`/`memory_pipeline`/`memory_storage`）的职责划分以 `memory_core.py` 顶部 `@claude(ignore)` 注释为准。`memory_storage/` 和 `memory_config/` 都可能被运行时更新。
+Memory 当前实际主线位于 `memory/memory_core.py`：负责 slice 分类、按 `(session_id, start_round, end_round)` 去重、`slice_node` 入库、`user_info` 提炼以及对应模板更新。两模块（`memory_core`/`memory_storage`）的职责划分以 `memory_core.py` 顶部 `@claude(ignore)` 注释为准。`memory_storage/` 和 `memory_config/` 都可能被运行时更新。
 
 Session 切片流入 Memory 的路径：
 

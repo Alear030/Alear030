@@ -5,6 +5,9 @@ from agent import agents
 from loop import Loop
 from memory import Memory
 
+# 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
+memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False))
+
 # 创建新的session
 session = Session(
     slice_agent=agents.agents['slice'],
@@ -13,20 +16,20 @@ session = Session(
 )
 
 # 创建新的Loop
-loop = Loop(agents=agents,session=session,hooks=hooks)
+loop = Loop(agents=agents,session=session,hooks=hooks,memory=memory)
 
-# 创建新的memory
-memory = Memory(memory_agent=agents.agents['memory'],loop=Loop())
+hooks.trigger(hook_point='before_session',session=session,agents=agents,memory=memory,hooks=hooks)
 
 # 主循环入口执行程序
 try:
     while True:
         # 用户输入信息并传入loop
+        user_message = ""
+        hooks.trigger(hook_point='before_round',session=session,agents=agents,memory=memory,hooks=hooks,user_message=user_message)
         user_message = input('please enter your message: ')
-        
         # 开启本轮循环
         loop.loop_run(agent_name='main',message=user_message)
-        hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory)
+        hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks)
 
 except KeyboardInterrupt:
     # 检测到退出动作，进行收尾

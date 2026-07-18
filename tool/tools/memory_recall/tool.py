@@ -19,6 +19,7 @@ if tool_prompt_file.exists():
 else:
     tool_prompt = None
 
+#@claude 这里其实后续应该将搜索的节点转移到memory_storage中的slice_node文件中
 
 # 得到全部的session_detail id 为后续得到slices准备，且排除当前session的id
 def _get_session_detail_ids():
@@ -36,9 +37,13 @@ def _get_slice(session_file)->list:
         slice['session_id'] = session_json['session_id']
     return session_slice
 
-# 并发得到全部session detail的slice
-def _get_slices():
-    session_ids = _get_session_detail_ids()
+# 并发得到全部session detail的slice；传入session_ids时收窄到交集,避免全量扫描
+def _get_slices(session_ids:list[str]=None):
+    all_session_ids = _get_session_detail_ids()
+    if session_ids:
+        session_ids = [session_id for session_id in session_ids if session_id in all_session_ids]
+    else:
+        session_ids = all_session_ids
     with ThreadPoolExecutor(max_workers=5) as tp:
         get_slice_queue = {
             tp.submit(_get_slice,SESSION_MEMORTY_DETAIL_PATH/f'{session_id}.json'):session_id for session_id in session_ids
@@ -50,14 +55,15 @@ def _get_slices():
 
 
 @register_tool(tool_name='memory_recall',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
-def memory_recall(key_words:list[str],search_target:str,top_k:int,**kwargs):
+def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:list[str]=None,**kwargs):
 
     # 拼接输入的keywords和search target 并得到向量值
     target_text = f"{' '.join(key_words)}  {search_target}"
     target_vec = _get_embedding_model().encode([target_text])[0]
 
-    # 得到slices并对每一个slice的embedding和target_embedding计算余弦相似度
-    slices = _get_slices()
+    # 得到slices并对每一个slice的embedding和target_embedding计算余弦相似度；
+    # session_ids 非空时收窄扫描范围,为空则维持原有全量扫描行为
+    slices = _get_slices(session_ids=session_ids)
     for slice in slices:
         slice_vec = embedding_from_b64(slice['slice_embedding'])
         # 点积后除以长度积 转float类型数值保存 A·B = |A| × |B| × cos(θ)
