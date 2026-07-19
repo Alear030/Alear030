@@ -43,3 +43,6 @@ memory/memory_config/backup/
 # Claude Code 本地配置(CLAUDE.md 已纳入跟踪,供并行 worktree 共享项目宪法)
 .claude/
 
+# benchmark 专用 API key(不提交 git,test/longmemeval_bench/bench_secret.py)
+test/longmemeval_bench/bench_secret.py
+
