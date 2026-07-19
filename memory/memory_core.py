@@ -1,5 +1,6 @@
 import json
 import re
+import tiktoken
 
 from json_repair import repair_json
 
@@ -27,6 +28,35 @@ from memory.memory_log import memory_log
 JUDGE_MERGED = 'merged'
 JUDGE_NO_MATCH = 'no_match'
 JUDGE_FAILED = 'failed'
+
+
+# timeline attachment token 预算与分层渲染(从 session_timeline_inject 搬来,收口为唯一实现,
+# before_session hook 与 session_compress 共用,避免分层逻辑双源漂移)
+# RECENT 预算内(或最近 MIN_FULL 条)用 full(含叙事线索 thread);超出预算的远段统一 keywords+summary
+RECENT_TIMELINE = int(2048)
+MIN_FULL_TIMELINE = int(3)
+# done(@claude): 补全 count_token,用 tiktoken gpt-4o 编码器算单段文本 token 数
+# 与 session_core._session_count_tokens 同一 gpt-4o 编码器;模块级缓存避免 timeline 循环里重复构建
+_TOKEN_ENCODING = tiktoken.encoding_for_model(model_name='gpt-4o')
+
+
+def count_token(text: str) -> int:
+    # 纯文本 token 数,不含消息列表 per-message 开销(那部分由 _session_count_tokens 按需 +4)
+    return len(_TOKEN_ENCODING.encode(text))
+
+
+# 根据 token 预算返回 timeline content:RECENT 预算内(或最近 MIN_FULL 条)用 full(含叙事线索);
+# 超出预算的远段统一 keywords+summary。远段不能只留 keywords--summary 是 agent 圈定
+# memory_recall session_ids 候选范围的关键语义线索,只给 keywords 会被当次主题稀释导致漏选
+def timeline_content(timeline, timeline_token, timeline_index):
+    sid = timeline['session_id']
+    keywords = '、'.join(timeline['keywords'])
+    summary = timeline.get('summary', '')
+    summary_seg = f"。本轮主要讲了{summary}" if isinstance(summary, str) and summary.strip() else ''
+    if timeline_index < MIN_FULL_TIMELINE or timeline_token < RECENT_TIMELINE:
+        thread = '；'.join(timeline['thread'])
+        return f"session:{sid}:关键词:{keywords}{summary_seg}。叙事线索:{thread}"
+    return f"session{sid}:关键词:{keywords}{summary_seg}"
 
 
 # 剥离模型回复外层可能包裹的 markdown 代码块或前缀/后缀文字，定位出真正的 JSON 候选片段。
@@ -752,6 +782,33 @@ class Memory:
     def get_historical_timeline(self,exclude_recent:int=3)->list[dict]:
         timeline = memory_storage.get_memory_storage(file_name='timeline') or []
         return timeline[:-exclude_recent] if exclude_recent > 0 else timeline
+
+
+    # 把历史 timeline 经 attachment 注入 session。before_session hook 与 session_compress 共用此入口,
+    # 收口为唯一实现避免分层逻辑双源漂移。compress 清空 message_list 时连带清掉首轮注入的 timeline,
+    # 必须由此恢复(谁清空谁恢复)。
+    def inject_timeline_attachment(self, session):
+        historical_timeline = self.get_historical_timeline(exclude_recent=3)
+        if not historical_timeline:
+            return
+        historical_timeline.reverse()
+
+        timeline_token = 0
+        timeline_info = None
+        for timeline_index, timeline in enumerate(historical_timeline):
+            tl_content = timeline_content(timeline=timeline, timeline_token=timeline_token, timeline_index=timeline_index)
+            timeline_info = timeline_info + '\n\n' + tl_content if timeline_info else tl_content
+            timeline_token += count_token(text=tl_content)
+
+        session.attachment.attachment_add(
+            attachment_type='notification',
+            attachment_source='session_timeline',
+            attachment_content=(
+                "以下是历史会话的时间线概览(按发生顺序,近段最详含叙事线索、远段保留关键词与一句话概括锚定 session_id,"
+                "配合 memory_recall 的 session_ids 参数圈定候选范围以提升召回准确率):\n"
+                + timeline_info
+            )
+        )
 
 
     # skill_candidates 的数据形状(task_desc/task_detail/task_slices_nodes)只有本类清楚，
