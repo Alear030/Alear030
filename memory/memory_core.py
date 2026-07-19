@@ -650,36 +650,100 @@ class Memory:
             memory_log.memory_log_write(
                 stage='session_timeline_extract.json_parse_failed',
                 error=error,
+                slice_data={'session_id':session_id},
                 agent=self.memory_agent
             )
-            return None
+            return self._fallback_timeline_entry(slices=slices,session_id=session_id)
         if not isinstance(rq_json,list) or len(rq_json) != 1 or not isinstance(rq_json[0],dict):
             memory_log.memory_log_write(
                 stage='session_timeline_extract.invalid_response_shape',
                 error='模型输出不是仅含一个对象的 JSON 数组',
+                slice_data={'session_id':session_id},
                 agent=self.memory_agent
             )
-            return None
+            return self._fallback_timeline_entry(slices=slices,session_id=session_id)
 
         result = rq_json[0]
         thread = result.get('thread')
         summary = result.get('summary')
         keywords = result.get('keywords')
-        if (not isinstance(thread,list) or not thread
-                or not all(isinstance(item,str) and item.strip() for item in thread)
-                or not isinstance(summary,str) or not summary.strip()
-                or not isinstance(keywords,list) or not keywords
-                or not all(isinstance(item,str) and item.strip() for item in keywords)):
-            return None
+        failed_fields = []
+        if not isinstance(thread,list) or not thread or not all(isinstance(item,str) and item.strip() for item in thread):
+            failed_fields.append('thread')
+        if not isinstance(summary,str) or not summary.strip():
+            failed_fields.append('summary')
+        if not isinstance(keywords,list) or not keywords or not all(isinstance(item,str) and item.strip() for item in keywords):
+            failed_fields.append('keywords')
+        if failed_fields:
+            memory_log.memory_log_write(
+                stage='session_timeline_extract.field_validation_failed',
+                error=f"字段不合规: {','.join(failed_fields)}",
+                slice_data={'session_id':session_id},
+                agent=self.memory_agent
+            )
+            return self._fallback_timeline_entry(slices=slices,session_id=session_id)
 
         timeline_entry = {
             "session_id":session_id,
             "thread":thread,
             "summary":summary,
             "keywords":keywords,
+            "source":"llm",
         }
         memory_storage.timeline_updater(lambda timeline: timeline.append(timeline_entry))
 
+        return timeline_entry
+
+
+    # session_timeline_extract 在 LLM 提炼失败(JSON 解析失败/响应形状不对/字段校验不合规)时,
+    # 用 slice 原始信息降级构造 timeline_entry 写入,避免该 session 在跨会话时间线整段消失--
+    # 失败 session 通常有 4-7 个 worthy slice,整段丢失会让 before_session 注入和 memory_recall
+    # 的 session_ids 圈定都漏掉它。thread 直接取各 slice 的 summary_detail(未压缩,语义对齐
+    # thread 定义--prompt 里 thread 本就是"逐条压缩 summary_detail",降级即不压缩);summary
+    # 留空(降级无概括能力,且 keywords 已覆盖 topic 实体,留 topic 拼接冗余);keywords 聚合
+    # 各 slice 的 key_words 去重不截断(保留全部唯一词,扩大 memory_recall 圈 session_ids 候选)。
+    # 标记 source='fallback' 便于追溯;消费者 timeline_content 对空 summary 做容错省略渲染
+    def _fallback_timeline_entry(self,slices:list[dict],session_id:str)->dict|None:
+        thread = []
+        topics = []
+        seen = set()
+        keywords = []
+        for s in slices:
+            anchor = s.get('slice_anchor') or {}
+            topic = anchor.get('topic')
+            if isinstance(topic,str) and topic.strip():
+                topics.append(topic.strip())
+            detail = anchor.get('summary_detail') or topic
+            if isinstance(detail,str) and detail.strip():
+                thread.append(detail.strip())
+            for kw in anchor.get('key_words',[]) or []:
+                if isinstance(kw,str) and kw.strip() and kw not in seen:
+                    seen.add(kw)
+                    keywords.append(kw)
+        if not thread:
+            # slice 全无可用 summary_detail/topic,降级也失败:补 log 避免静默(与"防静默"红线一致)
+            memory_log.memory_log_write(
+                stage='session_timeline_extract.fallback_empty',
+                error='slice 全无可用 summary_detail/topic,降级构造失败',
+                slice_data={'session_id':session_id},
+                agent=self.memory_agent
+            )
+            return None
+
+        summary = ""
+
+        # key_words 全空时用 topic 兜底,保证 keywords 非空(消费者 '、'.join 空串会输出"关键词:")
+        if not keywords:
+            keywords = topics
+
+        timeline_entry = {
+            "session_id":session_id,
+            "thread":thread,
+            "summary":summary,
+            "keywords":keywords,
+            "source":"fallback",
+        }
+        memory_storage.timeline_updater(lambda timeline: timeline.append(timeline_entry))
         return timeline_entry
 
 

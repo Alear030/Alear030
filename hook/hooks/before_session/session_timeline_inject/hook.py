@@ -25,10 +25,14 @@ def count_token(text: str) -> int:
 def timeline_content(timeline,timeline_token,timeline_index):
     sid = timeline['session_id']
     keywords = '、'.join(timeline['keywords'])
+    # summary 容错:降级条目(source=fallback)summary 留空,省略"本轮主要讲了"段避免空句;
+    # 其远段圈定靠 keywords(去重不截断、词多覆盖广)兜住。LLM 条目 summary 非空照常渲染
+    summary = timeline.get('summary','')
+    summary_seg = f"。本轮主要讲了{summary}" if (isinstance(summary,str) and summary.strip()) else ""
     if timeline_index < MIN_FULL_TIMELINE or timeline_token < RECENT_TIMELINE:
         thread = '；'.join(timeline['thread'])
-        return f"session:{sid}:关键词:{keywords}。本轮主要讲了{timeline['summary']}。叙事线索:{thread}"
-    return f"session{sid}:关键词:{keywords}。本轮主要讲了{timeline['summary']}"
+        return f"session:{sid}:关键词:{keywords}{summary_seg}。叙事线索:{thread}"
+    return f"session{sid}:关键词:{keywords}{summary_seg}"
 
 
 @hooks.register(hook_point='before_session')
