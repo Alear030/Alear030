@@ -4,6 +4,41 @@
 
 按时间倒序排列，最新改动在最上面。
 
+## 2026-07-19
+
+### v0.5.0 — 记忆系统闭环：任务经验技能化、跨会话时间线与可恢复的上下文压缩
+
+- 新增 task memory pipeline：定型 slice 按 `user_info` 与 `task` 分类；task 通过 normal/advanced 两级节点聚合，使用 `merged`/`no_match`/`failed` 三态契约路由，累积相似任务后产生 skill candidate
+- 新增 Session 归属的纯内存 Attachment：`interrupt` 用于技能候选确认，`notification` 用于自动注入；首轮请求渲染后清空，不写入 session 事实数据
+- 新增 skill 创建与更新闭环：`create-skill` 从来源 slice 回溯素材，`skill_finish` 将技能信息及新增来源写回 advanced task node，避免重复提示，并支持累计新变体后的更新 candidate
+- 新增 session timeline：会话结束提炼 worthy slice 为 `thread`/`summary`/`keywords` 写入 timeline；下次启动按 token 预算经 attachment 注入，辅助 `memory_recall` 圈定历史 session
+- timeline 提炼失败时，以 slice 的 `summary_detail`/`topic`/`key_words` 写入可追溯 fallback entry，避免单个 session 整段历史缺失；空 summary 的注入渲染同步兼容
+- 重写 session compress：token 计数改为 main agent 全量 `message_list`，超过正式阈值 `250000` 后保留 system 与最后切片原始消息，自动以 attachment 注入更早切片摘要并恢复跨会话 timeline；三轮真实 REPL 验证压缩后可由摘要恢复首轮唯一标记
+- 清理运行数据与 benchmark 密钥的版本控制：`test/`、真实 session/memory 语料及 `bench_secret.py` 均不再误提交；开源前仍需统一脱敏并重写历史泄漏文件
+
+后续计划：继续跑通 LongMemEval benchmark basic 四格，并观察真实会话中的 compress 触发频率、压缩后衔接质量与 timeline fallback 的召回效果。
+
+## 2026-07-14
+
+### v0.4.0 — memory 自涌现管线：从 session slice 到用户画像与可量化召回基线
+
+- 新增 memory pipeline、storage、config 与 prompt 子模块：after_round 处理已定型 worthy slice，after_session 补入最终尾片；`user_info` 经提取、reform 和身份去重后更新用户画像模板
+- Hook 生命周期重组：session slice/compress 归入 `after_round`，新增 `after_session/final_memory_pipeline`，使 session 原始消息与派生 memory 数据职责分离
+- 接入 `ask_user_question` 交互工具，为后续技能固化确认提供用户闸门
+- 新增 recall benchmark 基线：metrics 纯函数、真实 `memory_recall` harness 与 18 条查询/104 项分级标注，用于后续比较召回质量
+- 修复 slice 重复：按重喂窗口真实起点归一化 round、校验连续性并砍尾重接，消除 slice agent 重编号造成的重叠堆积
+- command 白名单同步修复 Windows `/` flag 大小写与提示词可见命令列表，避免白名单和模型认知脱节
+
+后续计划：收口 timeline、task memory 与 skill 生命周期，并用 benchmark 验证记忆链路的召回质量。
+
+## 2026-07-05
+
+### v0.3.1 — 切片可靠性与命令白名单修复
+
+- 重写 slice agent 的边界提示词，以“自包含最小单元”同时约束过拆和过合；`key_words` 改为随信息密度自适应
+- 修复切片 JSON markdown 围栏导致的解析失败，并保留工具调用与结果供切片及 task 提炼消费
+- 修复 Windows 风格 `/` flag 白名单大小写匹配，command prompt 从白名单唯一来源动态生成可用命令清单
+
 ## 2026-07-05
 
 ### v0.3.0 — slice 结构收敛：topic/key_words/summary_detail 收拢进 slice_anchor，正式进入 memory 框架阶段
