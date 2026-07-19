@@ -459,17 +459,32 @@ class Memory:
                 if update is None:
                     continue
                 # 已固化 node(skill_info 已写回):只 append 新来源累积进 task_slices_nodes,
-                # 不覆写 skill_info/task_desc/task_detail;后续由别处检测 task_slices_nodes
-                # 累积量触发"更新技能"attachment,本处不处理
+                # 不覆写 skill_info/task_desc/task_detail;累积量达阈值时产出"更新"candidate
                 if not node.get('skill_info', None):
                     node['task_desc'] = update['task_desc']
                     node['task_detail'] = update['task_detail']
                 node['task_slices_nodes'].append(dict(slice_ref))
-                # 判断如果这个合并进去的advanced_task_node如果现存在的task_slice大于等于2个，并且没有skill存在那就返回需要将这个advanced_task_node合成skill的信息注入user_message
-                if not node.get('skill_info',None) and len(node.get('task_slices_nodes',[])) >= 2:
-                    advanced_node_results.append(
-                        {"task_id":int(node.get('task_id')),"task_desc":node.get('task_desc'),"task_detail":node.get('task_detail'),"task_slices_nodes":node.get("task_slices_nodes")}
-                    )
+                sources = node.get('task_slices_nodes', [])
+                skill_info = node.get('skill_info')
+                # 未固化 node:合并兜底,累积来源达阈值产出"创建"candidate(阈值写 >=2,因未固化 node
+                # 新建时已至少带2来源,append后至少3,真实触发点为3,与 normal_task_node_judge 的 >=3 等价)
+                # 已固化 node:写回时 task_slices_nodes 清空->从0重新累积,>=3 即新变体真实累积阈值,产出"更新"candidate
+                # 来源列表统一 list 拷贝:避免多 slice 合并同一 node 时 candidate 被后续 append 污染
+                if not skill_info and len(sources) >= 2:
+                    advanced_node_results.append({
+                        "task_id": int(node.get('task_id')),
+                        "task_desc": node.get('task_desc'),
+                        "task_detail": node.get('task_detail'),
+                        "task_slices_nodes": list(sources),
+                    })
+                elif skill_info and len(sources) >= 3:
+                    advanced_node_results.append({
+                        "task_id": int(node.get('task_id')),
+                        "candidate_type": "update",
+                        "skill_name": skill_info.get('skill_name'),
+                        "skill_desc": skill_info.get('skill_desc'),
+                        "task_slices_nodes": list(sources),
+                    })
         memory_storage.advanced_task_updater(_update_advanced_task_nodes)
         
         return advanced_node_results if advanced_node_results else JUDGE_MERGED
@@ -680,10 +695,22 @@ class Memory:
     def _emit_skill_candidate_attachment(self,session,candidate:dict):
         source_count = len(candidate.get('task_slices_nodes',[]))
         task_slices_nodes = candidate.get('task_slices_nodes',[])
-        session.attachment.attachment_add(
-            attachment_type='interrupt',
-            attachment_source='memory_pipeline',
-            attachment_content=(
+        # candidate_type 区分创建/更新:更新 candidate 语义精简(只带 skill_name/skill_desc/新来源),
+        # 不带已固化 node 的旧 task_desc(=skill_desc,与 frontmatter 重复)/task_detail(创建前旧值,过时)
+        if candidate.get('candidate_type') == 'update':
+            content = (
+                f"已有技能 {candidate['skill_name']} 最近又累积了 {source_count} 次相似任务的新变体，建议更新该技能以覆盖新变体：\n"
+                f"任务id：{candidate['task_id']}\n"
+                f"技能名：{candidate['skill_name']}\n"
+                f"当前技能描述：{candidate['skill_desc']}\n"
+                f"新变体来源坐标（session_id/start_round/end_round）：{json.dumps(task_slices_nodes,ensure_ascii=False)}\n"
+                "请调用 ask_user_question 向用户确认是否同意更新该技能；"
+                "用户同意后使用 skill_load 加载 create-skill 技能并按其「更新场景」流程执行"
+                "（该技能会指导你先 file_read 已有 skill.md 作为基线，再用 session_slice 回溯上述新坐标取得素材，"
+                "对比后以 diff 为主向用户展示修订并确认，写盘覆盖、测试，最终调用 skill_finish 完成对该 task_id 节点的写回）。"
+            )
+        else:
+            content = (
                 f"最近 {source_count} 次任务被识别为相似模式，建议固化为可复用技能：\n"
                 f"任务id：{candidate['task_id']}\n"
                 f"任务概述：{candidate['task_desc']}\n"
@@ -694,6 +721,10 @@ class Memory:
                 "（该技能会指导你用 session_slice 回溯上述坐标取得原始素材，起草 skill.md，"
                 "经你确认后写盘、测试，最终调用 skill_finish 完成对该 task_id 节点的写回）。"
             )
+        session.attachment.attachment_add(
+            attachment_type='interrupt',
+            attachment_source='memory_pipeline',
+            attachment_content=content,
         )
 
     
