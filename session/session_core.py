@@ -29,15 +29,29 @@ def _json_write(content:str=None,file_path:Path=None):
     if file_path.is_dir():
         print('system error target file is dir')
         return
-    
+
     if not content:
         print('null content is none can not write in a json file')
         return
-    
+
     file_path.write_text(
         json.dumps(content,ensure_ascii=False,indent=2),
         encoding='utf-8'
     )
+
+
+# 统一从 message_list 元素取文本:dict({'role','content'}) 取 content;OpenAI assistant message
+# 对象取 .content,其 tool_calls 若非空单独成 JSON 计入(函数名/参数占 token,不可忽略)。
+# 供 _session_count_tokens 遍历混合类型的 message_list 用
+def _msg_text(msg) -> str:
+    if isinstance(msg, dict):
+        content = msg.get('content')
+        return content if isinstance(content, str) else ''
+    text = getattr(msg, 'content', None) or ''
+    tool_calls = getattr(msg, 'tool_calls', None)
+    if tool_calls:
+        text += json.dumps([tc.model_dump() for tc in tool_calls], ensure_ascii=False)
+    return text
 
 
 class Session:
@@ -100,24 +114,20 @@ class Session:
         return SESSION_MEMORTY_DETAIL_PATH/f'{self.session_id}.json'
     
     
-    def _session_count_tokens(self)->int:
-        session_json = _json_read(file_path=self.session_path)
-        count_pointer = session_json['session_slice'][-1]['start_round'] if session_json['session_slice'] else int(0)
-        
-        #处理需要计算tokens的message list
-        count_messages = []
-        #将需要计数的messages取出
-        for msg in session_json['session_messages']:
-            if msg['message_round'] >= count_pointer or msg['message_role'] == 'system':
-                count_messages.append(msg['message_content'])
-        
-        #开始计算
+    def _session_count_tokens(self, agent) -> int:
+        # 算 main agent 的 message_list 全量 token--这才是模型实际看到、且 compress 会缩小的量,
+        # 计数才能在 compress 后下降、不重复触发。原实现读 session_messages 且只算"最后一片 + system",
+        # 而 message_list 持续累积全部历史(loop_core._sent_message_api 每轮 append、无每轮重构),
+        # 导致计数严重低估、compress 几乎不可能触发--这是 compress 不触发的真正根因,比阈值大更根本。
+        # message_list 元素是混合类型:dict({'role','content'}) 与 OpenAI assistant message 对象
+        # (.content/.tool_calls),用 _msg_text 统一取文本
         token_count = 0
         token_encoding = tiktoken.encoding_for_model(model_name='gpt-4o')
-        for msg in count_messages:
-            token_count+=4
-            token_count += len(token_encoding.encode(msg))
-        
+        for msg in agent.message_list:
+            token_count += 4  # per-message 开销,与原实现一致
+            text = _msg_text(msg)
+            if text:
+                token_count += len(token_encoding.encode(text))
         return token_count
     
     
@@ -305,10 +315,42 @@ class Session:
         return message_list
 
 
-    def session_compress(self,agent):
-        # 判断是否需要进行压缩，如果需要进行压缩则将mainagent的messagelist进行重构
-        if self._session_count_tokens() >= self.max_tokens:
+    def _build_compress_attachment(self, session_slices: list) -> str:
+        # 构造 compress 时注入的 slice summary 字符串。B 版:每片输出 topic + summary_detail,
+        # 让 agent 在压缩后仍能回溯当前 session 更早片段的内容(更早原始消息已从上下文移除,
+        # 而 memory_recall 排除当前 session 救不回来,故必须经 attachment 自动注入)。
+        # 最后一片不在此列--它的原始消息保留在 message_list 中,无需 summary
+        lines = []
+        for slice in session_slices:
+            anchor = slice['slice_anchor']
+            lines.append(
+                f"session{slice['session_id']} 片段(round {slice['start_round']}-{slice['end_round']}):"
+                f"主题 {anchor['topic']}。详情: {anchor.get('summary_detail') or '(无摘要)'}"
+            )
+        return "以下是本次会话已压缩掉的更早片段摘要(原始消息已从上下文移除,如需细节用 session_slice 工具按坐标回读):\n" + '\n\n'.join(lines)
+
+
+    def session_compress(self, agent, memory):
+        # 压缩:token 超阈值时,把更早 slice 的 summary 经 attachment 注入(解决失忆),重新注入跨 session
+        # timeline(清空 message_list 时连带清掉了首轮注入的 timeline,谁清空谁恢复),message_list 重置为
+        # system + 最后一片原始消息(保留当前任务连续)。下一轮 _sent_message_api 把 attachment 拼入并清空
+        if self._session_count_tokens(agent) >= self.max_tokens:
+            # 兜底:对没 summary_detail 的片补跑(_session_slice_summary 内置守卫跳过已摘要);
+            # memory_pipeline 每轮后台已产 summary,通常空跑,仅防 memory_pipeline 未跑完的时序缺口
             self._session_summary()
+            session_json = _json_read(file_path=self.session_path)
+            session_slices = session_json['session_slice']
+            # 除最后一片外,注入当前 session 的 slice summary(最后一片的原始消息保留在 message_list)
+            if len(session_slices) > 1:
+                self.attachment.attachment_add(
+                    attachment_type='notification',
+                    attachment_source='session_compress',
+                    attachment_content=self._build_compress_attachment(session_slices[:-1])
+                )
+            # 重新注入跨 session timeline:compress 清空 message_list 时连带清掉了首轮注入的 timeline,
+            # 必须恢复,否则 agent 丢失更早会话的历史(谁清空谁恢复)
+            memory.inject_timeline_attachment(self)
+            # 清空历史,保留 system + 最后一片原始消息(复用 session_message_reform,不改它)
             agent.message_list = self.session_message_reform()
         
 

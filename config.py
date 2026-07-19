@@ -42,8 +42,10 @@ MODEL_LEVEL = {
 SESSION_MEMORTY_DETAIL_PATH = Path(__file__).parent/'session/session_detail'
 # session plan文件夹路径
 SESSION_PLAN_FILE_PATH = Path(__file__).parent/'session/session_plan'
-# session 对话最大token值
-MAX_SESSION_TOKEN = 300000
+# session 对话最大token值:compress 触发阈值,按模型实际上下文窗口留安全余量
+# (原 300000 几乎不触发;真正根因是 _session_count_tokens 已修正为算 message_list 全量,
+# 此阈值建议按实际模型窗口调,128K 窗口建议 100000)
+MAX_SESSION_TOKEN = 100000
 
 
 # memory config
