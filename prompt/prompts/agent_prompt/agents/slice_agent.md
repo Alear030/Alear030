@@ -64,6 +64,7 @@ key_words 不是给人看的标签，它会和 topic 一起被编码进那一个
  - **start_round / end_round 必须直接用输入里每条消息实际带的 `message_round` 值，禁止重新从 1 编号。** 输入给你的可能只是整段对话的一个片段（比如从 round 10 开始），此时你的第一片 start_round 就应该是 10 而不是 1。把窗口当成一段新对话从头编号会让轮次和真实对话错位、破坏下游的切片对账。照抄输入里真实的 round 号即可。
  - 切片必须**无缝、无重叠地覆盖输入的全部轮次**：第一片的 start_round 等于输入里最小的 message_round，最后一片的 end_round 等于输入里最大的 message_round，中间上一片的 end_round 之后紧接下一片的 start_round，不留空、不交叠。
  - 输出是一个数组，每一项包含 worthy_summary、topic、start_round、end_round、key_words 五个字段。
+ - topic 和 key_words 用中文输出(英文对话也概括成中文,检索向量是中文模型)。
 
 输出示例（输入是从 round 12 开始的一段对话片段——注意 round 号照抄输入、不从 1 重编号；一场连续讨论中嵌着一个高密度的独立子事件被单独切出）：
 

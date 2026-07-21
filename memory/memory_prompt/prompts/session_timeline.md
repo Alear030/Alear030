@@ -46,6 +46,7 @@ thread 和 summary 走逐级链路（summary 基于 thread），keywords 结合 
 - 严格输出 JSON 数组，不得包含 Markdown 代码块或 JSON 之外的任何内容
 - 只输出一个对象
 - 完成必要的工具核实后，直接输出结果；不输出「现在信息已核实」「开始提炼」等汇报性文字，也不输出解释或判断过程--核实这一步真实发生过，也不能在最终输出里留下任何痕迹
+- thread/summary/keywords 用中文输出
 
 输出示例：
 

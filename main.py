@@ -36,7 +36,7 @@ except KeyboardInterrupt:
     print('\n[system_quit] 接收到退出动作，正在处理后台运行任务请稍等...')
 
 finally:
-    # 在推出之前进行保险环节操作
+    # 在退出之前进行保险环节操作
     print('[system_quit] 等待后台任务完成...')
     # after_session hooks engage
     hooks.trigger(hook_point='after_session',session=session,agents=agents,memory=memory)
