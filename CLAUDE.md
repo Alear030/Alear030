@@ -28,6 +28,10 @@ python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.
 
 `python -m unittest discover -s test` 会因为 `test/loop/__init__.py` 遮蔽顶层 `loop` 包而报 `ImportError: cannot import name 'Loop'`；改用 `python -m unittest discover`（不带 `-s test`）从仓库根目录跑。
 
+`unittest discover` 跑出失败时，先用 `git stash` 回退到改动前的代码重跑一次：如果失败照样复现，说明是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只有 stash 前不失败、stash 后（=当前改动下）才失败的才是本次改动引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
+
+在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
+
 需要低成本探测模型在某个具体决策点（该不该调某个工具、该不该先读技能内容等）的反应，又不想承受真跑 `main.py` 的副作用（`ask_user_question` 阻塞 `input()`、真的写文件、真的派 subagent）时，可以绕开 Loop/session/hooks，直接用 `agents.agents['main']` 拿到常驻 Agent，手工拼消息列表调 `agent.agent_ai.chat.completions.create(model=agent.model_name, messages=..., tools=agent.tool_list, tool_choice='auto', extra_body={'thinking':{'type':'enabled'}})`，只看第一个 tool_call 是否符合预期。这类探针脚本连同输出文件跑完即删，不要留在 `test/` 下。
 
 ## 协作方式
