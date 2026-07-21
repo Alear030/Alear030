@@ -90,7 +90,7 @@ python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.
   → Session(slice_agent, summary_agent, main system prompt)
   → 主 Loop(agents, session, hooks)
   → Memory(memory agent, 独立 Loop())
-  → trigger('before_session')（timeline 经 attachment 注入）
+  → trigger('before_session')
   -> 进入输入循环
 
 一次用户输入：loop.loop_run('main', message)
@@ -110,7 +110,7 @@ python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.
 
 这三条路径职责不同：
 
-- `session_recent` 和 `memory_prompt` 在 Agent 初始化时读取磁盘并组成 main system prompt，是**启动快照**；同一进程中后续写入不会自动刷新该 prompt
+- `session_recent`、`memory_prompt`、`timeline_prompt` 在 Agent 初始化时读取磁盘并组成 main system prompt，是**启动快照**；同一进程中后续写入不会自动刷新该 prompt。`timeline_prompt` 读 `timeline.json` 做近/远分层渲染(近段含叙事线索,远段仅关键词+摘要),是 `after_session` 的 `session_timeline` hook 的唯一消费者，替代了原先经 `before_session` hook 走 attachment 注入的旧路径
 - 后台 Memory 管线将定型 slice 分类、去重并写入 `slice_node.json`，命中 `user_info` 时提炼和更新用户画像
 - `memory_recall` 主动检索历史 `session/session_detail/*.json` 中的 slice embedding，当前不以 `slice_node.json` 为检索源
 
@@ -149,7 +149,6 @@ Tool schema 由 `inspect.signature` 生成，当前排除 `self`、`agents`、`s
 
 | Hook | hook point | 模式 | 职责 |
 |------|------------|------|------|
-| `session_timeline_inject` | `before_session` | 同步 | 把历史时间线(排除最近3条,已被 session_recent 覆盖)经 attachment 注入,本 session 首条用户消息时拼接 |
 | `inject_import_args` | `pre_toolUse` | 同步 | 给工具调用注入 `agents/session/hooks/Loop` |
 | `memory_pipeline` | `after_round` | 后台 | 切片、摘要并把已定型且 worthy 的 slices 交给 Memory |
 | `session_compress` | `after_round` | 同步 | Token 超限时执行 session 压缩 |

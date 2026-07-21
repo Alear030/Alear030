@@ -1,6 +1,5 @@
 import json
 import re
-import tiktoken
 
 from json_repair import repair_json
 
@@ -28,35 +27,6 @@ from memory.memory_log import memory_log
 JUDGE_MERGED = 'merged'
 JUDGE_NO_MATCH = 'no_match'
 JUDGE_FAILED = 'failed'
-
-
-# timeline attachment token 预算与分层渲染(从 session_timeline_inject 搬来,收口为唯一实现,
-# before_session hook 与 session_compress 共用,避免分层逻辑双源漂移)
-# RECENT 预算内(或最近 MIN_FULL 条)用 full(含叙事线索 thread);超出预算的远段统一 keywords+summary
-RECENT_TIMELINE = int(2048)
-MIN_FULL_TIMELINE = int(3)
-# done(@claude): 补全 count_token,用 tiktoken gpt-4o 编码器算单段文本 token 数
-# 与 session_core._session_count_tokens 同一 gpt-4o 编码器;模块级缓存避免 timeline 循环里重复构建
-_TOKEN_ENCODING = tiktoken.encoding_for_model(model_name='gpt-4o')
-
-
-def count_token(text: str) -> int:
-    # 纯文本 token 数,不含消息列表 per-message 开销(那部分由 _session_count_tokens 按需 +4)
-    return len(_TOKEN_ENCODING.encode(text))
-
-
-# 根据 token 预算返回 timeline content:RECENT 预算内(或最近 MIN_FULL 条)用 full(含叙事线索);
-# 超出预算的远段统一 keywords+summary。远段不能只留 keywords--summary 是 agent 圈定
-# memory_recall session_ids 候选范围的关键语义线索,只给 keywords 会被当次主题稀释导致漏选
-def timeline_content(timeline, timeline_token, timeline_index):
-    sid = timeline['session_id']
-    keywords = '、'.join(timeline['keywords'])
-    summary = timeline.get('summary', '')
-    summary_seg = f"。本轮主要讲了{summary}" if isinstance(summary, str) and summary.strip() else ''
-    if timeline_index < MIN_FULL_TIMELINE or timeline_token < RECENT_TIMELINE:
-        thread = '；'.join(timeline['thread'])
-        return f"session:{sid}:关键词:{keywords}{summary_seg}。叙事线索:{thread}"
-    return f"session{sid}:关键词:{keywords}{summary_seg}"
 
 
 # 剥离模型回复外层可能包裹的 markdown 代码块或前缀/后缀文字，定位出真正的 JSON 候选片段。
@@ -236,9 +206,15 @@ class Memory:
             # 带 worthy_summary)与 slice_data 混存导致 slice_node 结构不一致;type_name 只能是
             # task/user_info 不会扩展,result:null 即纯聊天,空 slice_type 入库后永不再分类是合理终态
             slice_tag = []
-            if rq_json and 'result' not in rq_json[0]:
+            # LLM 偶尔返回 dict(如 {"result":null})而非 list,归一成 list 再取 [0](防 rq_json[0] KeyError)
+            if isinstance(rq_json, dict):
+                rq_json = [rq_json]
+            # rq_json[0] 是 dict 且不含 'result'(有分类)才处理;list of string 等异常格式跳过
+            if rq_json and isinstance(rq_json[0], dict) and 'result' not in rq_json[0]:
                 # 存在返回结果，逐个type_name更新特征库(新增/合并)，同时收集本slice的分类标签
                 for result in rq_json:
+                    if not isinstance(result, dict):
+                        continue
                     type_name:str = result['type_name']
                     type_feature:list = result['type_feature']
                     slice_tag.append({"type_name":type_name,"type_feature":type_feature})
@@ -727,12 +703,12 @@ class Memory:
 
     # session_timeline_extract 在 LLM 提炼失败(JSON 解析失败/响应形状不对/字段校验不合规)时,
     # 用 slice 原始信息降级构造 timeline_entry 写入,避免该 session 在跨会话时间线整段消失--
-    # 失败 session 通常有 4-7 个 worthy slice,整段丢失会让 before_session 注入和 memory_recall
+    # 失败 session 通常有 4-7 个 worthy slice,整段丢失会让 timeline system prompt 注入和 memory_recall
     # 的 session_ids 圈定都漏掉它。thread 直接取各 slice 的 summary_detail(未压缩,语义对齐
     # thread 定义--prompt 里 thread 本就是"逐条压缩 summary_detail",降级即不压缩);summary
     # 留空(降级无概括能力,且 keywords 已覆盖 topic 实体,留 topic 拼接冗余);keywords 聚合
     # 各 slice 的 key_words 去重不截断(保留全部唯一词,扩大 memory_recall 圈 session_ids 候选)。
-    # 标记 source='fallback' 便于追溯;消费者 timeline_content 对空 summary 做容错省略渲染
+    # 标记 source='fallback' 便于追溯;消费者 render_timeline_entry(prompt/prompts/timeline_prompt)对空 summary 做容错省略渲染
     def _fallback_timeline_entry(self,slices:list[dict],session_id:str)->dict|None:
         thread = []
         topics = []
@@ -775,40 +751,6 @@ class Memory:
         }
         memory_storage.timeline_updater(lambda timeline: timeline.append(timeline_entry))
         return timeline_entry
-
-
-    # 供 before_session hook 读取历史时间线用于 attachment 注入；对 memory_storage 的读取
-    # 统一收口在 Memory 类内，hook 不直接 import memory_storage，避免开一条平行读取路径
-    def get_historical_timeline(self,exclude_recent:int=3)->list[dict]:
-        timeline = memory_storage.get_memory_storage(file_name='timeline') or []
-        return timeline[:-exclude_recent] if exclude_recent > 0 else timeline
-
-
-    # 把历史 timeline 经 attachment 注入 session。before_session hook 与 session_compress 共用此入口,
-    # 收口为唯一实现避免分层逻辑双源漂移。compress 清空 message_list 时连带清掉首轮注入的 timeline,
-    # 必须由此恢复(谁清空谁恢复)。
-    def inject_timeline_attachment(self, session):
-        historical_timeline = self.get_historical_timeline(exclude_recent=3)
-        if not historical_timeline:
-            return
-        historical_timeline.reverse()
-
-        timeline_token = 0
-        timeline_info = None
-        for timeline_index, timeline in enumerate(historical_timeline):
-            tl_content = timeline_content(timeline=timeline, timeline_token=timeline_token, timeline_index=timeline_index)
-            timeline_info = timeline_info + '\n\n' + tl_content if timeline_info else tl_content
-            timeline_token += count_token(text=tl_content)
-
-        session.attachment.attachment_add(
-            attachment_type='notification',
-            attachment_source='session_timeline',
-            attachment_content=(
-                "以下是历史会话的时间线概览(按发生顺序,近段最详含叙事线索、远段保留关键词与一句话概括锚定 session_id,"
-                "配合 memory_recall 的 session_ids 参数圈定候选范围以提升召回准确率):\n"
-                + timeline_info
-            )
-        )
 
 
     # skill_candidates 的数据形状(task_desc/task_detail/task_slices_nodes)只有本类清楚，

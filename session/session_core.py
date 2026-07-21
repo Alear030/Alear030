@@ -330,9 +330,8 @@ class Session:
         return "以下是本次会话已压缩掉的更早片段摘要(原始消息已从上下文移除,如需细节用 session_slice 工具按坐标回读):\n" + '\n\n'.join(lines)
 
 
-    def session_compress(self, agent, memory):
-        # 压缩:token 超阈值时,把更早 slice 的 summary 经 attachment 注入(解决失忆),重新注入跨 session
-        # timeline(清空 message_list 时连带清掉了首轮注入的 timeline,谁清空谁恢复),message_list 重置为
+    def session_compress(self, agent):
+        # 压缩:token 超阈值时,把更早 slice 的 summary 经 attachment 注入(解决失忆),message_list 重置为
         # system + 最后一片原始消息(保留当前任务连续)。下一轮 _sent_message_api 把 attachment 拼入并清空
         if self._session_count_tokens(agent) >= self.max_tokens:
             # 兜底:对没 summary_detail 的片补跑(_session_slice_summary 内置守卫跳过已摘要);
@@ -347,9 +346,6 @@ class Session:
                     attachment_source='session_compress',
                     attachment_content=self._build_compress_attachment(session_slices[:-1])
                 )
-            # 重新注入跨 session timeline:compress 清空 message_list 时连带清掉了首轮注入的 timeline,
-            # 必须恢复,否则 agent 丢失更早会话的历史(谁清空谁恢复)
-            memory.inject_timeline_attachment(self)
             # 清空历史,保留 system + 最后一片原始消息(复用 session_message_reform,不改它)
             agent.message_list = self.session_message_reform()
         
