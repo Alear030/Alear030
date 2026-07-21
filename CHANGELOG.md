@@ -6,6 +6,34 @@
 
 **变更类型标签**：`[新增]` 新功能/新模块 · `[迭代]` 既有功能改进 · `[修复]` bug 修复 · `[重构]` 结构性重构 · `[收口]` 机制收敛/职责归一 · `[清理]` 版本控制治理/文档同步 · `[删除]` 移除功能。重大改动写「契机」（动机/根因）和「验证」（过程声明），小修省略。每块末尾「对应提交」列出 commit hash + 一句话，保证可回溯。
 
+## 2026-07-21 · v0.6.1 — 提炼类 prompt 中文输出约束与运行时提示措辞收紧
+
+变更：
+- [迭代] slice/summary/session_timeline 三份提炼类 prompt 补充中文输出约束：`topic`/`key_words`/`summary_detail`/`thread`/`summary`/`keywords` 统一用中文输出，英文对话也概括成中文（检索向量走中文 embedding 模型，跨语言会抵消召回）
+- [迭代] attachment_prompt 措辞收紧：删去「注入后不重复展示」这句与当前实现不符的描述，补充「非必要不向用户提到系统提示存在，默默使用」的隐蔽性要求
+- [删除] `session_recent` prompt 分块经 `enabled=False` 禁用（职责已被 timeline system prompt 分块覆盖）
+- [修复] `main.py` 退出收尾注释 typo（推出->退出）
+
+对应提交：`61da56d`(中文输出约束+attachment措辞+session_recent禁用+typo)
+
+后续计划：观察中文输出约束落地后 embedding 召回准确率变化。
+
+## 2026-07-21 · v0.6.0 — timeline 注入收口：attachment 路径改为 system prompt 分块
+
+契机：跨会话 timeline 原经 `before_session` hook 走 attachment 注入，与 `session_recent`/`memory_prompt` 的 system prompt 快照是两条并行通路，同一份 `timeline.json` 数据却分两套渲染逻辑。将 timeline 统一为 system prompt 分块，消除双源，并同次收口旧 attachment 路径。
+
+变更：
+- [新增] `prompt/prompts/timeline_prompt/prompt.py`：启动时读 `timeline.json` 做近/远分层渲染（近段含叙事线索、远段仅关键词+摘要），与旧 attachment 渲染逻辑等价但独立实现，不 import memory_core
+- [收口] 删除 `before_session/session_timeline_inject` 整个 hook，及 `memory_core.py` 的 `inject_timeline_attachment`/`get_historical_timeline` 方法与模块级 `timeline_content`/`count_token`/`RECENT_TIMELINE` 辅助代码；`session_core.session_compress` 与 `after_round/session_compress` hook 调用签名同步去掉 `memory` 参数
+- [修复] timeline_prompt 原稿两处必现 bug：`timeline` 变量未定义分支下的 `NameError`、`read_text` 缺 `encoding='utf-8'` 致 Windows 下 GBK 解码中文崩溃
+- [清理] CLAUDE.md 同步更新启动流程图、Hook 系统表与 Prompt 快照说明；补齐 `test/memory_pipeline` 两个测试文件的过时断言（`session_timeline_extract` 失败降级为 fallback entry 而非 None、`slice_type_define` 无命中返回新构造对象而非原对象）
+
+验证：AST 全量解析（302 文件）+ import 链路确认 timeline 分块注册、旧 hook 不再加载；`session_compress` 签名探针确认去 memory 依赖；36 项单测全绿；无关历史失败经 git stash 交叉验证排除。
+
+对应提交：`95591e8`(timeline system prompt 化 + 旧 attachment 路径收口)
+
+后续计划：观察 timeline system prompt 分块在真实会话中的召回效果，评估是否需要运行时刷新机制替代启动快照。
+
 ## 2026-07-17 ~ 2026-07-19 · v0.5.0 — 记忆系统闭环：任务经验技能化、跨会话时间线与可恢复压缩
 
 契机：v0.4.0 的 memory 管线已能从 slice 涌现 user_info，但 task 类经验仍随会话消散；旧 compress 几乎不触发（计数只算尾片+system 严重低估），且压缩后丢失首轮注入的 timeline。本版本闭合 task->skill 经验链路，并让 compress 真正可触发、可恢复。
