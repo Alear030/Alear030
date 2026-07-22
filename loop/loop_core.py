@@ -7,6 +7,11 @@ from rich_output import rich_print
 from .orchestrator import PlanRunner
 
 
+# 模型 API 调用失败（网络、限流、余额不足等），由 loop_run 统一兜底，不炸穿 main.py
+class LoopAPIError(Exception):
+    pass
+
+
 # 纯 ReAct 推理引擎：main agent 与 subagent 共用，对 plan 编排零感知
 class Loop:
 
@@ -30,13 +35,18 @@ class Loop:
 
 
     # 统一 LLM 调用：with_tools 决定是否携带 tools 与 thinking
+    # API 调用失败（余额不足/网络/限流等）在此翻译成 LoopAPIError，由 loop_run 统一兜底
     def _chat(self,agent,with_tools:bool)->ChatCompletionMessage:
         params = {'model':agent.model_name,'messages':agent.message_list}
         if with_tools:
             params['tools'] = agent.tool_list
             params['tool_choice'] = 'auto'
             params['extra_body'] = {'thinking':{'type':'enabled'}}
-        return agent.agent_ai.chat.completions.create(**params).choices[0].message
+        try:
+            return agent.agent_ai.chat.completions.create(**params).choices[0].message
+        except Exception as ee:
+            rich_print(message=f'模型调用失败：{ee}',type='system_error')
+            raise LoopAPIError(str(ee)) from ee
 
 
     # pre_toolUse hooks 处理，返回需透传给工具的非 JSON 参数
@@ -85,7 +95,13 @@ class Loop:
             if self.session:
                 self.session.session_message_insert(role='user',content=message_content)
 
-        agent_rq = self._chat(agent,with_tools=True)
+        try:
+            agent_rq = self._chat(agent,with_tools=True)
+        except LoopAPIError:
+            # 失败时弹出刚 append 的 user 消息，避免下一轮出现连续两条 user 消息
+            if message_content:
+                agent.message_list.pop()
+            raise
         agent.message_list.append(agent_rq)
 
         if self.session:
@@ -171,7 +187,12 @@ class Loop:
         agent.message_list.append({'role':'user','content':notice})
         if self.session:
             self.session.session_message_insert(role='user',content=notice)
-        final_rq = self._chat(agent,with_tools=False)
+        try:
+            final_rq = self._chat(agent,with_tools=False)
+        except LoopAPIError:
+            # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息
+            agent.message_list.pop()
+            raise
         agent.message_list.append(final_rq)
 
         if self.session:
@@ -223,14 +244,20 @@ class Loop:
 
 
     # 对外入口：解析 agent（agent 实例或 agent_name 二选一）→跑一轮→plan 编排→触发 after_round hook
+    # 模型 API 失败在此统一兜底：本轮提前结束，不炸穿 main.py 的顶层循环
     def loop_run(self,agent = None,agent_name:str=None,message:str=None):
         agent = agent if not agent_name else self._get_agent(agent_name=agent_name)
-        result = self.run_turn(agent=agent,message=message)
+        try:
+            result = self.run_turn(agent=agent,message=message)
 
-        # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_round 之前完成以保原切片时机
-        plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
-        if plan_result is not None:
-            result = plan_result
+            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_round 之前完成以保原切片时机
+            plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
+            if plan_result is not None:
+                result = plan_result
+        except LoopAPIError as ee:
+            result = f'[系统错误] 模型调用失败，本轮未完成：{ee}'
+            if self.session:
+                self.session.round += 1
 
         # @claude bug:loop_run 用 if self.session 当打印 agent_content 的条件不精确
         # memory agent 复用全局 loop 也带 session,后台记忆提炼 JSON 被误打印成主回复干扰用户
