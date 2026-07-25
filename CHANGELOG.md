@@ -6,6 +6,55 @@
 
 **变更类型标签**：`[新增]` 新功能/新模块 · `[迭代]` 既有功能改进 · `[修复]` bug 修复 · `[重构]` 结构性重构 · `[收口]` 机制收敛/职责归一 · `[清理]` 版本控制治理/文档同步 · `[删除]` 移除功能。重大改动写「契机」（动机/根因）和「验证」（过程声明），小修省略。每块末尾「对应提交」列出 commit hash + 一句话，保证可回溯。
 
+> **⚠ v0.6.2 及更早版本块的 commit hash 已全部失效**：2026-07-26 对仓库执行过一次 `git filter-repo` 历史重写（清理泄漏语料），全部 49 个 commit 的 hash 随之改变，写入时正确的旧 hash 现已无法解析。待开源前历史彻底定稿后统一回填——2026-07-05 之后的 commit 可按 message 的 `YYYYMMDD_HHMMSS` 前缀经 `git log --grep` 定位（该前缀写在 message 正文里，不随历史重写变化），更早的 14 个 commit 无稳定前缀，需按日期与描述人工比对。
+
+## 2026-07-26 · v0.6.5 — hook 补齐 enabled 开关，三套注册表范式对齐
+
+契机：tool（`tool_enabled`）和 prompt（`enabled`）两套注册表都带整体开关，只有 hook 缺，想临时停掉某个钩子只能注释整个装饰器或给目录加下划线前缀，粗糙且容易忘记还原。本次不引入新机制，只把已存在的范式补到第三套注册表上。
+
+变更：
+- [新增] `HookDef` 加 `enabled: bool = True` 字段，`hooks.register(..., enabled=False)` 声明式禁用；带默认值的字段放在 dataclass 末尾，不打乱现有位置参数构造
+- [新增] `trigger()` 循环开头按 `enabled` 过滤，过滤点特意置于 `_match` 与线程池 `submit` 之前——否则 `background=True` 的禁用钩子仍会进 `_pending`，导致 `wait_all()` 退出时白等
+- [迭代] `register` 加载日志区分 ` (disabled)` 后缀，启动时一眼看出哪些钩子是关的
+- 现有 5 个 hook 全不传参走默认 `True`，行为零变化
+
+验证：临时脚本 4 项断言（默认状态未变、禁用不触发且返回空列表、禁用与 `match` 条件正交、后台禁用不进 `_pending`）+ 全量 `unittest` 10 项通过，脚本验证后删除。
+
+对应提交：`b2acec9`(hook enabled 开关)
+
+后续计划：暂不加 `hooks.disable()`/`enable()` 运行时方法（当前无调用方，属投机性控制面），需要在进程运行中切换钩子时再评估。
+
+## 2026-07-26 · v0.6.4 — 开源前收尾：文档对齐代码、依赖声明补全与路径校验修复
+
+契机：README 多处描述已与代码实际漂移（agent 数量、prompt 分块数、tool 列表、memory 模块状态），`pyproject.toml` 缺 10 个运行时依赖声明，新用户按文档走不通完整上手流程；同轮排查中发现三处路径校验因 API 误用而形同虚设。
+
+变更：
+- [修复] `file_read`/`file_glob`/`file_grep` 三处绝对路径校验误用 `Path.absolute()` 而非 `is_absolute()`——前者对相对路径也返回真值，校验形同虚设
+- [新增] `LICENSE`（MIT）与 `.env.example`；后者只列运行必需的三级模型配置，`VOLC_*`/`BENCH_API_KEY` 等历史遗留或 benchmark 专用键不列入，避免误导新用户
+- [迭代] `pyproject.toml` 补全 `description` 及此前一直缺失的 10 个运行时依赖声明（openai/pyyaml/tiktoken/rich/sentence-transformers/ddgs/requests/beautifulsoup4/numpy/python-dotenv）
+- [清理] README 修正与代码漂移的多处描述：agents.yaml 4→5 个 agent（补 memory）、prompt 分块 6→9 块（补 memory_prompt/timeline_prompt/attachment_prompt）、hook 目录树按 hook point 重排、tool 列表补 skill_finish/interaction 并删已废弃的 user_intention 引用、memory 模块描述从「开发中空白骨架」更正为「分类/去重/画像/时间线主线已跑通」；运行章节补 `git clone`→`pip install`→`cp .env.example .env` 完整上手流程
+- [重构] `user_intention` 工具：删调试 print、修拼写错误变量名（masseges→messages、rounter→router），配置读取从 `.env` 里并不存在的 `main_BASE_URL` 等废弃键改为对齐项目统一的 `config.MODEL_LEVEL` 模式（工具本身仍保持 disabled）
+- [清理] 移除两处死代码（memory_pipeline hook 里注释掉的测试短路 `return`、session_core 里被 print 替代后遗留的 rich_print 死注释）及 `memory_core.py` 一处写死的本机绝对路径注释；`security.py` 移除对 Claude Code 源码文件路径/行数的具体归属描述，只保留通用设计模型说明；`.gitignore`/CLAUDE.md 补充 `.cc_file/` 目录约定
+
+对应提交：`3749de5`(开源前收尾)
+
+后续计划：核实 `skill_finish`/`skill_list` 的 `skill_name` 参数是否需要防路径穿越校验（rglob 实测证明当前不可利用，可标注为已验证无需修改）；推进 README「安全边界」说明段落；决定是否为 memory_storage/memory_config 提供脱敏 demo 数据。
+
+## 2026-07-22 · v0.6.3 — 模型 API 失败的统一错误边界
+
+契机：模型 API 调用失败（如账户余额不足）会直接崩穿 `main.py` 顶层循环、丢掉整轮对话。落地 20260702 暂缓方案（`polished-wondering-cook.md`）的第一部分，用统一错误边界替代层层 try/except。
+
+变更：
+- [修复] 三处 `chat.completions.create` 共用的 `_chat` 统一把裸异常翻译成 `LoopAPIError`（rich_print system_error 面板 + `raise from` 保留异常链）
+- [修复] `_sent_message_api`/`_force_final_reply` 失败时回滚多塞进 `message_list` 的那条消息，避免残留连续两条 user 消息
+- [修复] `loop_run` 顶层 `except LoopAPIError` 兜底返回错误字符串，并手动补 `session.round += 1`（因该路径跳过了 `_close_round`）
+
+验证：`unittest.mock` 临时探针验证异常翻译、消息回滚、`loop_run` 不崩、round 正确自增共 4 项，验证后删除。
+
+对应提交：`a658907`(统一错误边界)
+
+后续计划：`_tool_calls_api` 的 tool_calls 参数解析（`json.loads`）和 `match_tool` 的工具内部异常两块仍未纳入此边界，留在原方案里，后续需要时再确认范围。
+
 ## 2026-07-21 · v0.6.2 — CLAUDE.md 补充验证经验
 
 变更：
