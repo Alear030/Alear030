@@ -37,11 +37,13 @@ def file_glob(pattern:str,path:str=None,**kwargs)->str:
 
     matched_files.sort(key=lambda f:f.stat().st_mtime,reverse=True)
 
-    truncated = len(matched_files) > MAX_RESULTS
+    # 总数要在截断前记下,否则达上限时永远只会报 MAX_RESULTS,真实匹配量丢失
+    matched_total = len(matched_files)
+    truncated = matched_total > MAX_RESULTS
     matched_files = matched_files[:MAX_RESULTS]
 
-    header = f"[file_glob] 匹配到 {len(matched_files)} 个文件"
+    header = f"[file_glob] 匹配到 {matched_total} 个文件"
     if truncated:
-        header += f"（已达单次上限 {MAX_RESULTS} 条，请缩小 pattern 范围）"
+        header += f"（已达单次上限 {MAX_RESULTS} 条，仅显示前 {MAX_RESULTS} 条，请缩小 pattern 范围）"
 
     return header + '\n\n' + '\n'.join(str(f) for f in matched_files)

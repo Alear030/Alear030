@@ -7,10 +7,23 @@ from .security import validate_command,is_destructive_category,is_write_category
 MAX_TIMEOUT = 120
 
 # ── 编码处理 ──
-# Windows 中文环境默认 GBK (cp936)，Linux/macOS 默认 UTF-8。
-# 硬编码 utf-8 会导致 Windows 下中文命令输出乱码。
-# locale.getpreferredencoding() 自动获取系统实际编码。
+# 子进程输出没有单一正确编码：Windows 原生命令(dir/systeminfo)按系统码页输出(中文环境 GBK)，
+# 而 Python 脚本、git 等普遍输出 UTF-8。固定用任何一方解码都会让另一方乱码
+# (硬编码 utf-8 曾导致原生命令中文乱码，固定系统编码则导致 Python 输出乱码，两个坑都踩过)。
+# 因此不在 subprocess 层解码，改为取 bytes 后由 _decode 按 UTF-8 优先、失败回落系统编码。
 _SYSTEM_ENCODING = locale.getpreferredencoding(do_setlocale=False)
+
+
+def _decode(raw:bytes)->str:
+    # UTF-8 是自校验编码：整段能解通基本就是 UTF-8，解不通说明是本地码页。
+    # 已知残余风险：极短的 GBK 中文(一两个汉字)有小概率碰巧构成合法 UTF-8 而被误判；
+    # 长文本几乎必然触发回落，这是该策略的固有代价。
+    if not raw:
+        return ''
+    try:
+        return raw.decode('utf-8')
+    except UnicodeDecodeError:
+        return raw.decode(_SYSTEM_ENCODING,errors='replace')
 
 tool_desc = '执行本地 shell 命令（白名单安全模型），返回退出码、stdout 和 stderr'
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
@@ -59,9 +72,6 @@ def command(command:str,timeout:int=120,**kwargs)->str:
             command,
             shell=True,
             capture_output=True,
-            text=True,
-            encoding=_SYSTEM_ENCODING,
-            errors="replace",
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
@@ -77,8 +87,8 @@ def command(command:str,timeout:int=120,**kwargs)->str:
             f"错误: {type(e).__name__}: {e}"
         )
     
-    stdout = result.stdout.strip() if result.stdout else "(无输出)"
-    stderr = result.stderr.strip() if result.stderr else "(无输出)"
+    stdout = _decode(result.stdout).strip() or "(无输出)"
+    stderr = _decode(result.stderr).strip() or "(无输出)"
     exit_code = result.returncode
 
     category_label = {

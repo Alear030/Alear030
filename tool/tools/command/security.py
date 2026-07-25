@@ -1189,10 +1189,6 @@ def _check_injection(command: str) -> tuple[bool, str]:
         if ch == "$" and i + 1 < len(command) and command[i + 1] == "{" and not in_single:
             return (False, "命令包含 ${} 参数替换")
 
-    # 换行符
-    if "\n" in command or "\r" in command:
-        return (False, "命令包含换行符，可能分隔多个命令")
-
     # 重定向（在引号外的）
     unquoted = ""
     in_single = False
@@ -1214,6 +1210,11 @@ def _check_injection(command: str) -> tuple[bool, str]:
             continue
         if not in_single and not in_double:
             unquoted += ch
+
+    # 换行符：只查引号外的。引号内的换行是单条命令的参数内容(如 python -c 的多行脚本)，
+    # 引号外的换行才真正分隔多个命令、能绕过白名单
+    if "\n" in unquoted or "\r" in unquoted:
+        return (False, "命令包含换行符，可能分隔多个命令")
 
     if ">" in unquoted:
         return (False, "命令包含输出重定向 >，可能写入文件")

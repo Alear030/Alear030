@@ -28,13 +28,13 @@ def _get_session_detail_ids():
 
 # 得到一个session detail中的slice,并注入session_id
 def _get_slice(session_file)->list:
-    # 得到slice
+    # 得到slice；刚创建还没切片的 session 没有 session_slice 键，用 .get 兜住不让整次召回崩
     session_json = _json_read(file_path=session_file)
-    session_slice = session_json['session_slice']
+    session_slice = session_json.get('session_slice') or []
 
     # 将session_id注入到每个slice中 并且附上embedding数值
     for slice in session_slice:
-        slice['session_id'] = session_json['session_id']
+        slice['session_id'] = session_json.get('session_id','')
     return session_slice
 
 # 并发得到全部session detail的slice；传入session_ids时收窄到交集,避免全量扫描
@@ -49,9 +49,14 @@ def _get_slices(session_ids:list[str]=None):
             tp.submit(_get_slice,SESSION_MEMORTY_DETAIL_PATH/f'{session_id}.json'):session_id for session_id in session_ids
         }
         slice_results = []
+        failed = []
         for thread in as_completed(get_slice_queue):
-            slice_results += thread.result()
-    return slice_results
+            # 单个 session 文件损坏/结构异常不该毁掉整次召回，跳过并记名字，由调用方报出去
+            try:
+                slice_results += thread.result()
+            except Exception as ee:
+                failed.append(f'{get_slice_queue[thread]}({type(ee).__name__})')
+    return slice_results,failed
 
 
 @register_tool(tool_name='memory_recall',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
@@ -63,25 +68,43 @@ def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:li
 
     # 得到slices并对每一个slice的embedding和target_embedding计算余弦相似度；
     # session_ids 非空时收窄扫描范围,为空则维持原有全量扫描行为
-    slices = _get_slices(session_ids=session_ids)
+    slices,failed_files = _get_slices(session_ids=session_ids)
+
+    # 历史 slice 可能缺 slice_embedding(早期数据没这个字段)，无向量无法算相似度，跳过而非崩掉
+    scored_slices = []
+    skipped_no_embedding = 0
     for slice in slices:
-        slice_vec = embedding_from_b64(slice['slice_embedding'])
+        embedding_b64 = slice.get('slice_embedding')
+        if not embedding_b64:
+            skipped_no_embedding += 1
+            continue
+        slice_vec = embedding_from_b64(embedding_b64)
         # 点积后除以长度积 转float类型数值保存 A·B = |A| × |B| × cos(θ)
         slice['score'] = float(np.dot(slice_vec,target_vec)/(np.linalg.norm(target_vec) * np.linalg.norm(slice_vec)))
-    
+        scored_slices.append(slice)
+
     # 对slices按照score进行排序，得到top-k的结果并返回，同时对slice进行处理
-    slices.sort(key=lambda x:x['score'],reverse=True)
+    scored_slices.sort(key=lambda x:x['score'],reverse=True)
     slices_results = []
-    for slice in slices:
+    for slice in scored_slices[:top_k]:
+        anchor = slice.get('slice_anchor') or {}
         slices_results.append({
-            "session_id":slice['session_id'],
-            "topic":slice['slice_anchor']['topic'],
-            "start_round":slice['start_round'],
-            "end_round":slice['end_round'],
-            "key_words":slice['slice_anchor']['key_words'],
-            "summary_detail":slice['slice_anchor']['summary_detail'],
+            "session_id":slice.get('session_id',''),
+            "topic":anchor.get('topic',''),
+            "start_round":slice.get('start_round'),
+            "end_round":slice.get('end_round'),
+            "key_words":anchor.get('key_words',[]),
+            "summary_detail":anchor.get('summary_detail',''),
             "score":slice['score']
         })
 
+    # 跳过/失败不静默吞掉，否则召回结果变少却看不出原因
+    payload = {"results":slices_results}
+    if skipped_no_embedding:
+        payload["skipped_no_embedding"] = skipped_no_embedding
+    if failed_files:
+        payload["failed_session_files"] = failed_files
 
-    return json.dumps(slices_results[:top_k],ensure_ascii=False)
+    if skipped_no_embedding or failed_files:
+        return json.dumps(payload,ensure_ascii=False)
+    return json.dumps(slices_results,ensure_ascii=False)

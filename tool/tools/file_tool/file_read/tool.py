@@ -61,7 +61,8 @@ def file_read(file_path:str,offset:int=0,limit:int=2000,**kwargs)->str:
     line_end = offset + selected_line
     file_header = f'[file_reader]文件：{file_path}\n总行数:{lines_total},显示:{offset+1} - {line_end}'
 
+    # 追加而非覆盖:覆盖会丢掉文件路径/总行数/当前范围,agent 就不知道该用哪个 offset 接着读
     if limit == MAX_LINES and selected_line == MAX_LINES:
-        file_header = f'\n已达到单次读取文本上限{MAX_LINES}行，如需继续读取请使用offset继续读取'
+        file_header += f'\n已达到单次读取文本上限{MAX_LINES}行，如需继续读取请使用offset={line_end}继续读取'
 
     return file_header + '\n\n' + '\n'.join(lines_contents)
