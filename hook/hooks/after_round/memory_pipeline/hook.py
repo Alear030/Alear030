@@ -17,9 +17,6 @@ def memory_pipeline(session=None, memory=None, hooks=None,**kwargs):
     session._session_slice()
     session._session_summary()
 
-    # # ________ hook test avoid __________
-    # return
-    
     # memory 未注入(如无记忆的纯推理模式)→ 切片已落地,pipeline 阶段跳过
     if memory is None:
         return

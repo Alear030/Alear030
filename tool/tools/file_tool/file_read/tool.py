@@ -16,7 +16,7 @@ else:
 def file_read(file_path:str,offset:int=0,limit:int=2000,**kwargs)->str:
     file_path = Path(file_path)
 
-    if not file_path.absolute():
+    if not file_path.is_absolute():
         return f'错误:file_path必须是绝对路径，收到{file_path}'
     
     if not file_path.exists():

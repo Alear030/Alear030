@@ -46,3 +46,5 @@ memory/memory_config/backup/
 # benchmark 专用 API key(不提交 git,test/longmemeval_bench/bench_secret.py)
 test/longmemeval_bench/bench_secret.py
 
+# 准用于claudecode产出代码的文件夹
+.cc_file/

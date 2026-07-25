@@ -14,7 +14,6 @@ from .attachment_core import Attachment
 
 def _json_read(file_path:Path):
     if file_path.is_dir():
-        # rich_print(message='error:path is dir',type='system_error')
         return
     file_text = file_path.read_text(encoding='utf-8')
 

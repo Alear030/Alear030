@@ -322,7 +322,7 @@ class Memory:
 
     # 开始处理user_info_json
     def user_info_reform(self,rq_json):
-        # # 本函数说明：处理memmory_agent在user_info_extract输出的信息，然后对D:\Alear030\memory\memory_config\memory_configs\user_info.json 中的参考模板进行处理
+        # # 本函数说明：处理memory_agent在user_info_extract输出的信息，然后对 memory_config/memory_configs/user_info.json 中的参考模板进行处理
         # ## 处理类型
         # 1 - type_name\type_desc\type_feature 全部已有 - 不处理
         # 2 - type_name\type_desc已有 type_feature变更 - 新增

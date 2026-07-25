@@ -1,16 +1,13 @@
-import os
 import json
 
-from dotenv import load_dotenv
 from rich_output import rich_print
 from tool.tool_core import register_tool
 from json import JSONDecodeError
 from openai import OpenAI
 from pathlib import Path
+from config import MODEL_LEVEL
 
-load_dotenv()
-
-rounter_prompt = """
+router_prompt = """
 你是一个意图识别器，依据输入的关键词判断用户意图，输出JSON格式内容
 
 ## 意图分类 P0 - P1
@@ -94,26 +91,23 @@ else:
 
 @register_tool(tool_name='user_intention',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=False,tool_autho='basic_tool')
 def user_intention(user_content:str,**kwargs)->dict:
-    print('\nuser_intentionsing....\n')
-    print('\nuser_intention-s key_word is :'+user_content+'\n')
-    user_intentions = []
-
-    intention_ai = OpenAI(base_url=os.getenv('main_BASE_URL'),api_key=os.getenv('main_API_KEY'))
-    intention_ai_masseges = []
-    intention_ai_masseges.append({'role':'system','content':rounter_prompt})
-    intention_ai_masseges.append({'role':'user','content':user_content})
+    intention_level = MODEL_LEVEL['low_level']
+    intention_ai = OpenAI(base_url=intention_level['base_url'],api_key=intention_level['api_key'])
+    intention_ai_messages = [
+        {'role':'system','content':router_prompt},
+        {'role':'user','content':user_content}
+    ]
 
     rq = intention_ai.chat.completions.create(
-        model=os.getenv('SUBAGENT_MODEL_NAME'),
-        messages=intention_ai_masseges
+        model=intention_level['model_name'],
+        messages=intention_ai_messages
     )
-
 
     try:
         intention_ai_rq = json.loads(rq.choices[0].message.content)
     except JSONDecodeError as JE:
         return f'分析输出格式错误，错误原因:{JE}'
-    
+
     user_intention_result = f'\n--- user intention_tool: 根据关键词{intention_ai_rq["key_word"]}分析，用户的意图是{intention_ai_rq["intent"]},原因是{intention_ai_rq["reason"]}----\n'
 
     rich_print(message=user_intention_result,type='tool_result')

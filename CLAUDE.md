@@ -85,6 +85,8 @@ python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.
 
 `workspace/`、`z_ccstudy/`、`z_old_code/` 不参与主项目分析。
 
+`.cc_file/`（已 `.gitignore`）是非项目内容的存放位置（笔记、复盘、外部材料等），不参与项目代码分析，不受"外科手术式改动"等代码规范约束。
+
 ## 核心运行数据流
 
 ### 启动、顶层轮次与退出
@@ -124,10 +126,12 @@ python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.
 
 `loop/loop_core.py` 的 `Loop` 是 main 和项目临时 Subagent 共用的纯 ReAct 引擎；不传 `session`/`hooks` 时为无持久化模式。Plan 编排位于 `loop/orchestrator.py`，不应回塞进 Loop。
 
-两个非显而易见的设计决策：
+四个非显而易见的设计决策：
 
 - **强制收尾靠物理断供而非提示词**：`_force_final_reply` 不传 tools，让模型只能输出文本
 - **mode 切换靠 diff 而非信任模型自觉**：工具批次执行前后比较 `session.mode`，一旦切换便停止同批剩余工具并补齐 tool results
+- **模型 API 失败靠统一错误边界而非层层 try/except**：三处 `chat.completions.create` 共用的 `_chat` 把裸异常翻译成 `LoopAPIError`，`loop_run` 顶层统一兜底返回错误字符串，不炸穿 `main.py`；`_tool_calls_api` 的参数解析和 `match_tool` 的工具内部异常仍未纳入此边界（20260702 方案 `polished-wondering-cook.md` 的另外两部分，暂缓）
+- **thinking 与 tools 强绑定**：`_chat` 里 `with_tools=True` 时 `extra_body` 固定带 `thinking:enabled`，两者没有拆开的独立开关；想单独关某次调用的 thinking（如高频调用的性能优化）又要保留 tools，需要先解耦这个方法，会影响 main agent 真实运行时行为——不带 tools 的独立直调（如 `session_core.py::_session_slice`、`memory_core.py::slice_type_define`）可以各自直接传 `extra_body` 关闭，不受此绑定影响
 
 `PlanRunner.run()` 在非 plan 模式下直接返回；plan 模式通过 `session.plan.advance()` 取得当前 step，按连续重复的 `step_number` 和 `PLAN_STALL_LIMIT` 检测无进展。未来 GoalRunner 可在其外层做目标验收与重新规划，无需修改 Loop。
 

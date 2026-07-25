@@ -18,7 +18,7 @@ else:
 def file_glob(pattern:str,path:str=None,**kwargs)->str:
     search_path = Path(path) if path else WORK_SPACE
 
-    if not search_path.absolute():
+    if not search_path.is_absolute():
         return f"错误: path 必须是绝对路径，收到: {path}"
 
     if not search_path.exists():
