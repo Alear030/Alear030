@@ -19,6 +19,7 @@ class HookDef:
     func: Callable #钩子函数本身
     background: bool = False #True=后台线程异步跑不等结果，False=同步跑等待完成
     match: dict | list[dict] | None = None # None=无条件触发 {"tool": "write_file"}=只匹配该工具
+    enabled: bool = True # 整体开关，False时该钩子仍注册但永不触发（对应tool的tool_enabled、prompt的enabled）
 
 
 class HookManager:
@@ -37,13 +38,14 @@ class HookManager:
         self._pending: list[tuple[str,Any]] = []
 
 
-    def register(self,hook_point:str,background:bool=False,match:dict|None=None):
+    def register(self,hook_point:str,background:bool=False,match:dict|None=None,enabled:bool=True):
         if hook_point not in self._hooks:
             self._hooks[hook_point] = []
 
         def add_hook(func):
-            rich_print(f'hook {func.__name__} loaded...',type='system_message')
-            hook_def = HookDef(func=func,background=background,match=match)
+            status = '' if enabled else ' (disabled)'
+            rich_print(f'hook {func.__name__} loaded{status}...',type='system_message')
+            hook_def = HookDef(func=func,background=background,match=match,enabled=enabled)
             self._hooks[hook_point].append(hook_def)
             return func
 
@@ -59,6 +61,10 @@ class HookManager:
         results:list[HookResult] = []
 
         for hook_def in self._hooks.get(hook_point,[]):
+
+            # 放在 _match 和 submit 之前：禁用的后台钩子不能进线程池，否则 wait_all 退出时还要等它
+            if not hook_def.enabled:
+                continue
 
             if not self._match(hook_def,match_ctx):
                 continue
