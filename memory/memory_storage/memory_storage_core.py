@@ -4,7 +4,10 @@ import threading
 from pathlib import Path
 
 
+# memory_storages/ 已 gitignore 且无占位文件,全新 clone 上并不存在;
+# 下面各处 write_text 都不建目录,故在模块导入时统一建好,避免首次写入时 FileNotFoundError
 storages_path = Path(__file__).parent/'memory_storages'
+storages_path.mkdir(parents=True,exist_ok=True)
 
 class Memory_storage:
     def __init__(self):

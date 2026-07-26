@@ -56,3 +56,5 @@ MEMORY_STORAGE_PATH = Path(__file__).parent/'memory'/'memory_storage'/'memory_st
 # loacal model
 LOCAL_MODEL_PATH = Path(__file__).parent/'local_model'
 LOCAL_EMBEDDING_MODEL = Path(__file__).parent/'local_model/iic/nlp_gte_sentence-embedding_chinese-base'
+# 权重不进版本控制,缺失时按此 id 从 ModelScope 自动下载到 LOCAL_MODEL_PATH(下载后路径即 LOCAL_EMBEDDING_MODEL)
+MODELSCOPE_EMBEDDING_ID = 'iic/nlp_gte_sentence-embedding_chinese-base'

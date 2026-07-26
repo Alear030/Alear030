@@ -40,8 +40,10 @@ memory/memory_log/memory_logs/
 # memory config 备份(运行时快照,不进版本控制)
 memory/memory_config/backup/
 
-# Claude Code 本地配置(CLAUDE.md 已纳入跟踪,供并行 worktree 共享项目宪法)
+# Claude Code 本地配置与协作契约(CLAUDE.md 含协作方式约定及指向 .claude/ 内技能的引用,
+# 技能本体不上传会成悬空引用,故一并不纳入版本控制)
 .claude/
+CLAUDE.md
 
 # benchmark 专用 API key(不提交 git,test/longmemeval_bench/bench_secret.py)
 test/longmemeval_bench/bench_secret.py

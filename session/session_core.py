@@ -33,6 +33,9 @@ def _json_write(content:str=None,file_path:Path=None):
         print('null content is none can not write in a json file')
         return
 
+    # session_detail/ 已 gitignore 且无占位文件,全新 clone 上并不存在;
+    # 上面的 is_dir() 对不存在的路径返回 False 不拦,故此处必须建目录,否则首次启动写 session 即 FileNotFoundError
+    file_path.parent.mkdir(parents=True,exist_ok=True)
     file_path.write_text(
         json.dumps(content,ensure_ascii=False,indent=2),
         encoding='utf-8'
