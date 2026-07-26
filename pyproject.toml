@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "alear030"
 version = "0.1.0"
@@ -17,3 +21,9 @@ dependencies = [
     "numpy==2.4.5",
     "python-dotenv==1.2.1",
 ]
+
+# Alear030 是从仓库根目录 python main.py 运行的应用，不作为库被外部 import。
+# pip install -e . 的用途仅是装依赖，故显式声明不打包任何模块——
+# 否则 flat layout 下 setuptools 自动发现会因根目录多个顶层包而报错。
+[tool.setuptools]
+packages = []

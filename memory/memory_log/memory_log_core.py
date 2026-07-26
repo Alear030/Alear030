@@ -6,9 +6,14 @@ from datetime import datetime
 from pathlib import Path
 
 
-# 记录 memory 管线的失败诊断与正常评估两类日志，均含 agent 最终输出与 thinking。
-# 日志可能含真实会话内容，memory_logs 不进版本控制；项目开源前必须删除本模块及其调用，或改为脱敏实现。
+# 记录 memory 管线的失败诊断与正常评估两类日志。
+# 日志可能含真实会话内容，memory_logs 不进版本控制。
 memory_logs_path = Path(__file__).parent/'memory_logs'
+
+# 是否把 agent 的最终输出与 thinking 写进日志。默认关闭：这两项是唯一含真实会话内容的字段，
+# 对外分发时不应默认落盘；关闭后仍保留 stage/slice_ref/error/traceback，足以定位是哪一片在哪个阶段失败。
+# 本地排查静默丢片或评估 prompt 质量时手动置 True。
+LOG_AGENT_RESPONSE = False
 
 
 class Memory_log:
@@ -49,9 +54,10 @@ class Memory_log:
                 'end_round':slice_data.get('end_round')
             }
 
-        response = agent_response if agent_response is not None else self._agent_response(agent)
-        if response is not None:
-            log['agent_response'] = response
+        if LOG_AGENT_RESPONSE:
+            response = agent_response if agent_response is not None else self._agent_response(agent)
+            if response is not None:
+                log['agent_response'] = response
 
         return log
 

@@ -24,9 +24,9 @@ z_ccstudy/
 workspace/
 z_old_code/
 
-# 过程文件
+# 过程文件(真实会话与计划运行数据)
 session/session_detail/
-session/session_plan
+session/session_plan/
 
 # 测试数据与代码(含真实 session slice / 用户画像语料 / 一次性验证脚本,不进版本控制)
 test/
@@ -34,7 +34,7 @@ test/
 # memory 运行时记忆数据(真实画像/节点/时间线,不进版本控制)
 memory/memory_storage/memory_storages/
 
-# memory 失败诊断日志(可能含 agent 输出与 thinking,不进版本控制；开源前删除日志模块或改为脱敏实现)
+# memory 诊断与评估日志(agent 输出与 thinking 默认不落盘,见 memory_log_core.LOG_AGENT_RESPONSE)
 memory/memory_log/memory_logs/
 
 # memory config 备份(运行时快照,不进版本控制)
