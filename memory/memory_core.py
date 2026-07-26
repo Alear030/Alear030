@@ -824,7 +824,12 @@ class Memory:
     # 方法说明：将切片的分类、存储、按照type分配管道进行统合，方便hook直接对接
     # session 由 hook 逐次调用传入(不进 __init__)：attachment 归属当前 session，slices_pipeline 只在
     # 拿到 skill_candidates 时按需消费，session 为 None(如单测、未来离线批处理)则跳过 attachment 写入
-    def slices_pipeline(self,slices:list[dict],messages:list[dict],session=None):
+    def slices_pipeline(self,slices:list[dict],messages:list[dict],session=None,enable:bool=True):
+
+        # 控制全局memory_pipeline处理开关，用于静默测试，不改变userinfo或是tasknodes等相关落盘文件信息
+        if not enable:
+            return
+
         # done(@claude): 尾片排除 slices[:-1] 挪到 hook 做传入数据预处理,memory_core 只接定型片直接处理;身份去重留在本层(读 memory_storage 属内部状态)
         # 入参 slices 已由 hook 预处理:排除了仍在生长的尾片,均为定型可处理片
         if not slices:

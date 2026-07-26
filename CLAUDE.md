@@ -14,25 +14,7 @@ python main.py    # 交互式 REPL；Ctrl+C 触发有序收尾
 
 依赖根目录 `.env` 中的三级模型配置（`max_level` / `medium_level` / `low_level`），由 `config.py` 读取。当前 `pyproject.toml` 尚未声明完整运行依赖，也没有锁文件，不能把 `pip install -e .` 等命令当成可复现的完整安装方案。
 
-`python main.py` **不是无副作用的冒烟测试**：`Session()` 在启动时就创建 `session/session_detail/<session_id>.json`；每次交互和退出收尾都可能调用模型 API，并更新 session、memory storage 和 memory config。当前已有局部 `unittest`，但尚无覆盖运行主流程的成体系测试套件；按改动位置运行对应测试，不要假设 `test/` 中每项均可执行。
-
-只需低副作用检查 Python 语法时可使用 AST 解析（不会导入项目、调用 API 或生成 `.pyc`）：
-
-```bash
-python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.venv'}; files=[p for p in pathlib.Path('.').rglob('*.py') if not any(part in excluded for part in p.parts)]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in files]; print(f'AST OK: {len(files)} files')"
-```
-
-这只证明源码可解析，不等价于依赖、模块注册或端到端行为验证。
-
-需要 import 项目内部模块验证具体逻辑（如某个 prompt 拼装函数）时，`import` 本身会触发 hook/prompt/tool 三套自动发现的装饰器注册，打印一串 "tool X loaded..." / "prompt Y loaded..."；这是注册副作用，不是错误，不要据此判断改动出了问题。验证脚本必须以 `python -m 包.路径.脚本名`（点号路径，不带 `.py`）从仓库根目录调用；直接 `python test/xxx/script.py` 即使 cwd 在根目录也会报 `ModuleNotFoundError`（Python 把脚本自身所在目录塞进 `sys.path[0]`，不是 cwd）。
-
-`python -m unittest discover -s test` 会因为 `test/loop/__init__.py` 遮蔽顶层 `loop` 包而报 `ImportError: cannot import name 'Loop'`；改用 `python -m unittest discover`（不带 `-s test`）从仓库根目录跑。
-
-`unittest discover` 跑出失败时，先用 `git stash` 回退到改动前的代码重跑一次：如果失败照样复现，说明是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只有 stash 前不失败、stash 后（=当前改动下）才失败的才是本次改动引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
-
-在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
-
-需要低成本探测模型在某个具体决策点（该不该调某个工具、该不该先读技能内容等）的反应，又不想承受真跑 `main.py` 的副作用（`ask_user_question` 阻塞 `input()`、真的写文件、真的派 subagent）时，可以绕开 Loop/session/hooks，直接用 `agents.agents['main']` 拿到常驻 Agent，手工拼消息列表调 `agent.agent_ai.chat.completions.create(model=agent.model_name, messages=..., tools=agent.tool_list, tool_choice='auto', extra_body={'thinking':{'type':'enabled'}})`，只看第一个 tool_call 是否符合预期。这类探针脚本连同输出文件跑完即删，不要留在 `test/` 下。
+验证改动是否可用时用 `alear030-verify` 技能——这个项目的验证方式有几个反直觉的坑（`python main.py` 有真实副作用、验证脚本必须用 `python -m` 点号路径调用、`unittest discover` 不能带 `-s test`），别凭经验直接套用通用 Python 项目的验证套路。
 
 ## 协作方式
 
@@ -221,12 +203,4 @@ after_session / final_memory_pipeline（后台）
 
 ## 提交规范
 
-Commit message 格式：
-
-```text
-YYYYMMDD_HHMMSS 当前进度:<这次改了什么>；后续计划:<下一步打算做什么>
-```
-
-- 日期时间取提交时刻，格式与 session ID 一致
-- 即使没有明确下一步，也保留“当前进度/后续计划”两部分
-- 只 commit 本次改动直接相关的文件，不夹带工作区其他在途修改
+生成 commit message 用 `commit-message` 技能——固定格式是 `YYYYMMDD_HHMMSS 当前进度:...;后续计划:...`，只 commit 本次改动直接相关的文件。
