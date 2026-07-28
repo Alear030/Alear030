@@ -54,11 +54,9 @@ class BreathingPlaceholder(Static):
 
 class Alear030Tui(App):
     TITLE = 'Alear030'
-    # Alear030TUI 初始化 传入session 和 loop @codex 这里声明变量只是为了后续变成提示，需要删除
-    def __init__(self,run_round = None,session = None,loop = None,driver_class = None, css_path = str(DEFAULT_CSS_PATH), watch_css = True, ansi_color = None):
+    # done(@codex): 去掉未使用的 session/loop 占位参数，TUI 只依赖 run_round
+    def __init__(self,run_round = None,driver_class = None, css_path = str(DEFAULT_CSS_PATH), watch_css = True, ansi_color = None):
         super().__init__(driver_class, css_path, watch_css, ansi_color)
-        self.session = session
-        self.loop = loop
         self.run_round = run_round
 
         # Tui's information and sets

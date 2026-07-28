@@ -29,7 +29,7 @@ def run_round(message:str)->str:
     hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks)
     return result
 
-alearTui = Alear030Tui(run_round=run_round,session=session,loop=loop)
+alearTui = Alear030Tui(run_round=run_round)
 # 主循环入口执行程序
 try:
     alearTui.run()
