@@ -4,6 +4,7 @@ from hook.hook_core import hooks
 from agent import agents
 from loop import Loop
 from memory import Memory
+from tui import Alear030Tui
 
 # 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
 memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False))
@@ -19,17 +20,19 @@ session = Session(
 loop = Loop(agents=agents,session=session,hooks=hooks,memory=memory)
 
 hooks.trigger(hook_point='before_session',session=session,agents=agents,memory=memory,hooks=hooks)
+def run_round(message:str)->str:
+    # 执行before_round hook
+    hooks.trigger(hook_point='before_round',session=session,agents=agents,memory=memory,hooks=hooks,user_message=message)
+    # 执行loop
+    result = loop.loop_run(agent_name='main',message=message)
+    # 执行after_round hook
+    hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks)
+    return result
 
+alearTui = Alear030Tui(run_round=run_round,session=session,loop=loop)
 # 主循环入口执行程序
 try:
-    while True:
-        # 用户输入信息并传入loop
-        user_message = ""
-        hooks.trigger(hook_point='before_round',session=session,agents=agents,memory=memory,hooks=hooks,user_message=user_message)
-        user_message = input('please enter your message: ')
-        # 开启本轮循环
-        loop.loop_run(agent_name='main',message=user_message)
-        hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks)
+    alearTui.run()
 
 except KeyboardInterrupt:
     # 检测到退出动作，进行收尾

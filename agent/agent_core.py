@@ -76,6 +76,10 @@ class Agents:
     def _agents_reload(self):
         pass
 
+    # 支持 agents["name"] 字典式访问，替代 agents.agents["name"]
+    def __getitem__(self, key: str) -> Agent:
+        return self.agents[key]
+
 
 # 创建全局Agents实例
 agents = Agents(agents_yaml=agents_yaml)

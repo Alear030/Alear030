@@ -1,0 +1,96 @@
+#user_input{
+    height: 3;
+    border: none;
+    border-top: solid $primary;
+    border-bottom: solid $primary;
+    background: transparent;
+    padding: 0 1;
+    margin: 0 1;
+    color: $text;
+}
+
+#content_area{
+    scrollbar-size: 0 0;
+}
+
+#user_input:focus{
+    border: none;
+    border-top: solid $accent;
+    border-bottom: solid $accent;
+}
+
+#user_input > .input--placeholder{
+    color: $text-muted;
+    text-style: italic;
+}
+
+#user_input > .input--cursor{
+    color: $accent;
+}
+
+#status_bar{
+    height: 1;
+    background: $boost;
+}
+
+#status_left{
+    width: 1fr;
+    content-align: left middle;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#status_right{
+    width: 1fr;
+    content-align: right middle;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+.user_message{
+    padding: 0 0 0 1;
+    content-align:left middle;
+    background:$primary 10%;
+    margin-bottom: 1;
+}
+
+.thinking_message{
+    height: auto;
+    min-height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    text-style: italic;
+}
+
+.assistant_message{
+    height: auto;
+    min-height: 1;
+    padding: 0 1;
+    color: $text;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+/* 中间事件：agent thinking 标题行（细线，和 CC 风格一致） */
+.thinking_title{
+    min-height: 1;
+    padding: 0 0 0 0;
+    color: $text-muted;
+    margin: 0 1 1 1;
+}
+
+.thinking_body{
+    height: auto;
+    min-height: 1;
+    padding: 1 1 1 1;
+    color: $text-muted;
+    margin: 0 1 1 1;
+    border-left: solid $primary 20%;
+    background: $primary 5%;
+    content-align: left top;
+}
+
+/* Markdown 段落默认 margin-bottom:1，最后一段会在盒子内多撑一截底空白 */
+.thinking_body > MarkdownParagraph:last-child {
+    margin-bottom: 0;
+}

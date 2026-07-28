@@ -24,9 +24,37 @@ output_theme = Theme({
 
 console = Console(theme=output_theme)
 
+# 中间信息的接收器注册表：TUI 等非终端环境可以注册自己的接收器来消费 rich_print 事件。
+# 只要有任何接收器注册，rich_print 就不再往终端 console 输出，全部转给接收器。
+# 接收器签名：recv(event_type: str, message: str) -> None
+_output_receivers: list = []
+
+
+def register_output_receiver(recv) -> None:
+    """注册一个中间信息接收器，返回 None。
+
+    同一个接收器重复注册会被重复调用，调用方自己保证去重。
+    """
+    _output_receivers.append(recv)
+
+
+def unregister_output_receiver(recv) -> None:
+    """注销一个已注册的接收器。不存在时静默跳过。"""
+    try:
+        _output_receivers.remove(recv)
+    except ValueError:
+        pass
+
+
 # 后续需要增加agent的name、role、type
 def rich_print(message:str,type:str=None):
     message = message if message else ''
+    event_type = type or 'none'
+    # 有接收器就全部推给接收器，不再打终端
+    if _output_receivers:
+        for recv in _output_receivers:
+            recv(event_type, message)
+        return
     try:
         match type:
             case 'agent_thinking':
