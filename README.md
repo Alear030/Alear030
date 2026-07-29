@@ -169,11 +169,10 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · sentence-transformers 
 
 MIT，详见 `LICENSE`。
 
-## Known Limitations
+# roadmap
 
-- `memory_pipeline` hook 当前禁用（临时关闭用于测试其他功能）
-- `session_recent` prompt 分块当前禁用
-- 仅在 Windows 上实测过
-- `memory_recall` 检索源是 `session_detail/*.json` 里的 slice embedding，非 `slice_node.json`
-- `command` 工具安全白名单移植自 Claude Code，部分只读命令（如 systeminfo/wmic）可能被误拒
-- `HookManager.collect()` 尚未接入主循环
+- TUI初版实现
+- todolist初版实现
+- slash命令初版实现
+- eval 评测题集golden set初版建立
+- toolcall trace 机制建立

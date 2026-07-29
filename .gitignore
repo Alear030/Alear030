@@ -10,19 +10,14 @@ wheels/
 .venv
 .env
 
-# 配置文件
-config.yaml
-
 # 测试缓存
 .pytest_cache/
 
 # IDE配置
 .idea/
 
-# 历史项目
-z_ccstudy/
+# 非项目工作区
 workspace/
-z_old_code/
 
 # 过程文件(真实会话与计划运行数据)
 session/session_detail/
@@ -43,10 +38,10 @@ memory/memory_config/backup/
 # Claude Code 本地配置与协作契约(CLAUDE.md 含协作方式约定及指向 .claude/ 内技能的引用,
 # 技能本体不上传会成悬空引用,故一并不纳入版本控制)
 .claude/
-CLAUDE.md
+.agents/
 
-# benchmark 专用 API key(不提交 git,test/longmemeval_bench/bench_secret.py)
-test/longmemeval_bench/bench_secret.py
+CLAUDE.md
 
 # 准用于claudecode产出代码的文件夹
 .cc_file/
+AGENTS.md

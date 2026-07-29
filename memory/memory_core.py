@@ -309,10 +309,32 @@ class Memory:
             )
             raise
 
+        # 契约: list[dict]，且每维有 type_name。LLM 偶发返回 ["系统错误"] / 纯 string 时
+        # 绝不能落盘，否则污染 user.json、下次启动 memory_prompt 直接 AttributeError
+        if (
+            not isinstance(rq_json, list)
+            or not rq_json
+            or not all(isinstance(dim, dict) and dim.get('type_name') for dim in rq_json)
+        ):
+            error = ValueError(
+                f'user_info_extract: expected non-empty list[dict] with type_name, got {type(rq_json).__name__}'
+            )
+            memory_log.memory_exception_log(
+                stage='user_info_extract.invalid_response_shape',
+                error=error,
+                slice_data=slice_data,
+                agent=self.memory_agent
+            )
+            raise error
+
         # 过滤掉没有 info_source 的条目(无来源=不可靠,不入库;符合"只提取有据可依信息"原则)
         for dim in rq_json:
-            if 'info_list' in dim:
-                dim['info_list'] = [info for info in dim['info_list'] if info.get('info_source')]
+            info_list = dim.get('info_list')
+            if isinstance(info_list, list):
+                dim['info_list'] = [
+                    info for info in info_list
+                    if isinstance(info, dict) and info.get('info_source')
+                ]
 
         # 将返回结果传回给user.json
         memory_storage.update_memory_storage(file_name='user',file_content=rq_json)
@@ -330,6 +352,12 @@ class Memory:
         # 4 - type_name 不存在 分情况
         # 4-1 type_name新增 - 添加tpyename\typedesc\typefeature
         # 4-2 type_name合并 - 靠rq_json里合并后维度自带的merged_from(被吸收掉的旧type_name列表)精确删除，不靠"缺席即删"的猜测(避免误删还没攒到info的种子维度)
+
+        # 与 extract 同契约；上游已校验，此处再挡一层防止其它调用方传入脏数据
+        if not isinstance(rq_json, list) or not all(isinstance(dim, dict) and dim.get('type_name') for dim in rq_json):
+            raise ValueError(
+                f'user_info_reform: expected list[dict] with type_name, got {type(rq_json).__name__}'
+            )
 
         # 读取当前提取维度模板(每条仅 type_name/type_desc/type_feature，无 info_list)
         template = memory_config.get_memory_config(file_name='user_info')

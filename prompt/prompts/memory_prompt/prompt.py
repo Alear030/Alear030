@@ -21,18 +21,25 @@ def memory_prompt(agent)->str:
         return
 
     # 空画像不注入(避免空标题污染 system prompt)
-    if not user_content:
+    # 顶层必须是 list；曾被写成 ["系统错误"] 这类 list[str] 时直接跳过，避免 dim.get 崩启动
+    if not isinstance(user_content, list) or not user_content:
         return
     
     # 对user信息进行拼接
     user_info = '# Alear030大人的个人信息\n\n'
     has_valid = False
     for dim in user_content:
-        # 跳过缺 type_name 的维度(结构异常防御)
-        if not dim.get('type_name'):
+        # 跳过非 dict / 缺 type_name 的维度(结构异常防御)
+        if not isinstance(dim, dict) or not dim.get('type_name'):
             continue
         # 过滤出有 info 内容的条目;无有效条目的维度不输出(避免空维度标题,如 #4 过滤无 info_source 后变空)
-        valid_pieces = [piece for piece in dim.get('info_list', []) if piece.get('info')]
+        info_list = dim.get('info_list', [])
+        if not isinstance(info_list, list):
+            continue
+        valid_pieces = [
+            piece for piece in info_list
+            if isinstance(piece, dict) and piece.get('info')
+        ]
         if not valid_pieces:
             continue
         has_valid = True

@@ -78,7 +78,7 @@ class _ToolRegister:
 
         if tool_name not in self.tool_list:
             rich_print(message=f'{tool_name} doesnt exist...',type='system_error')
-            return {'role':'tool','tool_call_id':tool_call.id,'content':'错误工具不存在'}
+            return {'role':'tool','tool_call_id':tool_call.id,'content':'工具不存在'}
 
         if verbose:
             rich_print(message=f'{tool_name}...',type='tool_call')

@@ -2,6 +2,7 @@ import json
 import tiktoken
 import threading
 
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from openai import OpenAI
@@ -11,6 +12,15 @@ from config import SESSION_MEMORTY_DETAIL_PATH,MAX_SESSION_TOKEN
 from local_model import _get_embedding_model,embedding_to_b64
 from .session_plan import Plan
 from .attachment_core import Attachment
+
+
+# 当前上下文 token 用量的内存态缓存,供 TUI 状态栏展示;不写 session JSON。
+# used 由 _session_count_tokens 写入(与 compress 同源),max_tokens 对齐 Session.max_tokens。
+@dataclass
+class ContextTokens:
+    used: int = 0
+    max_tokens: int = 0
+
 
 def _json_read(file_path:Path):
     if file_path.is_dir():
@@ -84,6 +94,9 @@ class Session:
         # attachment：当前 session 内、仅供 main agent 本轮消费的运行时提示；纯内存态，不持久化
         self.attachment = Attachment()
 
+        # 上下文 token 用量缓存(内存态);启动与每轮 after_round/compress 时由 _session_count_tokens 刷新
+        self.context_tokens = ContextTokens(max_tokens=self.max_tokens)
+
 
     def _json_update(self,updater):
         # json文件锁进行并行异步管控
@@ -130,6 +143,8 @@ class Session:
             text = _msg_text(msg)
             if text:
                 token_count += len(token_encoding.encode(text))
+        # 同步写入展示缓存,让 TUI 与 compress 读到同一数值
+        self.context_tokens.used = token_count
         return token_count
     
     

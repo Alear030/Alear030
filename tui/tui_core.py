@@ -54,10 +54,11 @@ class BreathingPlaceholder(Static):
 
 class Alear030Tui(App):
     TITLE = 'Alear030'
-    # done(@codex): 去掉未使用的 session/loop 占位参数，TUI 只依赖 run_round
-    def __init__(self,run_round = None,driver_class = None, css_path = str(DEFAULT_CSS_PATH), watch_css = True, ansi_color = None):
+
+    def __init__(self,run_round = None,session = None,driver_class = None, css_path = str(DEFAULT_CSS_PATH), watch_css = True, ansi_color = None):
         super().__init__(driver_class, css_path, watch_css, ansi_color)
         self.run_round = run_round
+        self.session = session
 
         # Tui's information and sets
         self.title = 'Alear030'
@@ -82,6 +83,16 @@ class Alear030Tui(App):
         self.set_focus(self.query_one('#user_input'))
         # 注册 rich_print 接收器，把中间信息流接到 TUI
         register_output_receiver(self._output_receiver)
+        self._refresh_status_bar()
+
+    # 从 session.context_tokens 刷新状态栏右侧(used / max);无 session 时跳过
+    def _refresh_status_bar(self):
+        if self.session is None:
+            return
+        ctx = self.session.context_tokens
+        self.query_one('#status_right', Static).update(
+            f'ctx {ctx.used} / {ctx.max_tokens}'
+        )
 
     # 退出时反注册接收器，避免泄漏
     @on(message_type=Unmount)
@@ -177,6 +188,8 @@ class Alear030Tui(App):
         self.query_one("#user_input").disabled = False
         self.query_one('#user_input').focus()
         content_area.scroll_end(animate=False)
+        # after_round/compress 已刷新 context_tokens,此处同步到状态栏
+        self._refresh_status_bar()
 
     # 处理user_input 处理 run_round
     @on(message_type=Input.Submitted)

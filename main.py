@@ -26,10 +26,14 @@ def run_round(message:str)->str:
     # 执行loop
     result = loop.loop_run(agent_name='main',message=message)
     # 执行after_round hook
-    hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks)
+    hooks.trigger(hook_point='after_round',session=session,agents=agents,memory = memory,hooks=hooks,pipeline_enabled=False)
     return result
 
-alearTui = Alear030Tui(run_round=run_round)
+# 将loop和session传入TUI用于展示相关信息
+# 启动前刷一次 token,让首屏 status 就有 system prompt 用量,不必等第一轮 after_round
+session._session_count_tokens(agents.agents['main'])
+alearTui = Alear030Tui(run_round=run_round,session=session)
+
 # 主循环入口执行程序
 try:
     alearTui.run()

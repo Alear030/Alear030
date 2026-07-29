@@ -5,8 +5,8 @@ from hook.hook_core import hooks
 from config import SESSION_MEMORTY_DETAIL_PATH
 
 
-@hooks.register(hook_point='after_round', background=True,enabled=False)
-def memory_pipeline(session=None, memory=None, hooks=None,**kwargs):
+@hooks.register(hook_point='after_round', background=True,enabled=True)
+def memory_pipeline(session=None, memory=None, hooks=None,pipeline_enabled=False,**kwargs):
     # after_round 后台钩子:先切片+summary(session 职责),再把切片喂进 memory 管线(memory 职责)。
     # 合并自原 session_slice 钩子——切片是记忆摄入的第一阶段,生产者(切片)与消费者(管线)
     # 放进同一函数顺序执行,从结构上杜绝原先两个异步钩子靠注册顺序碰巧串行导致的读到旧数据/空列表的 bug。
@@ -46,5 +46,5 @@ def memory_pipeline(session=None, memory=None, hooks=None,**kwargs):
         slices=worthy_slices,
         messages=session_detail_content['session_messages'][1:],
         session=session,
-        enable=False
+        enable=pipeline_enabled
     )
