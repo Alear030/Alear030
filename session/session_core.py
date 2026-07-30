@@ -1,4 +1,6 @@
+import copy
 import json
+import re
 import tiktoken
 import threading
 
@@ -8,8 +10,15 @@ from pathlib import Path
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor,as_completed
 
-from config import SESSION_MEMORTY_DETAIL_PATH,MAX_SESSION_TOKEN
+from config import (
+    SESSION_MEMORTY_DETAIL_PATH,
+    MAX_SESSION_TOKEN,
+    STRUCTURED_API_TIMEOUT,
+    STRUCTURED_API_RETRIES,
+    SLICE_TOOL_RESULT_MAX_CHARS,
+)
 from local_model import _get_embedding_model,embedding_to_b64
+from rich_output import rich_print
 from .session_plan import Plan
 from .attachment_core import Attachment
 
@@ -66,6 +75,45 @@ def _msg_text(msg) -> str:
     return text
 
 
+# slice/summary 的结构化抽取直调:固定关 thinking 并收紧 timeout/重试。
+# 这两个调用不走 Loop._chat(不带 tools,也不需要思维链),开着 thinking 时长响应会在网关侧被
+# 掐断成 APIConnectionError,叠加客户端默认重试后单次切片可阻塞数分钟(见 config 常量处实测数据)。
+def _structured_chat(agent,message_list:list)->str:
+    client = agent.agent_ai.with_options(timeout=STRUCTURED_API_TIMEOUT,max_retries=STRUCTURED_API_RETRIES)
+    response = client.chat.completions.create(
+        model=agent.model_name,
+        messages=message_list,
+        extra_body={'thinking':{'type':'disabled'}},
+    )
+    return response.choices[0].message.content or ''
+
+
+# 剥离模型可能裹上的 markdown 代码块,让下游 json.loads 拿到裸 JSON
+def _strip_code_fence(text:str)->str:
+    cleaned = (text or '').strip()
+    fenced = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$',cleaned,re.DOTALL)
+    return fenced.group(1).strip() if fenced else cleaned
+
+
+# 切片重喂窗口的载荷:只截断超长 tool_result 正文,其余消息原样传。
+# tool_calls 消息(工具名 + 参数)不截断——切片 agent 判断任务型片段边界靠的是它,
+# 而 tool_result 的完整正文对边界判断没有增量价值,却能把窗口顶到几万 token。
+def _slice_window_payload(messages:list)->list:
+    payload = []
+    for msg in messages:
+        content = msg.get('message_content') or ''
+        if msg.get('message_role') == 'tool_result' and len(content) > SLICE_TOOL_RESULT_MAX_CHARS:
+            trimmed = dict(msg)
+            trimmed['message_content'] = (
+                content[:SLICE_TOOL_RESULT_MAX_CHARS]
+                + f'...[tool_result 已截断,原长 {len(content)} 字符]'
+            )
+            payload.append(trimmed)
+        else:
+            payload.append(msg)
+    return payload
+
+
 class Session:
     
     def __init__(self,slice_agent,summary_agent,system_prompt:str):
@@ -100,11 +148,19 @@ class Session:
 
     def _json_update(self,updater):
         # json文件锁进行并行异步管控
+        # updater 里只允许做纯内存改写:锁被持有期间任何写 session 的调用(尤其 session_message_insert
+        # 写用户输入)都要排队,把 LLM/embedding 放进来会让用户输入几分钟落不了盘
         with self.json_lock:
             # 1-读取json内容 2-用updater func 处理data 3-写回json内容
             data = json.loads(self.session_path.read_text(encoding='utf-8'))
             updater(data)
             self.session_path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
+
+
+    def _json_snapshot(self)->dict:
+        # 锁内只读取一份快照,供锁外的慢计算(LLM/embedding)使用;结果由后续短锁写回
+        with self.json_lock:
+            return json.loads(self.session_path.read_text(encoding='utf-8'))
 
 
     def _generate_session_id(self):
@@ -149,90 +205,119 @@ class Session:
     
     
     def _session_slice(self):
-        def do_slice(data):
-            # 处理slice的基础数据
-            session_slice = data['session_slice']
-            session_messages = [m for m in data['session_messages'] if m['message_role'] != 'system']
-            # 指针取最后一片的 start_round：最后一片是「未封口的临时尾巴」，重喂它是为了让新轮次
-            # 有机会并进同一片（同一件事继续），而不是每来一轮就封一片
-            slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
+        # 三段式:锁内读快照 → 锁外跑 LLM/embedding → 锁内短写。慢计算不能留在锁里,
+        # 否则用户输入的 session_message_insert 要等整轮切片结束才落盘。
+        data = self._json_snapshot()
 
-            # 得到没有slice的messages（重喂窗口 = round >= 指针，天然含最后那片的轮次；
-            # 保留 tool_calls/tool_result：工具调用是对话中真实发生的动作，是切片 agent 判断任务型
-            # 片段边界、以及下游消费端提炼 task/工作流的关键依据，不能在切片阶段丢弃）
-            unslice_messages = []
-            for msg in session_messages:
-                if msg['message_round'] >= slice_pointer:
-                    unslice_messages.append(msg)
+        # 处理slice的基础数据
+        session_slice = data['session_slice']
+        session_messages = [m for m in data['session_messages'] if m['message_role'] != 'system']
+        # 指针取最后一片的 start_round：最后一片是「未封口的临时尾巴」，重喂它是为了让新轮次
+        # 有机会并进同一片（同一件事继续），而不是每来一轮就封一片
+        slice_pointer = session_slice[-1]['start_round'] if session_slice else int(0)
 
-            if not unslice_messages:
+        # 得到没有slice的messages（重喂窗口 = round >= 指针，天然含最后那片的轮次；
+        # 保留 tool_calls/tool_result：工具调用是对话中真实发生的动作，是切片 agent 判断任务型
+        # 片段边界、以及下游消费端提炼 task/工作流的关键依据，不能在切片阶段丢弃）
+        unslice_messages = []
+        for msg in session_messages:
+            if msg['message_round'] >= slice_pointer:
+                unslice_messages.append(msg)
+
+        if not unslice_messages:
+            return
+
+        # 处理slice subagent 的message list（超长 tool_result 正文在此截断，见 _slice_window_payload）
+        message_list = []
+        message_list.append(self.slice_agent.message_list[0])
+        message_list.append({
+            'role':'user',
+            'content':json.dumps(_slice_window_payload(unslice_messages),ensure_ascii=False,indent=2)
+        })
+
+        # 锁外调用切片模型：失败只放弃本轮切片（下一轮重喂窗口会把这批消息再带上），并让用户可见
+        try:
+            slice_rqs = _structured_chat(agent=self.slice_agent,message_list=message_list)
+        except Exception as error:
+            #@agent 后续兼容到LOGGING模块中，统一管理日志打印
+            rich_print(message=f'slice 模型调用失败,跳过本轮 slice: {error}',type='system_error')
+            return
+
+        try:
+            # 剥离可能的 markdown 代码块（与 summary 处一致，防止模型裹 ```json 导致解析崩溃）
+            parsed_slices = json.loads(_strip_code_fence(slice_rqs))
+            if not parsed_slices:
                 return
 
-            # 处理slice subagent 的message list
-            message_list = []
-            message_list.append(self.slice_agent.message_list[0])
-            message_list.append({'role':'user','content':json.dumps(unslice_messages,ensure_ascii=False,indent=2)})
+            # 按窗口真实起点归一化，不信任模型回显的绝对 round：模型时常把重喂窗口当成一段新对话
+            # 从 1 重新编号，导致 start_round 与真实轮次错位、合并时对不齐而堆积重复片。取窗口内消息
+            # 的真实最小 round 作锚点，用「锚点 - 模型首片 start」的偏移把整批拉回真实编号——模型守
+            # 规矩输出绝对 round 时 offset=0 原样通过；重编号时 offset 把它映射回去。
+            window_start = min(msg['message_round'] for msg in unslice_messages)
+            window_end = max(msg['message_round'] for msg in unslice_messages)
+            offset = window_start - parsed_slices[0]['start_round']
+            for s in parsed_slices:
+                s['start_round'] += offset
+                s['end_round'] += offset
 
-            # 开始slice 并对sessionjson的session_slice进行覆盖
-            slice_rqs = self.slice_agent.agent_ai.chat.completions.create(model=self.slice_agent.model_name,messages = message_list).choices[0].message.content
-            try:
-                # 剥离可能的 markdown 代码块（与 summary 处一致，防止模型裹 ```json 导致解析崩溃）
-                import re
-                cleaned = slice_rqs.strip()
-                m = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$', cleaned, re.DOTALL)
-                if m:
-                    cleaned = m.group(1).strip()
-                parsed_slices = json.loads(cleaned)
-                if not parsed_slices:
-                    return
+            # 校验归一化后无缝、无重叠、恰好覆盖整个窗口（提示词已强制模型连续覆盖）；
+            # 不满足说明模型输出结构坏了，跟解析失败一样跳过本轮，不写脏数据
+            expect = window_start
+            for s in parsed_slices:
+                if s['start_round'] != expect or s['end_round'] < s['start_round']:
+                    raise ValueError('slice 轮次不连续')
+                expect = s['end_round'] + 1
+            if expect - 1 != window_end:
+                raise ValueError('slice 未覆盖到窗口末尾')
 
-                # 按窗口真实起点归一化，不信任模型回显的绝对 round：模型时常把重喂窗口当成一段新对话
-                # 从 1 重新编号，导致 start_round 与真实轮次错位、合并时对不齐而堆积重复片。取窗口内消息
-                # 的真实最小 round 作锚点，用「锚点 - 模型首片 start」的偏移把整批拉回真实编号——模型守
-                # 规矩输出绝对 round 时 offset=0 原样通过；重编号时 offset 把它映射回去。
-                window_start = min(msg['message_round'] for msg in unslice_messages)
-                window_end = max(msg['message_round'] for msg in unslice_messages)
-                offset = window_start - parsed_slices[0]['start_round']
-                for s in parsed_slices:
-                    s['start_round'] += offset
-                    s['end_round'] += offset
+            # 构造归一化后的新切片批次
+            new_slices = []
+            for slice in parsed_slices:
+                slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
+                slice_embedding = _get_embedding_model().encode([slice_text])[0]# @claude 后续这里坐上了memory类，需要移除，保证收口，保证处理速度效率
+                new_slices.append({
+                    "worthy_summary":slice['worthy_summary'],
+                    "session_id":self.session_id,
+                    "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    "start_round": slice['start_round'],
+                    "end_round": slice['end_round'],
+                    "slice_embedding": embedding_to_b64(slice_embedding),
+                    "slice_anchor":{
+                        "topic": slice['topic'],
+                        "key_words": slice['key_words'],
+                        "summary_detail":""
+                    }
+                })
+        except (json.JSONDecodeError,IndexError,KeyError,ValueError,TypeError) as error:
+            #@agent 后续兼容到LOGGING模块中，统一管理日志打印
+            rich_print(message=f'slice json 存在问题 跳过本轮 slice: {error}',type='system_error')
+            return
+        except Exception as error:
+            # embedding 加载/编码失败等:同样只放弃本轮切片,但必须上报——否则异常冒泡到后台
+            # future 里,既看不见,还会连带跳过同一个 hook 里紧随其后的 _session_summary
+            #@agent 后续兼容到LOGGING模块中，统一管理日志打印
+            rich_print(message=f'slice embedding 处理失败 跳过本轮 slice: {error}',type='system_error')
+            return
 
-                # 校验归一化后无缝、无重叠、恰好覆盖整个窗口（提示词已强制模型连续覆盖）；
-                # 不满足说明模型输出结构坏了，跟解析失败一样跳过本轮，不写脏数据
-                expect = window_start
-                for s in parsed_slices:
-                    if s['start_round'] != expect or s['end_round'] < s['start_round']:
-                        raise ValueError('slice 轮次不连续')
-                    expect = s['end_round'] + 1
-                if expect - 1 != window_end:
-                    raise ValueError('slice 未覆盖到窗口末尾')
+        def do_slice(data):
+            # 开口式写回：定型前缀必写；若盘上在前缀之后已覆盖得比本次窗口更远，则保留那段后续，
+            # 不因尾片变更整批丢弃（否则定型片进不了 memory_pipeline，重喂窗口会堆积）
+            current_slice = data['session_slice']
+            sealed = new_slices[:-1] if len(new_slices) > 1 else []
+            open_slice = new_slices[-1]
+            write_window_end = open_slice['end_round']
+            sealed_end = sealed[-1]['end_round'] if sealed else slice_pointer - 1
 
-                # 构造归一化后的新切片批次
-                new_slices = []
-                for slice in parsed_slices:
-                    slice_text = f"{slice['topic']} {' '.join(slice['key_words'])}"
-                    slice_embedding = _get_embedding_model().encode([slice_text])[0]# @claude 后续这里坐上了memory类，需要移除，保证收口，保证处理速度效率
-                    new_slices.append({
-                        "worthy_summary":slice['worthy_summary'],
-                        "session_id":self.session_id,
-                        "time_stamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-                        "start_round": slice['start_round'],
-                        "end_round": slice['end_round'],
-                        "slice_embedding": embedding_to_b64(slice_embedding),
-                        "slice_anchor":{
-                            "topic": slice['topic'],
-                            "key_words": slice['key_words'],
-                            "summary_detail":""
-                        }
-                    })
+            kept = [s for s in current_slice if s['start_round'] < slice_pointer]
+            continuation = [s for s in current_slice if s['start_round'] > sealed_end]
+            continuation_end = max((s['end_round'] for s in continuation), default=-1)
 
-                # 砍尾重接：丢弃所有 start_round >= 指针的旧片（即被重喂的最后那片，尾巴长大后
-                # 可能裂成多片），再整体接上归一化后的新批次。取代旧的「只跟 [-1] 单条对账」——
-                # 模型重编号时对不齐会漏判成 append 产生重复。
-                kept = [s for s in session_slice if s['start_round'] < slice_pointer]
+            if continuation_end > write_window_end:
+                # 盘上后续更远：前缀落地，尾部用盘上的（sealed 为空时即只留盘上，不拿旧开口回滚）
+                data['session_slice'] = kept + sealed + continuation
+            else:
+                # 常规开口更新：砍掉指针及之后的旧片，接上本批（含新开口尾）
                 data['session_slice'] = kept + new_slices
-            except (json.JSONDecodeError,IndexError,KeyError,ValueError):
-                print('slice json 存在问题 跳过本轮 slice')
 
         self._json_update(updater=do_slice)
         
@@ -253,17 +338,12 @@ class Session:
         message_list = []
         message_list.append(self.summary_agent.message_list[0])
         message_list.append({'role':'user','content':json.dumps(summary_messages,ensure_ascii=False)})
-        summary_rqs = self.summary_agent.agent_ai.chat.completions.create(model=self.summary_agent.model_name,messages=message_list).choices[0].message.content
+        summary_rqs = _structured_chat(agent=self.summary_agent,message_list=message_list)
         try:
             # 剥离可能的 markdown 代码块
-            import re
-            cleaned = summary_rqs.strip()
-            m = re.match(r'^```(?:json)?\s*\n(.*?)\n```\s*$', cleaned, re.DOTALL)
-            if m:
-                cleaned = m.group(1).strip()
-            summary_json = json.loads(cleaned)
+            summary_json = json.loads(_strip_code_fence(summary_rqs))
             summary_result = summary_json[0]['summary_detail']
-        except (json.JSONDecodeError,IndexError,KeyError):
+        except (json.JSONDecodeError,IndexError,KeyError,TypeError):
             summary_result = summary_rqs
         
         # 处理session_slice的summary
@@ -278,29 +358,62 @@ class Session:
 
 
     def _session_summary(self):
-        def do_summary(data):
+        # 与 _session_slice 同构:锁内读快照 → 锁外并行跑 summary → 锁内按坐标合并
+        data = self._json_snapshot()
+
         # 得到session的slice 和 session的session_messages
-            session_messages = data['session_messages']
-            session_slices = data['session_slice']
+        session_messages = data['session_messages']
+        session_slices = data['session_slice']
 
-            # 创建多线程处理需要summary的slice
-            with ThreadPoolExecutor(max_workers=5) as tp:
-                # 创建summary队列
-                slice_summary_queue = {
-                    tp.submit(self._session_slice_summary,slice,session_messages):slice for slice in session_slices
-                }
+        # 只挑真正缺 summary 的片进队列(原实现把全部片都 submit,靠 _session_slice_summary 内部守卫空跑)。
+        # 判据以 _session_slice_summary 里的守卫为准,这里只是提前过滤掉不需要排队的片
+        pending_slices = [
+            slice for slice in session_slices
+            if slice['worthy_summary'] and not slice['slice_anchor']['summary_detail']
+        ]
+        if not pending_slices:
+            return
 
-                # 取得summary队列的返回结果
-                slices_results = []
-                for thread in as_completed(slice_summary_queue):
-                    result = thread.result()
-                    slices_results.append(result)
-                
-            # 对得到的slices_results 进行排序
-            slices_results.sort(key=lambda x:x['start_round'])
+        # 锁外多线程处理需要summary的slice;传副本,避免锁外改到快照里的对象
+        summarized = {}
+        with ThreadPoolExecutor(max_workers=5) as tp:
+            # 创建summary队列:future → 该片的轮次坐标,写回时按坐标对账
+            slice_summary_queue = {
+                tp.submit(self._session_slice_summary,copy.deepcopy(slice),session_messages):
+                    (slice['start_round'],slice['end_round'])
+                for slice in pending_slices
+            }
 
-            # 对session json 进行复写并覆盖
-            data['session_slice'] = slices_results
+            # 取得summary队列的返回结果;单片失败不拖垮整批,下一轮会再补
+            for thread in as_completed(slice_summary_queue):
+                slice_key = slice_summary_queue[thread]
+                try:
+                    summarized[slice_key] = thread.result()
+                except Exception as error:
+                    #@agent 后续兼容到LOGGING模块中，统一管理日志打印
+                    rich_print(
+                        message=f'slice {slice_key[0]}-{slice_key[1]} summary 失败,留待下轮重试: {error}',
+                        type='system_error'
+                    )
+
+        if not summarized:
+            return
+
+        def do_summary(data):
+            # 按 (start_round,end_round) 逐片合并,不整表覆盖:锁外这段时间里 session_slice 可能已被
+            # 切片改过(尾片裂开/重接),整表回写会把那些改动抹掉。
+            # 切片顺序由 _session_slice 的「kept + new_slices」保证(原实现在此处重排序),此处只改字段不动顺序
+            for slice in data['session_slice']:
+                result = summarized.get((slice['start_round'],slice['end_round']))
+                if not result or slice['slice_anchor']['summary_detail']:
+                    continue
+                # 空摘要不落盘:模型返回空内容时连同那份按空摘要算出的 embedding 一起丢弃,
+                # 留给下一轮重试,避免用劣化向量覆盖切片阶段算出的可用 embedding
+                summary_detail = result['slice_anchor']['summary_detail']
+                if not (summary_detail or '').strip():
+                    continue
+                slice['slice_anchor']['summary_detail'] = summary_detail
+                slice['slice_embedding'] = result['slice_embedding']
 
         self._json_update(updater=do_summary)
 

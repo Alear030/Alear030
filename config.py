@@ -42,6 +42,19 @@ MODEL_LEVEL = {
 SESSION_MEMORTY_DETAIL_PATH = Path(__file__).parent/'session/session_detail'
 # session plan文件夹路径
 SESSION_PLAN_FILE_PATH = Path(__file__).parent/'session/session_plan'
+# slice/summary 这类结构化抽取直调的调用边界:
+# 实测同一份 4.2k tokens 的切片请求,开着 thinking 时挂 61s 后被网关掐断
+# (Server disconnected without sending a response),关掉后 6.5s 正常返回。
+# 故这两个直调固定关 thinking,并用下面的 timeout/重试把单次故障的代价限死:
+# 关掉 thinking 后正常 6.5s 完成,60s 已是 9 倍余量,再重试只是让后台线程多占一分钟。
+# 当前只有 session 的 slice/summary 直调遵守这组边界;memory_core.slice_type_define 是同一类
+# 不带 tools 的结构化直调,仍开着 thinking 与客户端默认重试,尚未收进来。
+STRUCTURED_API_TIMEOUT = 60
+STRUCTURED_API_RETRIES = 0
+# 切片重喂窗口里单条 tool_result 的最大字符数:超长工具结果(实测单条 174KB,整个窗口 131k token)
+# 会把窗口顶到几万 token,拖慢切片且无助于判断边界——工具名与参数在未截断的 tool_calls 消息里
+SLICE_TOOL_RESULT_MAX_CHARS = 2000
+
 # session 对话最大token值:compress 触发阈值,按模型实际上下文窗口留安全余量
 # (原 300000 几乎不触发;真正根因是 _session_count_tokens 已修正为算 message_list 全量,
 # 此阈值按当前模型窗口保留安全余量设为 250000)

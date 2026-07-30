@@ -90,6 +90,26 @@
     content-align: left top;
 }
 
+/* 后台管线失败提示：低调但可见，不抢正文 */
+.system_error{
+    height: auto;
+    min-height: 1;
+    padding: 0 1;
+    margin: 0 1 1 1;
+    color: $error;
+    border-left: solid $error 40%;
+}
+
+/* 系统提示（缺权重/下载进度）：muted，不与错误抢视觉 */
+.system_message{
+    height: auto;
+    min-height: 1;
+    padding: 0 1;
+    margin: 0 1 1 1;
+    color: $text-muted;
+    border-left: solid $primary 30%;
+}
+
 /* Markdown 段落默认 margin-bottom:1，最后一段会在盒子内多撑一截底空白 */
 .thinking_body > MarkdownParagraph:last-child {
     margin-bottom: 0;

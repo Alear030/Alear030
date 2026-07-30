@@ -8,6 +8,7 @@ from transformers import logging as transformers_logging
 from contextlib import redirect_stderr
 
 from config import LOCAL_EMBEDDING_MODEL, LOCAL_MODEL_PATH, MODELSCOPE_EMBEDDING_ID
+from rich_output import rich_print
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -26,10 +27,19 @@ def _weights_ready() -> bool:
     return any((LOCAL_EMBEDDING_MODEL/name).exists() for name in ('pytorch_model.bin','model.safetensors'))
 
 
+def embedding_weights_ready() -> bool:
+    """公共判据:本地嵌入权重是否已就绪。TUI 启动提示等外部调用走这条,不直接依赖私有 _weights_ready。"""
+    return _weights_ready()
+
+
 def _download_embedding_model():
     from modelscope import snapshot_download
 
-    print(f'本地嵌入模型权重缺失,正在从 ModelScope 下载 {MODELSCOPE_EMBEDDING_ID}（约 195MB,仅首次需要）...')
+    # 走 rich_print:TUI 接管后裸 print 不可见;下载多发生在后台切片线程,receiver 已就绪
+    rich_print(
+        message=f'本地嵌入模型权重缺失,正在从 ModelScope 下载 {MODELSCOPE_EMBEDDING_ID}（约 195MB,仅首次需要）...',
+        type='system_message',
+    )
     # cache_dir 指向 local_model/,modelscope 会按 <id> 落成 local_model/iic/xxx/,正好等于 LOCAL_EMBEDDING_MODEL
     snapshot_download(MODELSCOPE_EMBEDDING_ID,cache_dir=str(LOCAL_MODEL_PATH))
 
@@ -37,7 +47,7 @@ def _download_embedding_model():
         raise RuntimeError(
             f'嵌入模型下载后仍未找到权重文件。请手动下载 {MODELSCOPE_EMBEDDING_ID} 并解压到 {LOCAL_EMBEDDING_MODEL}'
         )
-    print('嵌入模型下载完成')
+    rich_print(message='嵌入模型下载完成',type='system_message')
 
 
 def _get_embedding_model():
@@ -61,6 +71,25 @@ def _get_embedding_model():
                     ) from error
 
     return _embedding_model
+
+
+def prewarm_embedding_model() -> bool:
+    """在守护线程里提前加载嵌入模型,返回是否真的启动了预热。
+
+    切片/摘要是第一批用到嵌入的调用,若等到那时才懒加载,这 8.6s(实测)会算进会话链路。
+    权重缺失时直接跳过:不在后台静默下载 195MB,留给首次真正需要它的调用显式处理并报错。
+    """
+    if not _weights_ready():
+        return False
+
+    def _warm():
+        try:
+            _get_embedding_model()
+        except Exception as error:
+            rich_print(message=f'嵌入模型预热失败,将在首次使用时重试: {error}',type='system_error')
+
+    threading.Thread(target=_warm,name='embedding-prewarm',daemon=True).start()
+    return True
 
 
 def embedding_to_b64(embedding) -> str:

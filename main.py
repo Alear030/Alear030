@@ -5,6 +5,11 @@ from agent import agents
 from loop import Loop
 from memory import Memory
 from tui import Alear030Tui
+from local_model import prewarm_embedding_model
+
+# 嵌入模型预热:切片/摘要是第一批用到它的调用,懒加载那 8.6s 不该算进第一轮会话链路;
+# 权重缺失时不预热(不在后台静默下 195MB);缺权重提示改由 TUI Mount 后可见展示
+prewarm_embedding_model()
 
 # 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
 memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False))

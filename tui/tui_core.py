@@ -8,6 +8,7 @@ from textual.events import Mount,Click,Unmount
 from pathlib import Path
 
 from rich_output import register_output_receiver, unregister_output_receiver
+from local_model import embedding_weights_ready
 
 
 DEFAULT_CSS_PATH = Path(__file__).parent / "tui_style.tcss"
@@ -84,6 +85,14 @@ class Alear030Tui(App):
         # 注册 rich_print 接收器，把中间信息流接到 TUI
         register_output_receiver(self._output_receiver)
         self._refresh_status_bar()
+        # 缺权重启动提示:在 UI 线程直接 mount,不经 rich_print→call_from_thread
+        # (main 启动时 receiver 尚未注册,提前 rich_print 会被 TUI 清屏盖掉)
+        if not embedding_weights_ready():
+            content_area = self.query_one('#content_area', VerticalScroll)
+            content_area.mount(Static(
+                '本地嵌入模型权重缺失,首次切片时会自动下载(约 195MB)',
+                classes='system_message',
+            ))
 
     # 从 session.context_tokens 刷新状态栏右侧(used / max);无 session 时跳过
     def _refresh_status_bar(self):
@@ -119,6 +128,17 @@ class Alear030Tui(App):
                 # 最终回复通过 run_round 返回值链路展示（round_finished 里 mount Markdown），
                 # rich_print 这条是给终端的，TUI 侧跳过避免重复
                 return
+            case 'system_error':
+                # 后台管线（切片/摘要）的失败必须在 TUI 里可见：终端 print 在 TUI 接管后不可见，
+                # 否则一次失败的切片只表现为"卡了很久却什么都没发生"
+                if not (message or '').strip():
+                    return
+                content_area.mount(Static(f'⚠ {message}', classes='system_error'))
+            case 'system_message':
+                # 嵌入下载进度等非错误提示；与 system_error 同可见、不同色
+                if not (message or '').strip():
+                    return
+                content_area.mount(Static(message, classes='system_message'))
             case _:
                 # 其他事件类型暂不渲染，静默跳过
                 return
