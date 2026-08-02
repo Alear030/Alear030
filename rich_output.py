@@ -25,9 +25,11 @@ output_theme = Theme({
 console = Console(theme=output_theme)
 
 # 中间信息的接收器注册表：TUI 等非终端环境可以注册自己的接收器来消费 rich_print 事件。
-# 只要有任何接收器注册，rich_print 就不再往终端 console 输出，全部转给接收器。
-# 接收器签名：recv(event_type: str, message: str) -> None
+# 只要有任何接收器注册，rich_print 就不再往 terminal console 输出，全部转给接收器。
+# 接收器签名：recv(event_type: str, message: str, meta: dict | None = None) -> None
 _output_receivers: list = []
+# 终端 fallback 流式缓冲：stream_id -> 累积文本
+_stream_buffers: dict[str, str] = {}
 
 
 def register_output_receiver(recv) -> None:
@@ -48,6 +50,8 @@ def unregister_output_receiver(recv) -> None:
 
 # 后续需要增加agent的name、role、type
 def rich_print(message:str,type:str=None):
+    # 临时截断：TUI 占终端时 rich 直写会撞崩 Windows 控制台；后续整删 rich_output
+    return
     message = message if message else ''
     event_type = type or 'none'
     # 有接收器就全部推给接收器，不再打终端

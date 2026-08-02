@@ -15,13 +15,16 @@ class LoopAPIError(Exception):
 # 纯 ReAct 推理引擎：main agent 与 subagent 共用，对 plan 编排零感知
 class Loop:
 
-    def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None):
+    def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None,emit=None):
         self.agents = agents
         self.session = session
         self.hooks = hooks
         self.memory = memory
         # 控制 thinking 类内容是否打印到终端；memory 等后台管线复用的 Loop 可传 False 静音
         self.verbose = verbose
+
+        self.stream_id = 0
+        self.emit_stream = None
 
 
     # 从 agents 容器中取出指定 agent
@@ -35,18 +38,85 @@ class Loop:
 
 
     # 统一 LLM 调用：with_tools 决定是否携带 tools 与 thinking
-    # API 调用失败（余额不足/网络/限流等）在此翻译成 LoopAPIError，由 loop_run 统一兜底
-    def _chat(self,agent,with_tools:bool)->ChatCompletionMessage:
+    # 建连失败与流式中途异常都在此翻译成 LoopAPIError，由 loop_run 统一兜底
+    def _chat(self,agent,with_tools:bool):
+
+        # 组装请求参数：with_tools 时带 tools 与 thinking
         params = {'model':agent.model_name,'messages':agent.message_list}
         if with_tools:
             params['tools'] = agent.tool_list
             params['tool_choice'] = 'auto'
             params['extra_body'] = {'thinking':{'type':'enabled'}}
+        # 打开流式：create 返回 stream，chunk 逐个到
+        params["stream"] = True
+
         try:
-            return agent.agent_ai.chat.completions.create(**params).choices[0].message
+            # 发起请求，拿回 stream 对象
+            stream = agent.agent_ai.chat.completions.create(**params)
+
+            # 本次调用的流序号，TUI 用它区分流
+            self.stream_id += 1
+            stream_key = f'{agent.agent_name}_{self.stream_id}'
+
+            # 累积变量：流式 content 全量在这攒
+            AssistantMessage = ''
+            AssistantThinking = ''
+            AssistantToolCalls = []
+
+            # 迭代 stream：空 choices 跳过，中途异常与建连失败同款兜底
+            for chunk in stream:
+                # 部分 provider 会夹空 choices 心跳包，跳过避免 IndexError
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+
+                # 处理content信息
+                if getattr(delta,'content',None):
+                    AssistantMessage += delta.content
+                    # 发全量给 TUI，widget 整段替换不累积
+                    if self.emit_stream:
+                        self.emit_stream(content_type='AssistantMessage',stream_id=stream_key,content={'message_content':AssistantMessage},agent_name=agent.agent_name)
+
+                # 处理thinking信息
+                if getattr(delta,'reasoning_content',None):
+                    AssistantThinking += delta.reasoning_content
+                    # @claude 提醒我 这里后续有了AssistantThinking TUI Widget后 接入emit机制
+
+                # 处理ToolCalls信息：分片到，按 index 拼回完整调用
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        # 并行调用时 index 不保证有序，列表不够长先占位
+                        while len(AssistantToolCalls) <= tc.index:
+                            AssistantToolCalls.append({"id":"","type":"function","function":{"name":"","arguments":""}})
+
+                        # 首片才有 id，其余片这里跳过保留空串
+                        if tc.id:
+                            AssistantToolCalls[tc.index]["id"] = tc.id
+                        if tc.function:
+                            # arguments 是增量，逐片 += 拼回完整 JSON
+                            if tc.function.name:
+                                AssistantToolCalls[tc.index]["function"]["name"] += tc.function.name
+                            if tc.function.arguments:
+                                AssistantToolCalls[tc.index]["function"]["arguments"] += tc.function.arguments
+
+            # 拼接完整用于 return 的message：和原非流式返回结构一致
+            complete_message = ChatCompletionMessage(
+                role = 'assistant',
+                content=AssistantMessage or None,
+                tool_calls=AssistantToolCalls or None
+            )
+            if AssistantThinking:
+                complete_message.reasoning_content = AssistantThinking
+
+            return complete_message
+        except LoopAPIError:
+            # LoopAPIError 别进 except Exception，原样上抛防二次包装
+            raise
         except Exception as ee:
+            # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
             rich_print(message=f'模型调用失败：{ee}',type='system_error')
             raise LoopAPIError(str(ee)) from ee
+
 
 
     # pre_toolUse hooks 处理，返回需透传给工具的非 JSON 参数

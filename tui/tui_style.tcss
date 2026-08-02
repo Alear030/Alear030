@@ -1,7 +1,8 @@
-#user_input{
-    height: 3;
+/* 全局界面样式：输入框/内容区；widget 样式留在各自 css_file */
+#USER_INPUT{
+    height: 3;                  /* 3 行高 */
     border: none;
-    border-top: solid $primary;
+    border-top: solid $primary; /* 上下主题色边线 */
     border-bottom: solid $primary;
     background: transparent;
     padding: 0 1;
@@ -9,108 +10,25 @@
     color: $text;
 }
 
-#content_area{
+/* 内容区：隐藏滚动条 */
+#main_CONTENT_AREA{
     scrollbar-size: 0 0;
 }
 
-#user_input:focus{
+/* 聚焦时：边线换 accent，提示正在输入 */
+#USER_INPUT:focus{
     border: none;
     border-top: solid $accent;
     border-bottom: solid $accent;
 }
 
-#user_input > .input--placeholder{
+/* 占位符：灰色斜体 */
+#USER_INPUT > .input--placeholder{
     color: $text-muted;
     text-style: italic;
 }
 
-#user_input > .input--cursor{
+/* 光标：accent 色 */
+#USER_INPUT > .input--cursor{
     color: $accent;
-}
-
-#status_bar{
-    height: 1;
-    background: $boost;
-}
-
-#status_left{
-    width: 1fr;
-    content-align: left middle;
-    padding: 0 1;
-    color: $text-muted;
-}
-
-#status_right{
-    width: 1fr;
-    content-align: right middle;
-    padding: 0 1;
-    color: $text-muted;
-}
-
-.user_message{
-    padding: 0 0 0 1;
-    content-align:left middle;
-    background:$primary 10%;
-    margin-bottom: 1;
-}
-
-.thinking_message{
-    height: auto;
-    min-height: 1;
-    padding: 0 1;
-    color: $text-muted;
-    text-style: italic;
-}
-
-.assistant_message{
-    height: auto;
-    min-height: 1;
-    padding: 0 1;
-    color: $text;
-    margin-top: 1;
-    margin-bottom: 1;
-}
-
-/* 中间事件：agent thinking 标题行（细线，和 CC 风格一致） */
-.thinking_title{
-    min-height: 1;
-    padding: 0 0 0 0;
-    color: $text-muted;
-    margin: 0 1 1 1;
-}
-
-.thinking_body{
-    height: auto;
-    min-height: 1;
-    padding: 1 1 1 1;
-    color: $text-muted;
-    margin: 0 1 1 1;
-    border-left: solid $primary 20%;
-    background: $primary 5%;
-    content-align: left top;
-}
-
-/* 后台管线失败提示：低调但可见，不抢正文 */
-.system_error{
-    height: auto;
-    min-height: 1;
-    padding: 0 1;
-    margin: 0 1 1 1;
-    color: $error;
-    border-left: solid $error 40%;
-}
-
-/* 系统提示（缺权重/下载进度）：muted，不与错误抢视觉 */
-.system_message{
-    height: auto;
-    min-height: 1;
-    padding: 0 1;
-    margin: 0 1 1 1;
-    color: $text-muted;
-    border-left: solid $primary 30%;
-}
-
-/* Markdown 段落默认 margin-bottom:1，最后一段会在盒子内多撑一截底空白 */
-.thinking_body > MarkdownParagraph:last-child {
-    margin-bottom: 0;
 }

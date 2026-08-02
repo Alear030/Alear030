@@ -4,6 +4,7 @@ from .local_model_core import (
     embedding_from_b64,
     embedding_weights_ready,
     prewarm_embedding_model,
+    shutdown_embedding_worker,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     'embedding_from_b64',
     'embedding_weights_ready',
     'prewarm_embedding_model',
+    'shutdown_embedding_worker',
 ]

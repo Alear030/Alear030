@@ -1,5 +1,7 @@
-from openai import OpenAI
 from datetime import datetime
+import uuid
+
+from openai import OpenAI
 
 
 from config import MODEL_LEVEL,SUB_MAX_TOOLCALLS
@@ -15,7 +17,8 @@ class Subagent:
     def __init__(self,subagent_file:dict = None,verbose:bool=True):
         # subagent 基础信息
         self.agent_id:int = subagent_file['subagent_id']
-        self.agent_name:str = 'subagent'
+        # 随机唯一名：agent_id 由 subagent_file 携带、模型可能重复生成，不做唯一名
+        self.agent_name:str = f'subagent_{uuid.uuid4().hex[:8]}'
         self.subagent_level:str = 'low_level'
         self.verbose:bool = verbose
 

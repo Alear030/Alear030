@@ -23,9 +23,17 @@ def subagent_create(subagent_files:list[dict],max_subagent:int = 5,**kwargs)->st
     if len(subagent_files) > max_subagent:
         return json.dumps({"error": f"subagent 数量({len(subagent_files)})超出上限 max_subagent={max_subagent}"}, ensure_ascii=False)
 
+    # hook 注入的 agents 从 kwargs 取；未注入直接报错返回
+    agents = kwargs.get('agents')
+    if agents is None:
+        return json.dumps({"error": "subagent_create tool调用失败:agents未被hook注入"}, ensure_ascii=False)
+
+    # subagent 注册进 agents 容器：loop 按 agent_name 统一可查，不维护双套传入
     subagent_group = []
     for file in subagent_files:
-        subagent_group.append(Subagent(subagent_file=file))
+        subagent = Subagent(subagent_file=file)
+        agents.agents[subagent.agent_name] = subagent
+        subagent_group.append(subagent)
 
     with ThreadPoolExecutor(max_workers=max_subagent) as tp:
         subagent_queue = {

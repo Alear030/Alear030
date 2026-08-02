@@ -73,9 +73,12 @@ class _ToolRegister:
     # verbose 单独接收，不并入 extra：extra 会原样透传进 tool_func(**tool_args,**extra)，
     # 混进去会污染工具实际收到的参数
     def match_tool(self,tool_call,verbose:bool=True,**extra)->dict:
+        # tool_call 是模型发来的"调用某工具"请求；参数在 function.arguments 里，是 JSON 字符串
         tool_name = tool_call.function.name
+        # 参数还原成 dict 才能展开调用（json 字符串 → 真实对象）
         tool_args = json.loads(tool_call.function.arguments)
 
+        # 工具没注册过：不给模型空转的机会，直接回一句"不存在"
         if tool_name not in self.tool_list:
             rich_print(message=f'{tool_name} doesnt exist...',type='system_error')
             return {'role':'tool','tool_call_id':tool_call.id,'content':'工具不存在'}
@@ -83,9 +86,13 @@ class _ToolRegister:
         if verbose:
             rich_print(message=f'{tool_name}...',type='tool_call')
 
+        # 从注册表取出真正要执行的函数，展开调用
         tool_func = self.tool_list[tool_name]['function']
+        # 两路参数合并：tool_args=模型给的调用参数；extra=hook 注入的运行时对象（agents/session/...），
+        # 工具签名里声明了哪个参数就收到哪个，没声明就进 **kwargs 被忽略
         tool_result = tool_func(**tool_args,**extra)
 
+        # 返回给模型的 tool result：role/tool_call_id 是协议字段，content 必须字符串（模型只见文本）
         return {'role':'tool','tool_call_id':tool_call.id,'content':str(tool_result)}
 
 

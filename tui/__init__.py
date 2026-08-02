@@ -1,3 +1,3 @@
-from .tui_core import Alear030Tui
+from .tui_core import Alear030TUI
 
-__all__ = ['Alear030Tui']
+__all__ = ['Alear030TUI']

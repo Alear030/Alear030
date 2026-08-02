@@ -3,7 +3,7 @@ import importlib
 from pathlib import Path
 
 
-from .hook_core import hooks
+from .hook_core import hooks,HookManager
 
 
 __all__ = ['hooks']
