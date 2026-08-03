@@ -8,6 +8,19 @@
 
 > **⚠ v0.6.2 及更早版本块的 commit hash 已全部失效**：2026-07-26 对仓库执行过一次 `git filter-repo` 历史重写（清理泄漏语料），全部 49 个 commit 的 hash 随之改变，写入时正确的旧 hash 现已无法解析。待开源前历史彻底定稿后统一回填——2026-07-05 之后的 commit 可按 message 的 `YYYYMMDD_HHMMSS` 前缀经 `git log --grep` 定位（该前缀写在 message 正文里，不随历史重写变化），更早的 14 个 commit 无稳定前缀，需按日期与描述人工比对。
 
+## 2026-08-03 · v0.7.3 — memory 入库开关收口 + thinking 与正文分离落盘
+
+变更：
+- [收口] memory 管线入库开关收拢为 `Memory.pipeline_enabled` 实例属性：`slices_pipeline` 去掉 `enable` 参数改读 `self.pipeline_enabled`，`__init__` 承接、`main.py` 创建时统一传 `False`；`memory_pipeline`/`final_memory_pipeline` 两 hook 不再各自传参——杜绝原 `after_round` 传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 的入库不对称（CLAUDE.md 明示 bug 来源）
+- [修复] assistant 落盘 thinking 污染 content：`session_message_insert` 改按 role 分类接收 `ChatCompletionMessage` 对象（正文进 `message_content`、thinking 进 `message_thinking`、有 `tool_calls` 追加独立 `tool_calls` 消息），loop 落盘传完整对象——修原 tool_calls 轮把 thinking 塞进 `message_content` 且正文丢失的问题，thinking 不再经 `session_message_reform` 回喂模型
+- [清理] `.gitignore` 忽略 `changelog-site/`（codex 产出的独立 git 仓库，防主仓库 `git clean` 误删）
+
+验证：AST + 探针（落盘对象/字符串/None 四路径形状）+ guard 测试 9 用例全绿。
+
+对应提交：`09b3625`(pipeline_enabled 收拢为 Memory 属性) · `1416b1e`(thinking 与正文分离落盘) · `926cc3c`(gitignore 忽略 changelog-site)
+
+后续计划：推进 TUI 主线——thinking/toolcall 挂载、channel 轮次记账重构、embedding 缺权重启动下载。
+
 ## 2026-08-02 · v0.7.2 — TUI 重构为 channel 路由 + widget 注册体系，流式 _chat 与 embedding worker 进程落地
 
 契机：v0.7.0 的 TUI 首版仍是单文件整体，事件经 rich_output 零散接收，无法按 agent 路由、承接不了流式渲染（`_chat` 整块返回，界面只能等整轮结束才看到输出）；`rich_print` 直写终端在 TUI 占终端时撞崩 Windows 控制台；sentence_transformers 在主进程加载拖慢启动，Windows 系统编码还易读坏中文。本批次把 TUI 重构成 channel 路由 + widget 注册体系承接 loop 流式事件，embedding 移入独立 worker 进程隔离重依赖。
