@@ -35,12 +35,11 @@ memory/memory_log/memory_logs/
 # memory config 备份(运行时快照,不进版本控制)
 memory/memory_config/backup/
 
-# Claude Code 本地配置与协作契约(CLAUDE.md 含协作方式约定及指向 .claude/ 内技能的引用,
-# 技能本体不上传会成悬空引用,故一并不纳入版本控制)
+# Claude Code 本地配置与协作契约(.claude/ 含技能本体与本地配置,不上传;CLAUDE.md 已纳入版本控制)
 .claude/
 .agents/
-
-CLAUDE.md
+.cursor/
+.vscode/
 
 # 准用于claudecode产出代码的文件夹
 .cc_file/
