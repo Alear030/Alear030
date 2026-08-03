@@ -8,6 +8,90 @@
 
 > **⚠ v0.6.2 及更早版本块的 commit hash 已全部失效**：2026-07-26 对仓库执行过一次 `git filter-repo` 历史重写（清理泄漏语料），全部 49 个 commit 的 hash 随之改变，写入时正确的旧 hash 现已无法解析。待开源前历史彻底定稿后统一回填——2026-07-05 之后的 commit 可按 message 的 `YYYYMMDD_HHMMSS` 前缀经 `git log --grep` 定位（该前缀写在 message 正文里，不随历史重写变化），更早的 14 个 commit 无稳定前缀，需按日期与描述人工比对。
 
+## 2026-08-02 · v0.7.2 — TUI 重构为 channel 路由 + widget 注册体系，流式 _chat 与 embedding worker 进程落地
+
+契机：v0.7.0 的 TUI 首版仍是单文件整体，事件经 rich_output 零散接收，无法按 agent 路由、承接不了流式渲染（`_chat` 整块返回，界面只能等整轮结束才看到输出）；`rich_print` 直写终端在 TUI 占终端时撞崩 Windows 控制台；sentence_transformers 在主进程加载拖慢启动，Windows 系统编码还易读坏中文。本批次把 TUI 重构成 channel 路由 + widget 注册体系承接 loop 流式事件，embedding 移入独立 worker 进程隔离重依赖。
+
+变更：
+- [重构] TUI 重写为 channel 路由 + widget 注册体系：`tui_core.py` 新版 `Alear030TUI`（原 `tui_main.py` 并入此文件并删除，旧版备份为 `tui_core_backup.py` 与 `tui_style copy.tcss` 入库供合并 master 对照，`__init__` 统一导出）；按 agent_name 建 channel，`emit_stream` 经 `call_from_thread` 送 UI 线程，`do_work` 线程跑 round 且 finally 解锁输入；`tui_style.tcss` 瘦身只留输入框/内容区，消息样式移入各 widget css
+- [新增] `TuiChannel`（`append_once`/`append_stream` + `stream_widgets` 缓存）与 `TuiWidgets` 注册体系（`@widget_register` + `build_widget` 按类型构造 + Static 兜底）；落地 `AssistantMessage`（reactive 全量替换不累积）与 `UserMessage` 两 widget；`main.py` 切 `Alear030TUI` 并挂 `loop.emit_stream`
+- [新增] `loop._chat` 改流式：`stream=True` 逐 chunk 累积 `content`/`thinking`/`tool_calls`（tool_calls 按 index 拼回完整 JSON），流式中途异常与建连失败统一 `LoopAPIError`
+- [新增] embedding 移入独立 worker 进程：新增 `embedding_client`（spawn worker + JSON-lines 协议 + 锁/超时/崩溃重启/atexit）与 `embedding_worker`（唯一允许加载 sentence_transformers 的进程，UTF-8 加固防 Windows gbk 读坏中文）；`local_model_core` 瘦身为 `_EmbeddingProxy` 门面，`shutdown_embedding_worker` 由 main.py finally 收尾
+- [迭代] subagent 改随机唯一名 `subagent_{uuid8}` 并注册进 agents 容器（`subagent_create` 从 kwargs 取 agents，未注入报错返回）
+- [修复] `rich_print` 恢复 receiver 接收器分发：有接收器则全量转接收器、无接收器才直写终端，修复 TUI 占终端时直写撞崩 Windows 控制台，并预留 `_stream_buffers`
+- [清理] hook 导出 `HookManager`；`tool_core` 为 `match_tool` 补流程注释
+
+对应提交：`ef0ccd5`(TUI channel+widget 重构/流式 _chat/embedding worker/subagent 命名) · `cd8c3a0`(rich_print receiver 分发代码补齐)
+
+后续计划：推进 TUI 主线——清理 rich_output 等过时类 TUI 文件、丰富 tui_widget 生态、TUI 接入 thinking（已累积未接，留 @claude 位）与 toolcall/toolresult 展示、优化整体 TUI 体验。
+
+## 2026-07-30 · v0.7.1 — 治理 after_round 切片/摘要阻塞用户输入
+
+契机：TUI 启用后暴露出长期潜伏的锁竞争——`after_round` 后台 `_session_slice`/`_session_summary` 在持有 `json_lock` 期间跑 LLM 与 embedding，用户输入要等几分钟才能落盘；重喂窗口吞下超长 `tool_result`（实证约 51k token）再叠加默认 thinking，API 易挂断或拖成数十分钟。
+
+变更：
+- [重构] slice/summary 改为「短锁读快照 → 锁外算 → 短锁写回」，LLM/embedding 不再占 `json_lock`
+- [修复] 结构化直调 `_structured_chat`：关 thinking、收紧 timeout/重试（实测开 thinking 会挂断，关掉数秒返回）
+- [迭代] 重喂窗口按 `SLICE_TOOL_RESULT_MAX_CHARS` 截断超长 `tool_result`，避免单次切片上下文爆炸
+- [迭代] 写回语义：定型前缀必写；若盘上 continuation 的 `end_round` 比本次窗口更远则保留 continuation，避免并发覆盖更长尾片
+- [新增] 启动预热 embedding；缺权重/下载进度经 TUI Mount 与 `system_message` 可见
+
+验证：单测覆盖锁外计算、写回合并、tool_result 截断与失败上报；live probe 确认并发 `session_message_insert` 等待降至毫秒级。
+
+对应提交：`65ebafc`(slice/summary 移出锁 + 写回合并 + embedding 预热)
+
+后续计划：修 compress/reform 按开口尾 `end_round` 砍上下文导致丢最新轮；memory 结构化直调收同一 API 边界；slice 失败上报改静默日志。
+
+## 2026-07-28 ~ 2026-07-29 · v0.7.0 — TUI 首版闭环与上下文用量可见
+
+契机：REPL 交互对后台切片延迟不敏感，需要可观测的终端 UI；同时压缩与状态栏都需要与 compress 同源的 token 计数，否则「用了多少上下文」只能猜。
+
+变更：
+- [新增] Textual TUI 首版：`main.py` 改由 `Alear030Tui` 驱动，封装 `run_round` 与 hook 链路；`rich_output` 增加输出接收器，把 thinking 等事件推入界面
+- [新增] thinking 区块样式与 title/body 成对展开/收起（含 Markdown 文本点击与段落底边距修正）
+- [新增] Session 内存态 `ContextTokens`，由 `_session_count_tokens` 与 compress 同源刷新；TUI 状态栏展示 ctx used/max，启动前预刷 system prompt 用量
+- [修复] `user_info_extract`/`reform` 落盘前校验 `list[dict]+type_name`，`memory_prompt` 读盘防御非 dict 维度，避免脏 JSON 污染 `user.json` 崩启动
+- [迭代] `memory_pipeline` hook 重新启用，经 `main` 显式传 `pipeline_enabled=False` 控制入库静默、切片摘要仍跑
+- [清理] TUI 构造去掉未使用的 session/loop 占位入参；gitignore 清过时条目并忽略 `.agents/` 与 `AGENTS.md`；README Known Limitations 改为 roadmap
+
+对应提交：`589c3b7`(TUI 首版闭环) · `75da9a2`(清理 TUI 构造参数) · `e925e56`(ContextTokens + user_info 校验 + pipeline_enabled)
+
+后续计划：深化 TUI toolcall/toolresult 与 plan 展示；为 eval 的 toollog 做准备。
+
+## 2026-07-26 ~ 2026-07-29 · v0.6.7 — 开源推送就绪：隐私开关、全新 clone 可跑、权重出库
+
+契机：v0.6.4 开源收尾之后仍挡推送——`pip install -e .` 在 flat layout 下炸、全新 clone 首次写 session 因 gitignore 目录不存在而崩、195MB 权重触 GitHub 单文件硬限制；协作契约（技能、`@claude` 标记）也不应随公开仓库悬空引用。
+
+变更：
+- [迭代] `memory_log` 加 `LOG_AGENT_RESPONSE` 默认 False：不删模块，关掉后仍可定位「哪一片在哪个阶段失败」，本地评 prompt 时再打开
+- [修复] `pyproject` 补 `[build-system]` 与 `packages=[]`，修 `pip install -e .`；补 `transformers`/`modelscope` 显式依赖
+- [修复] `session_core._json_write` 与 `memory_storage_core` 写前 `mkdir`，全新 clone 首次落盘不再 `FileNotFoundError`
+- [新增] 本地 embedding 权重改运行时 ModelScope 下载（以权重文件而非目录判据）；gitignore 忽略 `pytorch_model.bin`/`model.safetensors`
+- [清理] 从 git 历史移除已跟踪的 195MB `pytorch_model.bin`；`CLAUDE.md` 取消跟踪并 ignore（流程知识收到技能）；README 大规模事实漂移修正；`session_plan/` 补尾斜杠
+- [迭代] `memory_pipeline` 临时 `enabled=False` + `slices_pipeline(enable=…)`（后续 v0.7.0 改为 hook 开、入库静默）
+
+验证：mkdir 与下载逻辑探针、memory_log 开关双向、全量 unittest；真实数据 MD5 前后一致。
+
+对应提交：`cb969c3`(pipeline 临时关 + CLAUDE.md 收技能) · `3e4ba16`(LOG_AGENT_RESPONSE + pyproject) · `fcf7c8d`(README/mkdir/自动下载权重) · `1f62c7a`(历史移除 pytorch_model.bin)
+
+后续计划：开源前历史定稿后回填 CHANGELOG 失效 hash；继续 TUI toolcall/toolresult。
+
+## 2026-07-26 · v0.6.6 — 真实 coding 任务暴露的工具层六处修复
+
+契机：用 Alear030 读自身源码写简化版时，观察工具本身是坏的——`command` 固定按系统编码（中文 Windows=GBK）解码，而 Python/git 普遍输出 UTF-8，agent 看到乱码等于蒙眼调试。
+
+变更：
+- [修复] `command`：subprocess 取 bytes，新增 `_decode` UTF-8 优先、失败回落系统编码（已知极短 GBK 可能误判为合法 UTF-8，注释接受）
+- [修复] `security` 换行检查只查引号外，使 `python -c` 多行可执行、`dir` 换行危险命令仍拒
+- [修复] `file_read` 满 2000 行时 header 改为追加并给出续读 offset；`file_glob` 匹配总数在截断前统计
+- [修复] `memory_recall` 四处裸下标改 `.get`，单文件失败跳过；`web_fetch` 空 urls 早返回
+
+验证：临时脚本 18 项断言（含 UTF-8/GBK 双向）+ 全量 unittest；session/memory MD5 比对确认测试未写入，脚本已删。
+
+对应提交：`a52f112`(工具层六处修复)
+
+后续计划：元认知问题（工具在手想不到用、错误诊断不回溯等）根因是陈述性 prompt 扛程序性职责，待定是否先做轮次预算软提示与待办工具。
+
 ## 2026-07-26 · v0.6.5 — hook 补齐 enabled 开关，三套注册表范式对齐
 
 契机：tool（`tool_enabled`）和 prompt（`enabled`）两套注册表都带整体开关，只有 hook 缺，想临时停掉某个钩子只能注释整个装饰器或给目录加下划线前缀，粗糙且容易忘记还原。本次不引入新机制，只把已存在的范式补到第三套注册表上。
@@ -105,7 +189,7 @@
 - [重构] session compress：计数改为 main agent 全量 `message_list`（修旧计数只算尾片致几乎不触发）；超阈值 `250000` 后保留 system+最后切片原始消息，attachment 注入更早切片摘要并恢复跨会话 timeline
 - [收口] timeline 渲染与注入统一收口到 `memory.inject_timeline_attachment`，`session_timeline_inject` hook 与 `session_compress` 共用同一入口，消除分层双源漂移
 - [修复] `file_edit`/`file_write` 的 `path.absolute()` 误用改为 `is_absolute()`（原写法恒真致路径校验失效）
-- [清理] `test/`、真实 session/memory 语料及 `bench_secret.py` 纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目宪法）；取消跟踪已泄漏 session_detail；开源前仍需 filter-repo 重写历史
+- [清理] `test/`、真实 session/memory 语料及 `bench_secret.py` 纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目宪法）；取消跟踪已泄漏 session_detail；随后已于 2026-07-26 执行 filter-repo 重写历史（见文件头失效声明）
 
 验证：三轮真实 REPL 确认压缩后可由摘要恢复首轮唯一标记；AST + `_emit`/`_update` 分叉探针确认 skill candidate 产出逻辑。
 
