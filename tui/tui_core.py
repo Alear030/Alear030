@@ -72,9 +72,11 @@ class Alear030TUI(App):
         # pipeline_enabled=False：切片摘要可跑，不写 memory 入库
         self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks,pipeline_enabled=False)
 
-    # loop 挂载，执行中调用
+    # loop 挂载，执行中调用 emit_stream触发channel中的流式更新dom树方法
     def emit_stream(self,content_type:str,stream_id:str,content:dict,agent_name:str):
         self.call_from_thread(self.channels[agent_name].append_stream,content_type=content_type,stream_id=stream_id,content=content)
+
+    # @claude 后续需要增加从loop过来的一次性渲染终端的方法 emit_once 调用channel中的append_once方法
 
     # 解锁 USER_INPUT，并重新 focus；给 finally 里 call_from_thread 回调用
     def _unlock_input(self):

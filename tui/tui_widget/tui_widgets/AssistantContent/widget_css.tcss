@@ -1,3 +1,14 @@
 .AssistantMessage{
     height:auto;
+    min-height:1;
+    padding:0 1;
+    margin:1 2 1 1;
+    color:$text;
+}
+.AssistantMessage_output{
+    padding:0;
+    color:$text;
+}
+.AssistantMessage_output > MarkdownParagraph:last-child{
+    margin-bottom:0;
 }
