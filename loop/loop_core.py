@@ -50,6 +50,8 @@ class Loop:
         # 打开流式：create 返回 stream，chunk 逐个到
         params["stream"] = True
 
+        # 本次调用的流序号，TUI 用它区分流；建连失败时未赋值，异常路径据此跳过 end 信号
+        stream_key = None
         try:
             # 发起请求，拿回 stream 对象
             stream = agent.agent_ai.chat.completions.create(**params)
@@ -73,9 +75,9 @@ class Loop:
                 # 处理content信息
                 if getattr(delta,'content',None):
                     AssistantMessage += delta.content
-                    # 发全量给 TUI，widget 整段替换不累积
+                    # 发 delta 增量给 TUI，widget 内部走 MarkdownStream 累积
                     if self.emit_stream:
-                        self.emit_stream(content_type='AssistantMessage',stream_id=stream_key,content={'message_content':AssistantMessage},agent_name=agent.agent_name)
+                        self.emit_stream(content_type='AssistantMessage',stream_id=stream_key,content={'message_delta':delta.content},agent_name=agent.agent_name)
 
                 # 处理thinking信息
                 if getattr(delta,'reasoning_content',None):
@@ -108,6 +110,10 @@ class Loop:
             if AssistantThinking:
                 complete_message.reasoning_content = AssistantThinking
 
+            # 流正常收尾：发结束信号，TUI 据此停 MarkdownStream 并回收
+            if self.emit_stream:
+                self.emit_stream(content_type='AssistantMessageEnd',stream_id=stream_key,content={},agent_name=agent.agent_name)
+
             return complete_message
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
@@ -115,6 +121,9 @@ class Loop:
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
             rich_print(message=f'模型调用失败：{ee}',type='system_error')
+            # 流中断也发结束信号防 TUI 侧 stream 悬挂；建连失败未开流则跳过
+            if self.emit_stream and stream_key:
+                self.emit_stream(content_type='AssistantMessageEnd',stream_id=stream_key,content={},agent_name=agent.agent_name)
             raise LoopAPIError(str(ee)) from ee
 
 
