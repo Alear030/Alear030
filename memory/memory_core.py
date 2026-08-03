@@ -84,10 +84,13 @@ def _strip_code_fence(text:str)->str:
 
 
 class Memory:
-    def __init__(self,memory_agent,loop = None):
+    def __init__(self,memory_agent,loop = None,pipeline_enabled:bool = False):
         # memory agents 相关
         self.memory_agent = memory_agent
         self.loop = loop
+        # 管线入库总闸:创建时统一设置,各 hook 从 memory.pipeline_enabled 读,不再各自传参
+        # (原 TUI 每轮传 pipeline_enabled=False 与 final_memory_pipeline 漏传走默认 True 的不对称即源于分散传参)
+        self.pipeline_enabled = pipeline_enabled
 
         # memory 侧单例收口为实例属性：供注入到 tool 后通过 memory.memory_storage / memory_config / memory_log / memory_prompts 调用，
         # 避免在 tool 侧再开一条直接 import 子包单例的平行读取路径(违反 memory 读取统一收口在 Memory 类内的红线)
@@ -852,10 +855,10 @@ class Memory:
     # 方法说明：将切片的分类、存储、按照type分配管道进行统合，方便hook直接对接
     # session 由 hook 逐次调用传入(不进 __init__)：attachment 归属当前 session，slices_pipeline 只在
     # 拿到 skill_candidates 时按需消费，session 为 None(如单测、未来离线批处理)则跳过 attachment 写入
-    def slices_pipeline(self,slices:list[dict],messages:list[dict],session=None,enable:bool=True):
+    def slices_pipeline(self,slices:list[dict],messages:list[dict],session=None):
 
         # 控制全局memory_pipeline处理开关，用于静默测试，不改变userinfo或是tasknodes等相关落盘文件信息
-        if not enable:
+        if not self.pipeline_enabled:
             return
 
         # done(@claude): 尾片排除 slices[:-1] 挪到 hook 做传入数据预处理,memory_core 只接定型片直接处理;身份去重留在本层(读 memory_storage 属内部状态)

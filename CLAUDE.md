@@ -115,7 +115,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
   → run_turn()
   → PlanRunner.run()（仅 plan 模式执行，可能再调用多个 run_turn）
   → loop_run 返回
-  → _run_round 内 trigger('after_round', pipeline_enabled=False)
+  → _run_round 内 trigger('after_round')
   → finally 解锁输入，回 TUI 事件循环
 
 退出（finally）：trigger('after_session')
@@ -124,7 +124,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
   → shutdown_embedding_worker()
 ```
 
-`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_round` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后触发一次（`tui/tui_core.py`，带 `pipeline_enabled=False` 控制 memory 入库静默）。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。`HookManager.collect()` 当前没有接入主循环，不要把它写入实际生命周期。session 切片如何流入 Memory，见"架构核心 > Session 与 Memory"。
+`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_round` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后触发一次（`tui/tui_core.py`）；memory 入库开关收拢为 `Memory.pipeline_enabled` 实例属性（`main.py` 创建时统一传入），hook 不再各自传参。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。`HookManager.collect()` 当前没有接入主循环，不要把它写入实际生命周期。session 切片如何流入 Memory，见"架构核心 > Session 与 Memory"。
 
 ### Prompt 快照、派生存储与主动召回
 
@@ -204,7 +204,7 @@ after_session / final_memory_pipeline（后台）
 
 `after_round` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口只过滤传给 Memory 的 `worthy_summary=False`，session JSON 仍保留完整、无缝的原始 slices。历史 slice 缺少该字段时用 `slice.get('worthy_summary', True)` 保守兼容。这两个 hook 的触发时机见"Hook 系统"表。
 
-`memory.slices_pipeline(enable=...)` 是管线入库总闸：`enable=False` 时 slice 分类/user_info/task 落盘全部短路（切片摘要照跑）。当前 `after_round` 触发传 `pipeline_enabled=False` 控制入库静默，`final_memory_pipeline` 若漏传则走默认 `True`——这是曾出现的不对称 bug 来源（见数据安全与 config 化讨论）。
+`memory.slices_pipeline` 是管线入库总闸，开关收拢为 `Memory.pipeline_enabled`（`main.py` 创建 Memory 时统一传入）：`False` 时 slice 分类/user_info/task 落盘全部短路（切片摘要照跑）。曾因 `after_round` 触发传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 产生不对称，收拢为单一实例属性后由构造处统一控制，杜绝分散传参。
 
 ## 数据与版本控制安全
 

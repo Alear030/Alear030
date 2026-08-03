@@ -12,7 +12,8 @@ from tui import Alear030TUI
 prewarm_embedding_model()
 
 # 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
-memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False))
+# pipeline_enabled=False：切片摘要照跑，memory 分类/user_info/task 落盘短路（入库总闸收拢在 memory 实例）
+memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False),pipeline_enabled=False)
 
 # 创建新的session
 session = Session(

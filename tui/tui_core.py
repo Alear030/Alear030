@@ -69,8 +69,8 @@ class Alear030TUI(App):
         self.hooks.trigger(hook_point='before_round',session=self.session,agents=self.agents,memory=self.memory,hooks=self.hooks,user_message=user_input)
         # 走 now_channel 绑定的 loop，按 agent_name 派发
         self.now_channel.channel_loop.loop_run(agent_name = agent_name,message = user_input)
-        # pipeline_enabled=False：切片摘要可跑，不写 memory 入库
-        self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks,pipeline_enabled=False)
+        # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
+        self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
 
     # loop 挂载，执行中调用 emit_stream触发channel中的流式更新dom树方法
     def emit_stream(self,content_type:str,stream_id:str,content:dict,agent_name:str):
