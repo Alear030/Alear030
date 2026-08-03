@@ -10,10 +10,12 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "json-repair==0.61",
-    "openai==2.24.0",
+    "openai==2.24.0", 
     "pyyaml==6.0.3",
     "tiktoken==0.13.0",
     "rich==14.3.3",
+    # TUI 主线 tui/tui_core.py 顶层 import;缺了 main.py 启动即失败
+    "textual==8.2.7",
     "sentence-transformers==5.6.0",
     # transformers 在 local_model_core 里显式 import;modelscope 用于权重缺失时自动下载
     "transformers==5.12.1",
