@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessage
 from concurrent.futures import ThreadPoolExecutor,as_completed
 
 from config import (
@@ -481,16 +482,34 @@ class Session:
         
 
     def session_message_insert(self,role,content):
-
+        # 按 role 分类落盘：assistant 收到 ChatCompletionMessage 对象时正文/thinking 分离成键，
+        # 有 tool_calls 再追加一条 tool_calls 消息；其余 role 收字符串原样写。字段结构收口在本类，
+        # loop 侧只交对象/字符串，不感知 session JSON 形状。
         def do_insert(data):
-            # 在session json中的session_messages插入新的message
-            data['session_messages'].append({
-                "message_round": self.round,
-                "message_role": str(role),
-                "message_content":str(content)
-            })
-            # 将新的sessionjson写回文件
-        
+            if role == 'assistant' and isinstance(content, ChatCompletionMessage):
+                msg = {
+                    "message_round": self.round,
+                    "message_role": "assistant",
+                    "message_content": content.content or '',
+                }
+                thinking = getattr(content, 'reasoning_content', None)
+                if thinking:
+                    msg['message_thinking'] = str(thinking)
+                data['session_messages'].append(msg)
+                if content.tool_calls:
+                    data['session_messages'].append({
+                        "message_round": self.round,
+                        "message_role": "tool_calls",
+                        "message_content": json.dumps(
+                            [tc.model_dump() for tc in content.tool_calls], ensure_ascii=False),
+                    })
+            else:
+                data['session_messages'].append({
+                    "message_round": self.round,
+                    "message_role": str(role),
+                    "message_content": '' if content is None else str(content),
+                })
+
         self._json_update(updater=do_insert)
 
 

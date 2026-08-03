@@ -184,11 +184,8 @@ class Loop:
         agent.message_list.append(agent_rq)
 
         if self.session:
-            if agent_rq.tool_calls:
-                self.session.session_message_insert(role='assistant',content=self._get_reasoning(agent_rq))
-                self.session.session_message_insert(role='tool_calls',content=json.dumps([tc.model_dump() for tc in agent_rq.tool_calls],ensure_ascii=False))
-            else:
-                self.session.session_message_insert(role='assistant',content=agent_rq.content)
+            # assistant 落盘直接交完整对象,正文/thinking/tool_calls 由 session_message_insert 按 role 分类拆字段
+            self.session.session_message_insert(role='assistant',content=agent_rq)
         return agent_rq
 
 
@@ -277,7 +274,7 @@ class Loop:
         if self.session:
             if self.verbose:
                 rich_print(message=self._get_reasoning(final_rq),type='agent_thinking')
-            self.session.session_message_insert(role='assistant',content=final_rq.content or '')
+            self.session.session_message_insert(role='assistant',content=final_rq)
         return final_rq.content
 
 
