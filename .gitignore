@@ -45,6 +45,9 @@ memory/memory_config/backup/
 .cc_file/
 AGENTS.md
 
+# codex 产出的 changelog 展示站(独立 git 仓库,不进主仓库版本控制;忽略防 git clean 误删)
+changelog-site/
+
 # 本地 embedding 权重(约 195MB,不进版本控制;缺失时由 local_model_core 从 ModelScope 下载)
 local_model/**/pytorch_model.bin
 local_model/**/model.safetensors
