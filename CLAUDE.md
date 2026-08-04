@@ -204,7 +204,7 @@ after_session / final_memory_pipeline（后台）
 
 `after_round` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口只过滤传给 Memory 的 `worthy_summary=False`，session JSON 仍保留完整、无缝的原始 slices。历史 slice 缺少该字段时用 `slice.get('worthy_summary', True)` 保守兼容。这两个 hook 的触发时机见"Hook 系统"表。
 
-`memory.slices_pipeline` 是管线入库总闸，开关收拢为 `Memory.pipeline_enabled`（`main.py` 创建 Memory 时统一传入）：`False` 时 slice 分类/user_info/task 落盘全部短路（切片摘要照跑）。曾因 `after_round` 触发传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 产生不对称，收拢为单一实例属性后由构造处统一控制，杜绝分散传参。
+`memory.slices_pipeline` 是管线入库总闸，开关收拢为 `Memory.pipeline_enabled`（`main.py` 创建 Memory 时统一传入）：`False` 时切片/摘要与 slice 分类/user_info/task 落盘全部短路——`memory_pipeline`/`final_memory_pipeline` 两个 hook 的 `memory is None or not memory.pipeline_enabled` 判空检查在切片之前，pipeline 关闭时切片摘要也不跑。曾因 `after_round` 触发传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 产生不对称，收拢为单一实例属性后由构造处统一控制，杜绝分散传参。
 
 ## 数据与版本控制安全
 

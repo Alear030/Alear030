@@ -12,8 +12,8 @@ def final_memory_pipeline(session=None, memory=None, **kwargs):
     if session is None:
         return
 
-    # memory 未注入(如无记忆的纯推理模式)→ 切片已落地,pipeline 阶段跳过
-    if memory is None:
+    # memory 未注入(如无记忆的纯推理模式)或 pipeline_enabled 为 False→ 切片已落地,pipeline 阶段跳过
+    if memory is None or not memory.pipeline_enabled:
         return
 
     # 读取刚写好的持久化 JSON;文件不存在或为空则跳过

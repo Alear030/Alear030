@@ -13,13 +13,13 @@ def memory_pipeline(session=None, memory=None, hooks=None,**kwargs):
     if session is None:
         return
 
-    # 切片 + summary 无条件先跑(session 自身职责,不依赖 memory 是否接上)
+    # memory 未注入(如无记忆的纯推理模式)或 pipeline_enabled 为 False→ 切片已落地,pipeline 阶段跳过
+    if memory is None or not memory.pipeline_enabled:
+        return
+
+    # 切片 + summary 
     session._session_slice()
     session._session_summary()
-
-    # memory 未注入(如无记忆的纯推理模式)→ 切片已落地,pipeline 阶段跳过
-    if memory is None:
-        return
 
     # 读取刚写好的持久化 JSON;文件不存在或为空则跳过
     session_detail_file = SESSION_MEMORTY_DETAIL_PATH / f'{session.session_id}.json'
