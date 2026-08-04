@@ -33,21 +33,21 @@ class TuiChannel:
 
     # 一次性的信息，无需流式处理
     def append_once(self,content_type:str,content:dict,stream_id:str):
-        new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content)
+        new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=f"{content_type}_{stream_id}")
         self.body.mount(new_widget)
         self.once_widgets[f"{content_type}_{stream_id}"] = new_widget
 
     def append_stream(self,content_type:str,stream_id:str,content:dict):
-        
-        if f"{content_type}_{stream_id}" not in self.stream_widgets.keys():
+        widget_id = f"{content_type}_{stream_id}"
+        if widget_id not in self.stream_widgets.keys():
             # 首建：首包交给 widget 构造，首段 delta 在 __init__ 落进 Markdown 初始内容
-            new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content)
+            new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=widget_id)
             self.body.mount(new_widget)
-            self.stream_widgets[f"{content_type}_{stream_id}"] = new_widget
+            self.stream_widgets[widget_id] = new_widget
             return
 
         # 后续增量包：widget 内部转发给 MarkdownStream
-        self.stream_widgets[f"{content_type}_{stream_id}"].update_widget(widget_content=content)
+        self.stream_widgets[widget_id].update_widget(widget_content=content)
 
     def handle_loop_emit(self,event:str,content:dict,stream_id:str,agent_name:str):
         if event not in event_methods.keys():
@@ -61,6 +61,11 @@ class TuiChannel:
     @event_register(event="AssistantContent")
     def _AssistantContent_method(self,content:dict,stream_id:str,**args):
         self.append_stream(content_type="AssistantMessage",stream_id=stream_id,content=content)
+
+    # AssistantThinking 处理方法
+    @event_register(event="AssistantThinking")
+    def _AssistantThinking_method(self,content:dict,stream_id:str,**args):
+        self.append_stream(content_type="AssistantThinking",stream_id=stream_id,content=content)
 
     # 一条流收尾：finalize 该流下全部 widget 并从缓存移除（同一流可挂多个 widget 类型，按 stream_id 归组）
     @event_register(event="StreamEnd")

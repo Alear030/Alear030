@@ -18,7 +18,7 @@ class AssistantMessage(Widget):
         self._stream = None
 
         # 每一个widget的标准信息
-        self.widget_id = f"{widget_type}_{widget_id}"
+        self.widget_id = widget_id
 
     def compose(self):
         yield Markdown(self._first_delta,classes='AssistantMessage_output',id=f"{self.widget_id}")

@@ -494,7 +494,12 @@ class Session:
                 }
                 thinking = getattr(content, 'reasoning_content', None)
                 if thinking:
-                    msg['message_thinking'] = str(thinking)
+                    msg = {
+                        "message_round": self.round,
+                        "message_role": "assistant",
+                        "message_thinking": str(thinking),
+                        "message_content": content.content or ''
+                    }
                 data['session_messages'].append(msg)
                 if content.tool_calls:
                     data['session_messages'].append({

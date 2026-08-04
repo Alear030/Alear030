@@ -9,10 +9,11 @@ css_file = Path(__file__).parent/"widget_css.tcss"
 
 @widget_register(widget_type='UserMessage',widget_css_file=css_file,widget_enable=True)
 class UserMessage(Widget):
-    def __init__(self,widget_content:dict):
+    def __init__(self,widget_content:dict,widget_id:str=None):
         super().__init__(classes='UserMessage')
         self.widget_content = widget_content
         self.user_input = self._get_user_input()
+        self.widget_id = widget_id
 
     def compose(self):
         yield Static(content=self.user_input,classes='UserMessage_user_input')

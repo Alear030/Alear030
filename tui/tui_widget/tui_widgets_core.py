@@ -34,7 +34,7 @@ class TuiWidgets:
         return add_widget
 
     # widget构造函数，传入widget type用于区分构造的widget cls 传入dict结构信息，构造的时候widget cls自取
-    def build_widget(self,widget_type:str,widget_content:dict|None)->Widget:
+    def build_widget(self,widget_type:str,widget_content:dict|None,widget_id:str=None)->Widget:
         widget_cls = self.widget_list.get(widget_type)
 
         # 如果传入的widget_content是空，返回一个default样式STATIC占位提示
@@ -46,7 +46,7 @@ class TuiWidgets:
             return Static(content=f"this {widget_type} message is not enabled",classes='default_css')
 
         # 已注册且启用的widget，构造时自己从dict取内容
-        return widget_cls['widget_cls'](widget_content)
+        return widget_cls['widget_cls'](widget_content,widget_id=widget_id)
 
     # css files 构造返回函数
     def collect_css_files(self)->list[str]:

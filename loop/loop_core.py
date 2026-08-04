@@ -83,7 +83,8 @@ class Loop:
                 # 处理thinking信息
                 if getattr(delta,'reasoning_content',None):
                     AssistantThinking += delta.reasoning_content
-                    # @claude 提醒我 这里后续有了AssistantThinking TUI Widget后 接入emit机制
+                    if self.emit:
+                        self.emit(event='AssistantThinking',content={'reasoning_delta':delta.reasoning_content},stream_id=stream_key,agent_name=agent.agent_name)
 
                 # 处理ToolCalls信息：分片到，按 index 拼回完整调用
                 if delta.tool_calls:
