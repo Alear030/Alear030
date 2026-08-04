@@ -33,7 +33,7 @@ class AssistantMessage(Widget):
         # write 是 async，同步方法里用 run_worker 丢进 UI 事件循环
         self.run_worker(self._stream.write(delta))
 
-    def finalize_stream(self):
+    def finalize(self):
         # 流结束：stop 内部任务（顺带冲刷残留 pending），清句柄
         if self._stream is not None:
             self.run_worker(self._stream.stop())

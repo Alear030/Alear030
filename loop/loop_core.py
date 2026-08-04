@@ -24,7 +24,8 @@ class Loop:
         self.verbose = verbose
 
         self.stream_id = 0
-        self.emit_stream = None
+        # 唯一外发口：TUI 挂载 handle_loop_event；loop 内部统一 emit(event,content,stream_id,agent_name) 外发，事件名语义化不感知渲染层
+        self.emit = None
 
 
     # 从 agents 容器中取出指定 agent
@@ -76,8 +77,8 @@ class Loop:
                 if getattr(delta,'content',None):
                     AssistantMessage += delta.content
                     # 发 delta 增量给 TUI，widget 内部走 MarkdownStream 累积
-                    if self.emit_stream:
-                        self.emit_stream(content_type='AssistantMessage',stream_id=stream_key,content={'message_delta':delta.content},agent_name=agent.agent_name)
+                    if self.emit:
+                        self.emit(event='AssistantContent',content={'message_delta':delta.content},stream_id=stream_key,agent_name=agent.agent_name)
 
                 # 处理thinking信息
                 if getattr(delta,'reasoning_content',None):
@@ -110,9 +111,9 @@ class Loop:
             if AssistantThinking:
                 complete_message.reasoning_content = AssistantThinking
 
-            # 流正常收尾：发结束信号，TUI 据此停 MarkdownStream 并回收
-            if self.emit_stream:
-                self.emit_stream(content_type='AssistantMessageEnd',stream_id=stream_key,content={},agent_name=agent.agent_name)
+            # 流正常收尾：发 stream_end，TUI 据此停 MarkdownStream 并回收该流
+            if self.emit:
+                self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
 
             return complete_message
         except LoopAPIError:
@@ -121,9 +122,9 @@ class Loop:
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
             rich_print(message=f'模型调用失败：{ee}',type='system_error')
-            # 流中断也发结束信号防 TUI 侧 stream 悬挂；建连失败未开流则跳过
-            if self.emit_stream and stream_key:
-                self.emit_stream(content_type='AssistantMessageEnd',stream_id=stream_key,content={},agent_name=agent.agent_name)
+            # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败未开流则跳过
+            if self.emit and stream_key:
+                self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
             raise LoopAPIError(str(ee)) from ee
 
 

@@ -22,3 +22,7 @@ class UserMessage(Widget):
             return str(self.widget_content.get('user_input'))
         else:
             return 'user input has been missed'
+
+    # 占位
+    def finalize(self):
+        return

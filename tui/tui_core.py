@@ -26,6 +26,7 @@ class Alear030TUI(App):
         self.theme = "rose-pine-dawn"
 
         self.loop = loop
+        self.loop.emit = self.receive_loop_emit
         self.session = session
         self.hooks = hooks
         self.agents = agents
@@ -36,8 +37,6 @@ class Alear030TUI(App):
         # 当前对准的 channel，输入走它
         self.now_channel:TuiChannel = None
         self._channel_init()
-
-        loop.emit_stream = self.emit_stream
 
 
     # 登记常驻 channel
@@ -53,36 +52,37 @@ class Alear030TUI(App):
         yield self.channels["main"].body
         yield Input(placeholder=">",id="USER_INPUT")
 
-    # Mount 后聚焦 USER_INPUT
-    @on(message_type=Mount)
-    def _compose_init(self):
-        self.set_focus(self.query_one("#USER_INPUT"))
+    # @claude 一次性渲染不再需要独立 emit_once 方法：loop 侧 emit 泛化后，新增一次性事件（如 system_message）经事件分发路由 channel.append_once 即可
 
-    # 跑一轮：before_round → 当前 channel 的 loop → after_round
-    def _run_round(self,user_input=None):
-        # 空输入直接丢
-        if not user_input:
-            return
-
-        agent_name = self.now_channel.agent_name
-
-        self.hooks.trigger(hook_point='before_round',session=self.session,agents=self.agents,memory=self.memory,hooks=self.hooks,user_message=user_input)
-        # 走 now_channel 绑定的 loop，按 agent_name 派发
-        self.now_channel.channel_loop.loop_run(agent_name = agent_name,message = user_input)
-        # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
-        self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
-
-    # loop 挂载，执行中调用 emit_stream触发channel中的流式更新dom树方法
-    def emit_stream(self,content_type:str,stream_id:str,content:dict,agent_name:str):
-        self.call_from_thread(self.channels[agent_name].append_stream,content_type=content_type,stream_id=stream_id,content=content)
-
-    # @claude 后续需要增加从loop过来的一次性渲染终端的方法 emit_once 调用channel中的append_once方法
 
     # 解锁 USER_INPUT，并重新 focus；给 finally 里 call_from_thread 回调用
     def _unlock_input(self):
         self.query_one('#USER_INPUT').disabled = False
         self.set_focus(self.query_one("#USER_INPUT"))
 
+    # Mount 后聚焦 USER_INPUT
+    @on(message_type=Mount)
+    def _compose_init(self):
+        self.set_focus(self.query_one("#USER_INPUT"))
+
+    
+    # 输入提交：内容交给当前 channel，并锁输入防连发
+    @on(Input.Submitted)
+    def user_input(self,event:Input.Submitted):
+        inptu_content = event.value
+        # 空输入直接丢
+        if not inptu_content:
+            return
+        # 触发 UserMessage 事件，并传入 stream_id
+        self.now_channel.append_once(content_type="UserMessage",content={"user_input":inptu_content},stream_id=self.now_channel.channel_loop.stream_id)
+        event.input.clear()
+        # 锁住输入；解锁走 do_work finally
+        # @claude: 后续有中途打断后，再重看这套 lock
+        event.input.disabled = True
+        # 挂 do_work：按当前 channel 找 agent / loop
+        self.do_work(user_input = inptu_content)
+
+    
     # 双保险：exit_on_error=False 防 worker 异常杀 App；try 再兜一层
     @work(thread=True, exit_on_error=False)
     def do_work(self,user_input:str=None):
@@ -95,24 +95,22 @@ class Alear030TUI(App):
         finally:
             self.call_from_thread(self._unlock_input)
 
-
-    # 输入提交：内容交给当前 channel，并锁输入防连发
-    @on(Input.Submitted)
-    def user_input(self,event:Input.Submitted):
-        inptu_content = event.value
+    # 跑一轮：before_round → 当前 channel 的 loop → after_round
+    def _run_round(self,user_input:str=None):
         # 空输入直接丢
-        if not inptu_content:
+        if not user_input:
             return
+        
+        agent_name = self.now_channel.agent_name
+        # 触发 before_round 钩子
+        self.hooks.trigger(hook_point='before_round',session=self.session,agents=self.agents,memory=self.memory,hooks=self.hooks,user_message=user_input)
+        # 走 now_channel 绑定的 loop，按 agent_name 派发
+        self.now_channel.channel_loop.loop_run(agent_name = agent_name,message = user_input)
+        # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
+        self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
 
-        self.now_channel.append_once(type="UserMessage",content={"user_input":inptu_content})
-        event.input.clear()
-        # 锁住输入；解锁走 do_work finally
-        # @claude: 后续有中途打断后，再重看这套 lock
-        event.input.disabled = True
-
-        # 挂 do_work：按当前 channel 找 agent / loop
-        self.do_work(user_input = inptu_content)
-
-if __name__ == '__main__':
-    Alear030 = Alear030TUI()
-    Alear030.run()
+    def receive_loop_emit(self,event:str,content:dict,agent_name:str,stream_id:str):
+        if agent_name not in self.channels.keys():
+            return # @claude 后续增加System_error widget展示错误
+        target_channel = self.channels[agent_name]
+        self.call_from_thread(target_channel.handle_loop_emit,event=event,content=content,agent_name=agent_name,stream_id=stream_id)
