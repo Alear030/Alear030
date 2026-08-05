@@ -3,9 +3,41 @@ from ..tui_widget import tuiwidgets
 
 from contextlib import _AsyncGeneratorContextManager
 from dataclasses import dataclass
+
+from textual import on
 from textual.containers import VerticalScroll,Horizontal
 from textual.widgets import Static
+from textual.events import MouseScrollUp,MouseScrollDown
 
+
+# channel内容区：VerticalScroll子类，才能吃到滚轮事件（挂TuiChannel无效）
+class ChannelBody(VerticalScroll):
+    def __init__(self,channel,body_id:str):
+        super().__init__(id=body_id)
+        
+        # 自动贴底开关：True则emit后scroll_end
+        self.body_scroll = True
+        # 滚动锁定，如果为ture，channel_body不能滚动 后续介入不同事件留用
+        self.body_scroll_lock = False
+        self.channel = channel
+
+    # 滚轮事件处理：输出中滚轮：关贴底，避免和用户抢视口
+    @on(message_type=MouseScrollUp)
+    @on(message_type=MouseScrollDown)
+    def _body_scroll_off(self):
+        if not self.channel.outputing:
+            return
+        self.body_scroll = False
+        self.call_after_refresh(self._body_scroll_end)  # 延迟到布局刷新后检测
+    
+    # 检测当前滚动是否到底，到底了则自动开启贴地滚动
+    def _body_scroll_end(self):
+        self.body_scroll = self.is_vertical_scroll_end
+
+    # channel_body scroll to end, if body_scroll_lock is False and body_scroll is True
+    def scroll_to_end(self):
+        if not self.body_scroll_lock and self.body_scroll:
+            self.scroll_end(animate=False)
 
 # 事件分发注册表：event 名 → handler 方法名；@event_handler 注册，handle_event 查表分发
 # 放模块级而非类内：类体里跑装饰器时还没有实例，注册表放类里要和 __init__ 的实例属性纠缠，语义易踩坑
@@ -25,7 +57,10 @@ class TuiChannel:
         self.channel_id = channel_id
         self.channel_loop = channel_loop
         self.channel_type = channel_type
-        self.body = VerticalScroll(id=f"{agent_name}_CONTENT_AREA")
+
+        self.body = ChannelBody(channel=self,body_id=f"{agent_name}_CHANNEL_BODY")
+        # 本轮是否在流式输出：供body滚轮关贴底判断
+        self.outputing = False
 
         self.once_widgets:dict = {}
         self.stream_widgets:dict = {}
@@ -56,11 +91,13 @@ class TuiChannel:
         if not getattr(self,method_name,None):
             return # @claude 后续增加System_error widget承接
         getattr(self,method_name)(content=content,agent_name=agent_name,stream_id=stream_id)
+        # scroll to end if body_scroll_lock is False and body_scroll is True
+        self.body.scroll_to_end()
 
     # AssistantContent 处理方法
     @event_register(event="AssistantContent")
     def _AssistantContent_method(self,content:dict,stream_id:str,**args):
-        self.append_stream(content_type="AssistantMessage",stream_id=stream_id,content=content)
+        self.append_stream(content_type="AssistantContent",stream_id=stream_id,content=content)
 
     # AssistantThinking 处理方法
     @event_register(event="AssistantThinking")
@@ -76,8 +113,3 @@ class TuiChannel:
             del self.stream_widgets[k]
 
         # @claude 后续增加toolcall toolresult
-
-
-
-
-    

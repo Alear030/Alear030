@@ -1,34 +1,13 @@
-/* 全局界面样式：输入框/内容区；widget 样式留在各自 css_file */
-#USER_INPUT{
-    height: 3;                  /* 3 行高 */
-    border: none;
-    border-top: solid $primary; /* 上下主题色边线 */
-    border-bottom: solid $primary;
-    background: transparent;
-    padding: 0 1;
-    margin: 0 1;
-    color: $text;
+/* 全局：内容区吃剩余高度；输入条样式在 UserInput/widget_css.tcss */
+
+Screen {
+    background: transparent !important;
 }
 
-/* 内容区：隐藏滚动条 */
-#main_CONTENT_AREA{
+/* channel 滚动区：与 dock bottom 的输入条分高 */
+#main_CHANNEL_BODY {
+    height: 1fr;
     scrollbar-size: 0 0;
+    background: transparent !important;
 }
 
-/* 聚焦时：边线换 accent，提示正在输入 */
-#USER_INPUT:focus{
-    border: none;
-    border-top: solid $accent;
-    border-bottom: solid $accent;
-}
-
-/* 占位符：灰色斜体 */
-#USER_INPUT > .input--placeholder{
-    color: $text-muted;
-    text-style: italic;
-}
-
-/* 光标：accent 色 */
-#USER_INPUT > .input--cursor{
-    color: $accent;
-}
