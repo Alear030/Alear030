@@ -10,7 +10,8 @@ def session_timeline(session=None, memory=None, **kwargs):
     # after_session 后台钩子:会话结束时,把该 session 全部已定型且 worthy_summary 的 slice
     # 提炼成一条跨会话时间线事件。与 final_memory_pipeline 的尾片逻辑独立,此处需要整段会话
     # 的完整 slice 序列(不止尾片),否则叙事线索会缺前面的片段。
-    if session is None or memory is None:
+    # memory 未注入(如无记忆的纯推理模式)或 pipeline_enabled 为 False→ timeline 阶段跳过    
+    if session is None or memory is None or not memory.pipeline_enabled:
         return
 
     session_detail_file = SESSION_MEMORTY_DETAIL_PATH / f'{session.session_id}.json'
