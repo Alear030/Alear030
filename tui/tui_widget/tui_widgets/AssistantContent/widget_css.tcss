@@ -1,14 +1,23 @@
-.AssistantMessage{
+.AssistantContent{
     height:auto;
     min-height:1;
     padding:0 1;
     margin:1 2 1 1;
     color:$text;
 }
-.AssistantMessage_output{
+
+
+
+.AssistantContent_output{
     padding:0;
+    margin:0;
     color:$text;
 }
-.AssistantMessage_output > MarkdownParagraph:last-child{
-    margin-bottom:0;
+
+
+
+/* 段落默认 margin-bottom:1 会在盒内撑出空行；统一清零 */
+.AssistantContent_output MarkdownParagraph {
+    margin: 0;
 }
+

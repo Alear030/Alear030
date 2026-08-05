@@ -1,1 +1,1 @@
-from .widget_core import AssistantMessage
+from .widget_core import AssistantContent

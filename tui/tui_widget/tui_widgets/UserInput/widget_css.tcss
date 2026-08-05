@@ -1,0 +1,46 @@
+/* 输入条：钉在底部；高度由 _sync_height 写（含上下边框 2 行） */
+.UserInput {
+    dock: bottom;
+    min-height: 3;   /* 1 内容 + 2 边框 */
+    max-height: 11;  /* 9 内容 + 2 边框 */
+    border: none;
+    border-top: solid white;
+    border-bottom: solid white;
+    padding: 0 1;
+    margin: 0 1;
+    color: $text;
+    scrollbar-size: 0 0;
+}
+
+.UserInput:focus-within {
+    border: none;
+    border-top: solid white;
+    border-bottom: solid white;
+}
+
+.UserInput_pointer {
+    width: 2;
+    height: auto;
+    color: $text-muted;
+    content-align: left top;
+    padding: 0 1 0 0;
+}
+
+.UserInputCore {
+    width: 1fr;
+    height: 1fr;
+    border: none;
+    padding: 0;
+    color: $text;
+    scrollbar-size: 0 0;
+    background: transparent !important;
+}
+
+/* 光标块：白偏一点灰；关 reverse（ansi_color 默认会反色，把浅底吃成黑块） */
+.UserInputCore .text-area--cursor {
+    color: #1e1e1e;
+    background: #e0e0e0;
+    text-style: none;
+}
+
+

@@ -1,0 +1,23 @@
+/* user_content widget 样式 */
+.UserContent{
+    height: auto; /* 不写就填满父容器，消息条要贴合内容 */
+    padding:0 1;
+    margin:1 2 1 0;
+}
+
+.UserContent_user_input_horizontal{
+    height:auto;
+    width:100%;
+}
+
+.UserContent_user_input_pointer{
+    height:auto;
+    width:2;
+    color:rgb(255, 255, 255);
+}
+
+.UserContent_user_input_content{
+    color:$text;
+    width:1fr;
+    height:auto;
+}
