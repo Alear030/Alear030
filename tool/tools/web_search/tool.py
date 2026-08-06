@@ -63,5 +63,6 @@ def web_search(key_words:list[str],tool_call_content:dict,**kwargs)->str:
                 rich_print(f'web_search error:{EE}',type='system_error')
                 results.append({'key_word':key_word,'result':f'web_search 失败: {EE}'})
 
-    tool_call_content["tool_call_state"] = "success"
+    tool_call_content
+    
     return json.dumps(results,ensure_ascii=False)

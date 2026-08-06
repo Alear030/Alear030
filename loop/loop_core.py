@@ -1,7 +1,7 @@
 import json
 
 from openai.types.chat import ChatCompletionMessage
-
+from functools import partial
 
 from rich_output import rich_print
 from .orchestrator import PlanRunner
@@ -116,24 +116,22 @@ class Loop:
                                     self.emit(event="AssistantToolCallInit",content={"tool_call_id":tc.id,"tool_name":tc.function.name},agent_name=agent.agent_name)
                             if tc.function.arguments:
                                 AssistantToolCalls[tc.index]["function"]["arguments"] += tc.function.arguments
-            
                 # 处理finish_reason信息
                 if chunk.choices[0].finish_reason == "length":
                     self.length_end = True
+                
+            # 流正常收尾：发 stream_end，TUI 据此停 MarkdownStream 并回收该流
+            if self.emit:
+                self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
 
+            if AssistantThinking:
+                complete_message.reasoning_content = AssistantThinking.rstrip('\n')
             # 拼接完整用于 return 的message：和原非流式返回结构一致
             complete_message = ChatCompletionMessage(
                 role = 'assistant',
                 content=AssistantMessage or None,
                 tool_calls=AssistantToolCalls or None
             )
-            if AssistantThinking:
-                complete_message.reasoning_content = AssistantThinking.rstrip('\n')
-
-            # 流正常收尾：发 stream_end，TUI 据此停 MarkdownStream 并回收该流
-            if self.emit:
-                self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
-
             return complete_message
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
@@ -209,20 +207,30 @@ class Loop:
         return agent_rq
 
 
+    # tool_call返回结果后，传入对应的tool_call_content，编辑tool_call_content，用于TUI展示
+    def _tool_call_error_emit(self,tool_call_content:dict,error_message:str,agent_name:str):
+        tool_call_content["tool_call_state"] = "error"
+        tool_call_content["error_message"] = error_message
+        if self.emit:
+            self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name=agent_name)
+
     # 处理一批 tool_calls：解析参数→pre hook→调工具→写 session；返回本批是否发生 mode 切换
     # 不信任提示词自觉性，靠 diff session.mode 判断 plan_mode_on/off 是否真的生效
     def _tool_calls_api(self,agent,tool_calls)->bool:
         mode_switched = False
+        tool_call_basic_error = False
 
         for func in tool_calls:
             # 后续每个tool加上一个return_processing的方法，返回用于TUI展示的信息
             tool_call_content = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"processing"}
             # 发送tool_call_state change signal
             if self.emit:
-                self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name=agent.agent_name)
+                tool_call_content_init = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"waiting"}
+                self.emit(event="AssistantToolCallUpdate",content=tool_call_content_init,agent_name=agent.agent_name)
             
             # mode 已切换后剩余并行调用不再执行，但 openai 要求每个 tool_call_id 都有 tool 回复
             if mode_switched:
+                tool_call_basic_error = True
                 tool_result = {
                     'role':'tool',
                     'tool_call_id':func.id,
@@ -237,6 +245,7 @@ class Loop:
                 try:
                     tool_args = json.loads(func.function.arguments)
                 except (json.JSONDecodeError, TypeError) as ee:
+                    tool_call_basic_error = True
                     tool_result = {
                         'role':'tool',
                         'tool_call_id':func.id,
@@ -248,6 +257,7 @@ class Loop:
                 else:
                     # null、数组、字符串等合法 JSON 值也不能作为函数参数映射
                     if not isinstance(tool_args,dict):
+                        tool_call_basic_error = True
                         tool_result = {
                             'role':'tool',
                             'tool_call_id':func.id,
@@ -269,6 +279,7 @@ class Loop:
                                 mode_switched = True
                         except Exception as ee:
                             # 单个工具失败仍返回同一 tool_call_id，避免异常打断整批调用和后续重试
+                            tool_call_basic_error = True
                             tool_result = {
                                 'role':'tool',
                                 'tool_call_id':func.id,
@@ -278,11 +289,13 @@ class Loop:
                                 },ensure_ascii=False)
                             }
                             
-            # 发送tool_call_state change signal
-            if self.emit:
-                self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name = agent.agent_name)
+            
+            # 如果工具调用基本错误，则发送error信号
+            if tool_call_basic_error:
+                tool_call_basic_error_content = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"basic_error","error_message":tool_result.get("content",{}).get("message","")}
+                self.emit(event="AssistantToolCallUpdate",content=tool_call_basic_error_content,agent_name=agent.agent_name)
+            
             agent.message_list.append(tool_result)
-
             if self.session:
                 self.session.session_message_insert(role='tool_result',content=json.dumps(tool_result,ensure_ascii=False))
 

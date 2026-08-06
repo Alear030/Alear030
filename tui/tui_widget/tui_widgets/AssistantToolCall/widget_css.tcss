@@ -1,0 +1,51 @@
+.AssistantToolCall{
+    height: auto;
+    padding:0 1;
+    margin:1 2 1 0;
+}
+
+.AssistantToolCall_tool_call_horizontal{
+    height:auto;
+    width:100%;
+}
+
+.AssistantToolCall_tool_call_pointer_waiting{
+    height:auto;
+    width:2;
+    color:rgb(108, 108, 108);
+}
+
+.AssistantToolCall_tool_call_pointer_processing{
+    height:auto;
+    width:2;
+    color:rgb(255, 255, 255);
+}
+
+.AssistantToolCall_tool_call_pointer_success{
+    height:auto;
+    width:2;
+    color:rgb(0, 255, 94);
+}
+
+.AssistantToolCall_tool_call_pointer_error{
+    height:auto;
+    width:2;
+    color:rgb(255, 199, 199);
+}
+
+.AssistantToolCall_tool_call_vertical{
+    height:auto;
+    width:100%;
+}
+
+.AssistantToolCall_tool_call_name{
+    height:auto;
+    width:1fr;
+    color:$text;
+}
+
+.AssistantToolCall_tool_call_basic_error_message{
+    height:auto;
+    width:1fr;
+    color:rgba(255, 199, 199, 0.36);
+}
