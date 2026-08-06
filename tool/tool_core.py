@@ -42,7 +42,7 @@ class _ToolRegister:
 
         for name,arg in func_sig.parameters.items():
             # memory 与 agents/session 一样是 pre_toolUse 注入的运行时对象，模型无法构造，必须从可见 schema 排除
-            if name in ('self','agents','session','memory') or arg.kind == inspect.Parameter.VAR_KEYWORD:
+            if name in ('self','agents','session','memory','tool_call_content') or arg.kind == inspect.Parameter.VAR_KEYWORD:
                 continue
 
             if arg.default is inspect.Parameter.empty:
