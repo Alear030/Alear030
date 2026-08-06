@@ -1,14 +1,47 @@
+/* 组件根容器，高度随内容撑开 */
 .AssistantThinking{
-    height:auto;    
-    min-height:1;
+    height:auto;
+    width:100%;
     padding:0 1;
-    margin:1 2 1 1;
-    color:$text;
+    margin:1 2 1 0;
 }
 
-.AssistantThinking_output{
-    height: auto;
-    padding: 0;
-    margin: 0;
+/* 折叠态 brief 条：● + 计时 */
+.AssistantThinking_assistant_thinking_output_brief_bar{
+    height:auto;
+    width:100%;
 }
 
+/* 展开态 details 条：● + thinking 内容，点击切换 */
+.AssistantThinking_assistant_thinking_output_details_bar{
+    height:auto;
+    width:100%;
+}
+
+/* 折叠态 ● 指示点 */
+.AssistantThinking_assistant_thinking_output_brief_pointer{
+    height:auto;
+    width:2;
+    color:rgb(255, 255, 255);
+}
+
+/* 展开态 ● 指示点 */
+.AssistantThinking_assistant_thinking_output_details_pointer{
+    height:auto;
+    width:2;
+    color:rgb(255, 255, 255);
+}
+
+/* 折叠态计时文案：Alear030 Thinking in X.Xs */
+.AssistantThinking_assistant_thinking_output_brief_timer{
+    height:auto;
+    width:1fr;
+    color:rgb(255, 255, 255);
+}
+
+/* 展开态 thinking 内容 */
+.AssistantThinking_assistant_thinking_output_details_content{
+    height:auto;
+    width:1fr;
+    color:rgb(255, 255, 255);
+}

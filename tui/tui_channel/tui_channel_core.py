@@ -67,24 +67,22 @@ class TuiChannel:
         self.tool_widgets:dict = {}# toolcall and toolresult use tool_id to group store
 
     # 一次性的信息，无需流式处理
-    def append_once(self,content_type:str,content:dict,stream_id:str):
-        new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=f"{content_type}_{stream_id}")
+    def append_once(self,content_type:str=None,content:dict=None,widget_id:str=None):
+        new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=widget_id)
         self.body.mount(new_widget)
-        self.once_widgets[f"{content_type}_{stream_id}"] = new_widget
+        self.once_widgets[widget_id] = new_widget
 
-    def append_stream(self,content_type:str,stream_id:str,content:dict):
-        widget_id = f"{content_type}_{stream_id}"
+    # 流式信息，需要流式处理，widget_id需要传入的时候就直接拼接
+    def append_stream(self,content_type:str=None,content:dict=None,widget_id:str=None):
         if widget_id not in self.stream_widgets.keys():
-            # 首建：首包交给 widget 构造，首段 delta 在 __init__ 落进 Markdown 初始内容
             new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=widget_id)
             self.body.mount(new_widget)
             self.stream_widgets[widget_id] = new_widget
             return
-
-        # 后续增量包：widget 内部转发给 MarkdownStream
+        # 每个widget内都需要有一个update_widget方法
         self.stream_widgets[widget_id].update_widget(widget_content=content)
 
-    def handle_loop_emit(self,event:str,content:dict,stream_id:str,agent_name:str):
+    def handle_loop_emit(self,event:str=None,content:dict=None,stream_id:str=None,agent_name:str=None):
         if event not in event_methods.keys():
             return # @claude 后续增加System_error widget承接
         method_name = event_methods[event]
@@ -97,12 +95,31 @@ class TuiChannel:
     # AssistantContent 处理方法
     @event_register(event="AssistantContent")
     def _AssistantContent_method(self,content:dict,stream_id:str,**args):
-        self.append_stream(content_type="AssistantContent",stream_id=stream_id,content=content)
+        self.append_stream(content_type="AssistantContent",widget_id=f"AssistantContent_{stream_id}",content=content)
 
-    # AssistantThinking 处理方法
+    # AssistantThinking 处理方法 更新ThinkingWidget内容
     @event_register(event="AssistantThinking")
     def _AssistantThinking_method(self,content:dict,stream_id:str,**args):
-        self.append_stream(content_type="AssistantThinking",stream_id=stream_id,content=content)
+        self.append_stream(content_type="AssistantThinking",widget_id=f"AssistantThinking_{stream_id}",content=content)
+
+    # AssistantThinkingStreamEnd 处理方法 收尾ThinkingWidget
+    @event_register(event="AssistantThinkingStreamEnd")
+    def _AssistantThinkingStreamEnd_method(self,content:dict,stream_id:str,**args):
+        if self.stream_widgets.get(f"AssistantThinking_{stream_id}",None):
+            self.stream_widgets[f"AssistantThinking_{stream_id}"].thinking_stream_end()
+
+    # ToolCallInit 处理方法 创建toolcall的初始widget
+    @event_register(event="AssistantToolCallInit")
+    def _AssistantToolCallInit_method(self,content:dict,**args):
+        self.append_once(content_type="AssistantToolCall",content=content,widget_id=content['tool_call_id'])
+        self.tool_widgets[content['tool_call_id']] = self.once_widgets[content['tool_call_id']]
+
+    # ToolCallUpdate 处理方法 更新toolcall的widget状态
+    @event_register(event="AssistantToolCallUpdate")
+    def _AssistantToolCallUpdate_method(self,content:dict,**args):
+        tool_widget = self.tool_widgets.get(content['tool_call_id'])
+        if tool_widget:
+            tool_widget.update_widget(content)
 
     # 一条流收尾：finalize 该流下全部 widget 并从缓存移除（同一流可挂多个 widget 类型，按 stream_id 归组）
     @event_register(event="StreamEnd")
@@ -111,5 +128,3 @@ class TuiChannel:
         for k in finished:
             self.stream_widgets[k].finalize()
             del self.stream_widgets[k]
-
-        # @claude 后续增加toolcall toolresult

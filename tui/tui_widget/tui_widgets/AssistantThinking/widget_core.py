@@ -1,55 +1,127 @@
 from ...tui_widgets import widget_register
 
+from time import monotonic
 from pathlib import Path
+from textual import on
 from textual.widget import Widget
 from textual.widgets import Static
+from textual.containers import Horizontal
+from textual.events import Click, Mount
 
 css_file = Path(__file__).parent/'widget_css.tcss'
 
 
 @widget_register(widget_type="AssistantThinking",widget_css_file=css_file,widget_enable=True)
 class AssistantThinking(Widget):
-    def __init__(self,widget_content:dict,widget_type="AssistantThinking",widget_id:str=None):
+    def __init__(self,widget_content:dict=None,widget_id:str=None):
         super().__init__(classes='AssistantThinking')
         self.widget_id = widget_id
-        self.reasoning_content = widget_content.get('reasoning_delta','') or ''
-        # Static句柄提前建：防compose未完成就update；展示去掉首尾换行，避免盒内顶/底空行
-        self.thinking_static = Static(self._display_text(),classes='AssistantThinking_output',id=self.widget_id)
-        # mount前增量缓冲，on_mount再刷屏
-        self._pending:list[str] = []
 
-    def _display_text(self) -> str:
-        # 只剥首尾换行，保留段中空白
-        return (self.reasoning_content or '').lstrip('\n').rstrip('\n')
+        self.strt_time = monotonic()
+        self.elapsed_time = 0
+        self._timer = None
+        self.brief_bar_display = True
+
+        self.thinking_content = ""
+        self.thinking_content_holder = ""
+        self.thinking_content_holder_timer = None
+        self.thinking_content_pending:list[str] = []
+
+        self.has_been_finalized = False
+        
+        self.assistant_thinking_brief_pointer = Static(content='●',classes='AssistantThinking_assistant_thinking_output_brief_pointer')
+        self.assistant_thinking_brief_timer = Static(content=f'Alear030 Thinking in {self.elapsed_time:.1f}s',classes='AssistantThinking_assistant_thinking_output_brief_timer')
+        self.assistant_thinking_brief_bar = Horizontal(
+            self.assistant_thinking_brief_pointer,
+            self.assistant_thinking_brief_timer,
+            classes='AssistantThinking_assistant_thinking_output_brief_bar',
+        )
+        self.assistant_thinking_brief_bar.display = self.brief_bar_display
+
+        self.assistant_thinking_details_pointer = Static(content='●',classes='AssistantThinking_assistant_thinking_output_details_pointer')
+        self.assistant_thinking_details_content = Static(content='',classes='AssistantThinking_assistant_thinking_output_details_content')
+        self.assistant_thinking_details_bar = Horizontal(
+            self.assistant_thinking_details_pointer,
+            self.assistant_thinking_details_content,
+            classes='AssistantThinking_assistant_thinking_output_details_bar',
+        )
+        self.assistant_thinking_details_bar.display = not self.brief_bar_display
 
     def compose(self):
-        yield self.thinking_static
+        yield self.assistant_thinking_brief_bar
+        yield self.assistant_thinking_details_bar
 
-    # mount完成：冲刷pending
-    def on_mount(self):
-        self._flush_pending()
+    @on(Mount)
+    def _on_mount(self):
+        self._timer = self.set_interval(1.0,self._refresh_timer)
+        self._refresh_timer()
+        if self.has_been_finalized:
+            # Stream已经结束，做一次终结补偿，确保brief timer和details content都显示完整
+            self.assistant_thinking_brief_timer.update(f'Alear030 Done Thinking in {self.elapsed_time:.1f}s')
+            self._flush_thinking_pending()
+            self._thinking_content_holder_handle()
+            if self._timer:
+                self._timer.stop()
+                self._timer = None
+        else:
+            # Stream还在进行中，将mount之前的pending内容一次性刷新
+            self._flush_thinking_pending()
 
-    # 流式增量：未mount进pending，已mount直接update
+    @on(Click)
+    def _on_click(self):
+        if self.thinking_content:
+            self.brief_bar_display = not self.brief_bar_display
+            self.assistant_thinking_brief_bar.display = self.brief_bar_display
+            self.assistant_thinking_details_bar.display = not self.brief_bar_display
+
+    def _refresh_timer(self):
+        self.elapsed_time = monotonic() - self.strt_time
+        self.assistant_thinking_brief_timer.update(f'Alear030 Thinking in {self.elapsed_time:.1f}s')
+    
+    def _flush_thinking_pending(self):
+        if self.thinking_content_pending:
+            for pending in self.thinking_content_pending:
+                self.thinking_content_holder += pending
+            self.thinking_content_pending = []
+            self._thinking_content_holder_handle()
+
+    def _thinking_content_holder_handle(self):
+        if self.thinking_content_holder:
+            self.thinking_content = self.thinking_content + self.thinking_content_holder
+            self.thinking_content_holder = ""
+            self.assistant_thinking_details_content.update(self.thinking_content.rstrip('\n'))
+            self.thinking_content_holder_timer = None
+
     def update_widget(self,widget_content:dict):
         delta = widget_content.get('reasoning_delta','')
         if not delta:
             return
-        self.reasoning_content = self.reasoning_content + delta
         if not self.is_mounted:
-            self._pending.append(delta)
+            self.thinking_content_pending.append(delta)
             return
-        self.thinking_static.update(self._display_text())
+        self.thinking_content_holder += delta
+        if self.thinking_content_holder_timer is None:
+            self.thinking_content_holder_timer = self.set_timer(0.5,self._thinking_content_holder_handle)
 
-    # pending刷进Static：内存串已累加，刷一次全文
-    def _flush_pending(self):
-        if not self._pending:
+    def thinking_stream_end(self):
+        if self.has_been_finalized:
             return
-        self._pending.clear()
-        self.thinking_static.update(self._display_text())
+        self.has_been_finalized = True
+        
+        self.elapsed_time = monotonic() - self.strt_time
+        if self.is_mounted:
+            self.assistant_thinking_brief_timer.update(f'Alear030 Done Thinking in {self.elapsed_time:.1f}s')
+            self._flush_thinking_pending()
+            self._thinking_content_holder_handle()
+        
+        if self._timer:
+            self._timer.stop()
+            self._timer = None
+        
+        if self.thinking_content_holder_timer:
+            self.thinking_content_holder_timer.stop()
+            self.thinking_content_holder_timer = None
 
-    # 流结束兜底冲刷
+
     def finalize(self):
-        if self._pending:
-            self._flush_pending()
-        else:
-            self.thinking_static.update(self._display_text())
+        self.thinking_stream_end()

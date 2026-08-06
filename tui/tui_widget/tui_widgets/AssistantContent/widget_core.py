@@ -2,7 +2,8 @@ from ...tui_widgets import widget_register
 
 from pathlib import Path
 from textual.widget import Widget
-from textual.widgets import Markdown
+from textual.widgets import Markdown,Static
+from textual.containers import Horizontal
 
 css_file = Path(__file__).parent/'widget_css.tcss'
 
@@ -10,7 +11,7 @@ css_file = Path(__file__).parent/'widget_css.tcss'
 @widget_register(widget_type="AssistantContent",widget_css_file=css_file,widget_enable=True)
 class AssistantContent(Widget):
     # 流式渲染：首段进Markdown，后续走MarkdownStream
-    def __init__(self,widget_content:dict,widget_type="AssistantContent",widget_id:str=None):
+    def __init__(self,widget_content:dict,widget_id:str=None):
         super().__init__(classes='AssistantContent')
         # 首段delta：channel首建时塞进构造
         self._first_delta = str((widget_content or {}).get('message_delta', ''))
@@ -18,12 +19,15 @@ class AssistantContent(Widget):
         self._stream = None
         self.widget_id = widget_id
         # Markdown句柄提前建：防compose未完成就update
-        self.content_markdown = Markdown(self._first_delta,classes='AssistantContent_output',id=f"{self.widget_id}")
+        self.assistant_content_pointer = Static(content='●',classes='AssistantContent_assistant_output_pointer')
+        self.assistant_content_content = Markdown(self._first_delta,classes='AssistantContent_assistant_output_content',id=f"{self.widget_id}")
         # mount前增量缓冲，on_mount再写入stream
         self._pending:list[str] = []
 
     def compose(self):
-        yield self.content_markdown
+        with Horizontal(classes = "AssistantContent_assistant_output_horizontal"):
+            yield self.assistant_content_pointer
+            yield self.assistant_content_content
 
     # mount完成：冲刷pending
     def on_mount(self):
@@ -42,7 +46,7 @@ class AssistantContent(Widget):
     # 单段delta写入MarkdownStream
     def _write_delta(self,delta:str):
         if self._stream is None:
-            self._stream = Markdown.get_stream(self.content_markdown)
+            self._stream = Markdown.get_stream(self.assistant_content_content)
         # write是async，run_worker丢进UI循环
         self.run_worker(self._stream.write(delta))
 

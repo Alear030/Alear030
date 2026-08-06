@@ -26,6 +26,7 @@ class Loop:
         self.stream_id = 0
         # 唯一外发口：TUI 挂载 handle_loop_event；loop 内部统一 emit(event,content,stream_id,agent_name) 外发，事件名语义化不感知渲染层
         self.emit = None
+        self.length_end = False# @claude 后续需要添加流式长度，截断工具执行的逻辑
 
 
     # 从 agents 容器中取出指定 agent
@@ -48,24 +49,30 @@ class Loop:
             params['tools'] = agent.tool_list
             params['tool_choice'] = 'auto'
             params['extra_body'] = {'thinking':{'type':'enabled'}}
+            tui_thinking_enabled = True # 标记TUI是否开启ThinkingWidget
+        else:
+            tui_thinking_enabled = False # 标记TUI是否开启ThinkingWidget
         # 打开流式：create 返回 stream，chunk 逐个到
         params["stream"] = True
 
         # 本次调用的流序号，TUI 用它区分流；建连失败时未赋值，异常路径据此跳过 end 信号
         stream_key = None
         try:
-            # 发起请求，拿回 stream 对象
-            stream = agent.agent_ai.chat.completions.create(**params)
-
-            # 本次调用的流序号，TUI 用它区分流
+            # 流号前置分配，先发 Thinking 骨架事件，input 即显示
             self.stream_id += 1
             stream_key = f'{agent.agent_name}_{self.stream_id}'
+            if self.emit and tui_thinking_enabled:
+                self.emit(event='AssistantThinking',content={},stream_id=stream_key,agent_name=agent.agent_name)
+
+            # 发起请求，拿回 stream 对象
+            stream = agent.agent_ai.chat.completions.create(**params)
 
             # 累积变量：流式 content 全量在这攒
             AssistantMessage = ''
             AssistantThinking = ''
+            AssistantThinkingStreamEndFlag = False
             AssistantToolCalls = []
-
+            
             # 迭代 stream：空 choices 跳过，中途异常与建连失败同款兜底
             for chunk in stream:
                 # 部分 provider 会夹空 choices 心跳包，跳过避免 IndexError
@@ -73,17 +80,22 @@ class Loop:
                     continue
                 delta = chunk.choices[0].delta
 
+                if AssistantThinkingStreamEndFlag and not getattr(delta,"reasoning_content",None):
+                    AssistantThinkingStreamEndFlag = False
+                    self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
+                    
                 # 处理content信息
                 if getattr(delta,'content',None):
-                    AssistantMessage += delta.content
                     # 发 delta 增量给 TUI，widget 内部走 MarkdownStream 累积
+                    AssistantMessage += delta.content
                     if self.emit:
                         self.emit(event='AssistantContent',content={'message_delta':delta.content},stream_id=stream_key,agent_name=agent.agent_name)
 
                 # 处理thinking信息
                 if getattr(delta,'reasoning_content',None):
+                    AssistantThinkingStreamEndFlag = True
                     AssistantThinking += delta.reasoning_content
-                    if self.emit:
+                    if self.emit and tui_thinking_enabled:
                         self.emit(event='AssistantThinking',content={'reasoning_delta':delta.reasoning_content},stream_id=stream_key,agent_name=agent.agent_name)
 
                 # 处理ToolCalls信息：分片到，按 index 拼回完整调用
@@ -100,8 +112,14 @@ class Loop:
                             # arguments 是增量，逐片 += 拼回完整 JSON
                             if tc.function.name:
                                 AssistantToolCalls[tc.index]["function"]["name"] += tc.function.name
+                                if self.emit:
+                                    self.emit(event="AssistantToolCallInit",content={"tool_call_id":tc.id,"tool_name":tc.function.name},agent_name=agent.agent_name)
                             if tc.function.arguments:
                                 AssistantToolCalls[tc.index]["function"]["arguments"] += tc.function.arguments
+            
+                # 处理finish_reason信息
+                if chunk.choices[0].finish_reason == "length":
+                    self.length_end = True
 
             # 拼接完整用于 return 的message：和原非流式返回结构一致
             complete_message = ChatCompletionMessage(
@@ -110,7 +128,7 @@ class Loop:
                 tool_calls=AssistantToolCalls or None
             )
             if AssistantThinking:
-                complete_message.reasoning_content = AssistantThinking
+                complete_message.reasoning_content = AssistantThinking.rstrip('\n')
 
             # 流正常收尾：发 stream_end，TUI 据此停 MarkdownStream 并回收该流
             if self.emit:
@@ -197,12 +215,21 @@ class Loop:
         mode_switched = False
 
         for func in tool_calls:
+            # 后续每个tool加上一个return_processing的方法，返回用于TUI展示的信息
+            tool_call_content = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"processing"}
+            # 发送tool_call_state change signal
+            if self.emit:
+                self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name=agent.agent_name)
+            
             # mode 已切换后剩余并行调用不再执行，但 openai 要求每个 tool_call_id 都有 tool 回复
             if mode_switched:
                 tool_result = {
                     'role':'tool',
                     'tool_call_id':func.id,
-                    'content':json.dumps({'skipped':'plan 模式已在本轮切换，系统跳过本轮其余工具调用'},ensure_ascii=False)
+                    'content':json.dumps({
+                        "error":"plan_mode_switched",
+                        "message":"plan 模式已在本轮切换，系统跳过本轮其余工具调用"
+                    },ensure_ascii=False)
                 }
             else:
                 tool_name = func.function.name
@@ -232,6 +259,7 @@ class Loop:
                     else:
                         try:
                             extra_args = self._pre_tool_use_hooks(tool_name, tool_args)
+                            extra_args["tool_call_content"] = tool_call_content
                             func.function.arguments = json.dumps(tool_args,ensure_ascii=False)
 
                             # 调用前后 diff mode，判断此次调用是否为 plan_mode_on/off
@@ -249,8 +277,12 @@ class Loop:
                                     'message':f'工具执行失败：{type(ee).__name__}: {ee}。请根据错误修正后重试。'
                                 },ensure_ascii=False)
                             }
-
+                            
+            # 发送tool_call_state change signal
+            if self.emit:
+                self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name = agent.agent_name)
             agent.message_list.append(tool_result)
+
             if self.session:
                 self.session.session_message_insert(role='tool_result',content=json.dumps(tool_result,ensure_ascii=False))
 

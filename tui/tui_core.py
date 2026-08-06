@@ -70,7 +70,7 @@ class Alear030TUI(App):
             return
         # 触发 UserContent 挂载，并传入 stream_id
         self.user_input._clear()
-        self.now_channel.append_once(content_type="UserContent",content={"user_input":inptu_content},stream_id=self.now_channel.channel_loop.stream_id)
+        self.now_channel.append_once(content_type="UserContent",content={"user_input":inptu_content})
         # 新一轮：贴底并标记输出中（do_work是异步，False不能写在下一行）
         self.now_channel.body.scroll_to_end()
         self.now_channel.outputing = True
@@ -115,7 +115,7 @@ class Alear030TUI(App):
         self.now_channel.body.body_scroll = True
 
 
-    def receive_loop_emit(self,event:str,content:dict,agent_name:str,stream_id:str):
+    def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
         if agent_name not in self.channels.keys():
             return # @claude 后续增加System_error widget展示错误
         target_channel = self.channels[agent_name]

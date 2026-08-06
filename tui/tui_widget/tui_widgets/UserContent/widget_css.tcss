@@ -3,6 +3,7 @@
     height: auto; /* 不写就填满父容器，消息条要贴合内容 */
     padding:0 1;
     margin:1 2 1 0;
+    background: #373737;
 }
 
 .UserContent_user_input_horizontal{
@@ -17,7 +18,7 @@
 }
 
 .UserContent_user_input_content{
-    color:$text;
-    width:1fr;
     height:auto;
+    width:1fr;
+    color:$text;
 }

@@ -37,9 +37,9 @@ class TuiWidgets:
     def build_widget(self,widget_type:str,widget_content:dict|None,widget_id:str=None)->Widget:
         widget_cls = self.widget_list.get(widget_type)
 
-        # 如果传入的widget_content是空，返回一个default样式STATIC占位提示
-        if not widget_content:
-            return Static(content=f"this {widget_type} message's widget_content is empty",classes='default_css')
+        # # 如果传入的widget_content是空，返回一个default样式STATIC占位提示
+        # if not widget_content:
+        #     return Static(content=f"this {widget_type} message's widget_content is empty",classes='default_css')
 
         # 未注册或未启用的widget，用默认Static兜底渲染
         if not widget_cls or not widget_cls['widget_enable']:

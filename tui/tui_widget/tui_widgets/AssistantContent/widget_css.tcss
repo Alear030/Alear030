@@ -2,22 +2,29 @@
     height:auto;
     min-height:1;
     padding:0 1;
-    margin:1 2 1 1;
-    color:$text;
+    margin:1 2 1 0;
 }
 
-
-
-.AssistantContent_output{
-    padding:0;
-    margin:0;
-    color:$text;
+.AssistantContent_assistant_output_horizontal{
+    height:auto;
+    width:100%;
 }
 
+.AssistantContent_assistant_output_pointer{
+    height:auto;
+    width:2;
+    color:rgb(255, 255, 255);
+}
 
+.AssistantContent_assistant_output_content{
+    height:auto;
+    width:1fr;
+    color:$text;
+    padding-left: 0;
+}
 
 /* 段落默认 margin-bottom:1 会在盒内撑出空行；统一清零 */
-.AssistantContent_output MarkdownParagraph {
+.AssistantContent_assistant_output_content MarkdownParagraph {
     margin: 0;
 }
 
