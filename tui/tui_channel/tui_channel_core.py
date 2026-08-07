@@ -108,18 +108,15 @@ class TuiChannel:
         if self.stream_widgets.get(f"AssistantThinking_{stream_id}",None):
             self.stream_widgets[f"AssistantThinking_{stream_id}"].thinking_stream_end()
 
-    # ToolCallInit 处理方法 创建toolcall的初始widget
-    @event_register(event="AssistantToolCallInit")
-    def _AssistantToolCallInit_method(self,content:dict,**args):
-        self.append_once(content_type="AssistantToolCall",content=content,widget_id=content['tool_call_id'])
-        self.tool_widgets[content['tool_call_id']] = self.once_widgets[content['tool_call_id']]
-
-    # ToolCallUpdate 处理方法 更新toolcall的widget状态
+    # ToolCallUpdate 处理方法：widget 未建则懒建，已建则更新（Init 事件已退役，首次 Update 即出生）
     @event_register(event="AssistantToolCallUpdate")
     def _AssistantToolCallUpdate_method(self,content:dict,**args):
         tool_widget = self.tool_widgets.get(content['tool_call_id'])
         if tool_widget:
             tool_widget.update_widget(content)
+        else:
+            self.append_once(content_type="AssistantToolCall",content=content,widget_id=content['tool_call_id'])
+            self.tool_widgets[content['tool_call_id']] = self.once_widgets[content['tool_call_id']]
 
     # 一条流收尾：finalize 该流下全部 widget 并从缓存移除（同一流可挂多个 widget 类型，按 stream_id 归组）
     @event_register(event="StreamEnd")
