@@ -16,7 +16,7 @@ class UserContent(Widget):
         self.user_input = self._get_user_input()
         self.widget_id = widget_id
 
-        self.user_input_pointer = Static(content='●',classes='UserContent_user_input_pointer')
+        self.user_input_pointer = Static(content='>',classes='UserContent_user_input_pointer')
         self.user_input_content = Static(content=self.user_input,classes='UserContent_user_input_content')
 
     def compose(self):

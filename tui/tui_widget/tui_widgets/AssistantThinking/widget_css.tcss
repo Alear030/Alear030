@@ -22,26 +22,26 @@
 .AssistantThinking_assistant_thinking_output_brief_pointer{
     height:auto;
     width:2;
-    color:rgb(255, 255, 255);
+    color:rgba(255, 255, 255, 0.5);
 }
 
 /* 展开态 ● 指示点 */
 .AssistantThinking_assistant_thinking_output_details_pointer{
     height:auto;
     width:2;
-    color:rgb(255, 255, 255);
+    color:rgba(255, 255, 255, 0.5);
 }
 
 /* 折叠态计时文案：Alear030 Thinking in X.Xs */
 .AssistantThinking_assistant_thinking_output_brief_timer{
     height:auto;
     width:1fr;
-    color:rgb(255, 255, 255);
+    color:rgba(255, 255, 255, 0.5);
 }
 
 /* 展开态 thinking 内容 */
 .AssistantThinking_assistant_thinking_output_details_content{
     height:auto;
     width:1fr;
-    color:rgb(255, 255, 255);
+    color:rgba(255, 255, 255, 0.5);
 }

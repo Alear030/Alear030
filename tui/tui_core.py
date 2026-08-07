@@ -79,6 +79,7 @@ class Alear030TUI(App):
         # 挂 do_work：按当前 channel 找 agent / loop
         self.do_work(user_input = inptu_content)
 
+    # 保持焦点永远在user_input上
     
     # 双保险：exit_on_error=False 防 worker 异常杀 App；try 再兜一层
     @work(thread=True, exit_on_error=False)
