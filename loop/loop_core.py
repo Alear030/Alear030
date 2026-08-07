@@ -25,7 +25,7 @@ class Loop:
 
         self.stream_id = 0
         # 唯一外发口：TUI 挂载 handle_loop_event；loop 内部统一 emit(event,content,stream_id,agent_name) 外发，事件名语义化不感知渲染层
-        self.emit = None
+        self.emit = emit
         self.length_end = False# @claude 后续需要添加流式长度，截断工具执行的逻辑
 
 
@@ -82,7 +82,8 @@ class Loop:
 
                 if AssistantThinkingStreamEndFlag and not getattr(delta,"reasoning_content",None):
                     AssistantThinkingStreamEndFlag = False
-                    self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
+                    if self.emit:
+                        self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
                     
                 # 处理content信息
                 if getattr(delta,'content',None):
@@ -112,8 +113,6 @@ class Loop:
                             # arguments 是增量，逐片 += 拼回完整 JSON
                             if tc.function.name:
                                 AssistantToolCalls[tc.index]["function"]["name"] += tc.function.name
-                                if self.emit:
-                                    self.emit(event="AssistantToolCallInit",content={"tool_call_id":tc.id,"tool_name":tc.function.name},agent_name=agent.agent_name)
                             if tc.function.arguments:
                                 AssistantToolCalls[tc.index]["function"]["arguments"] += tc.function.arguments
                 # 处理finish_reason信息
@@ -124,14 +123,14 @@ class Loop:
             if self.emit:
                 self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
 
-            if AssistantThinking:
-                complete_message.reasoning_content = AssistantThinking.rstrip('\n')
             # 拼接完整用于 return 的message：和原非流式返回结构一致
             complete_message = ChatCompletionMessage(
                 role = 'assistant',
                 content=AssistantMessage or None,
                 tool_calls=AssistantToolCalls or None
             )
+            if AssistantThinking:
+                complete_message.reasoning_content = AssistantThinking.rstrip('\n')
             return complete_message
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
@@ -144,38 +143,6 @@ class Loop:
                 self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
             raise LoopAPIError(str(ee)) from ee
 
-
-
-    # pre_toolUse hooks 处理，返回需透传给工具的非 JSON 参数
-    # @claude 后续钩子需要都合并到hooks下进行解耦，先记录
-    def _pre_tool_use_hooks(self,tool_name:str,tool_args:dict)->dict:
-        extra_args = {}
-        if not self.hooks:
-            return extra_args
-
-        results = self.hooks.trigger(
-            hook_point='pre_toolUse',
-            match_ctx={'tool':tool_name},
-            session = self.session,
-            agents = self.agents,
-            hooks = self.hooks,
-            Loop = Loop,
-            memory = self.memory,
-            tool_args = dict(tool_args)
-        )
-
-        for hr in results:
-            if hr.block:
-                continue
-            if hr.modify_input:
-                # 可 JSON 序列化的值改写 tool_args，其余走 extra_args 直传工具
-                for k,v in hr.modify_input.items():
-                    if isinstance(v, (str, int, float, bool, list, dict, type(None))):
-                        tool_args[k] = v
-                    else:
-                        extra_args[k] = v
-
-        return extra_args
 
 
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
@@ -207,98 +174,24 @@ class Loop:
         return agent_rq
 
 
-    # tool_call返回结果后，传入对应的tool_call_content，编辑tool_call_content，用于TUI展示
-    def _tool_call_error_emit(self,tool_call_content:dict,error_message:str,agent_name:str):
-        tool_call_content["tool_call_state"] = "error"
-        tool_call_content["error_message"] = error_message
-        if self.emit:
-            self.emit(event="AssistantToolCallUpdate",content=tool_call_content,agent_name=agent_name)
-
-    # 处理一批 tool_calls：解析参数→pre hook→调工具→写 session；返回本批是否发生 mode 切换
+    # 处理一批 tool_calls：match_tool→分发；返回本批是否发生 mode 切换
     # 不信任提示词自觉性，靠 diff session.mode 判断 plan_mode_on/off 是否真的生效
+    # 工具调用全生命周期（processing/error/success 触发）收口在 match_tool，这里只做 mode diff 与结果分发
     def _tool_calls_api(self,agent,tool_calls)->bool:
         mode_switched = False
-        tool_call_basic_error = False
-
         for func in tool_calls:
-            # 后续每个tool加上一个return_processing的方法，返回用于TUI展示的信息
-            tool_call_content = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"processing"}
-            # 发送tool_call_state change signal
-            if self.emit:
-                tool_call_content_init = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"waiting"}
-                self.emit(event="AssistantToolCallUpdate",content=tool_call_content_init,agent_name=agent.agent_name)
-            
-            # mode 已切换后剩余并行调用不再执行，但 openai 要求每个 tool_call_id 都有 tool 回复
-            if mode_switched:
-                tool_call_basic_error = True
-                tool_result = {
-                    'role':'tool',
-                    'tool_call_id':func.id,
-                    'content':json.dumps({
-                        "error":"plan_mode_switched",
-                        "message":"plan 模式已在本轮切换，系统跳过本轮其余工具调用"
-                    },ensure_ascii=False)
-                }
-            else:
-                tool_name = func.function.name
-                # 参数必须先还原为 JSON object；解析失败不能伪装成空参数继续执行工具
-                try:
-                    tool_args = json.loads(func.function.arguments)
-                except (json.JSONDecodeError, TypeError) as ee:
-                    tool_call_basic_error = True
-                    tool_result = {
-                        'role':'tool',
-                        'tool_call_id':func.id,
-                        'content':json.dumps({
-                            'error':'invalid_tool_arguments',
-                            'message':f'工具参数不是合法 JSON：{ee}。请修正参数后重新调用。'
-                        },ensure_ascii=False)
-                    }
-                else:
-                    # null、数组、字符串等合法 JSON 值也不能作为函数参数映射
-                    if not isinstance(tool_args,dict):
-                        tool_call_basic_error = True
-                        tool_result = {
-                            'role':'tool',
-                            'tool_call_id':func.id,
-                            'content':json.dumps({
-                                'error':'invalid_tool_arguments',
-                                'message':'工具参数必须是 JSON object，请修正参数后重新调用。'
-                            },ensure_ascii=False)
-                        }
-                    else:
-                        try:
-                            extra_args = self._pre_tool_use_hooks(tool_name, tool_args)
-                            extra_args["tool_call_content"] = tool_call_content
-                            func.function.arguments = json.dumps(tool_args,ensure_ascii=False)
-
-                            # 调用前后 diff mode，判断此次调用是否为 plan_mode_on/off
-                            mode_before = self.session.mode if self.session else None
-                            tool_result = agent.match_tool(func,verbose=self.verbose,**extra_args)
-                            if self.session and self.session.mode != mode_before:
-                                mode_switched = True
-                        except Exception as ee:
-                            # 单个工具失败仍返回同一 tool_call_id，避免异常打断整批调用和后续重试
-                            tool_call_basic_error = True
-                            tool_result = {
-                                'role':'tool',
-                                'tool_call_id':func.id,
-                                'content':json.dumps({
-                                    'error':'tool_execution_error',
-                                    'message':f'工具执行失败：{type(ee).__name__}: {ee}。请根据错误修正后重试。'
-                                },ensure_ascii=False)
-                            }
-                            
-            
-            # 如果工具调用基本错误，则发送error信号
-            if tool_call_basic_error:
-                tool_call_basic_error_content = {"tool_call_id":func.id,"tool_name":func.function.name,"tool_call_state":"basic_error","error_message":tool_result.get("content",{}).get("message","")}
-                self.emit(event="AssistantToolCallUpdate",content=tool_call_basic_error_content,agent_name=agent.agent_name)
-            
-            agent.message_list.append(tool_result)
+            # 调用前记 mode，回来 diff 是否真的切换（不信任提示词自觉性）
+            mode_before = self.session.mode if self.session else None
+            # match_tool 接管 mode 旁路、参数解析/校验、hooks、执行、异常、生命周期 emit
+            tcr = agent.match_tool(func,verbose=self.verbose,mode_switched=mode_switched,
+                                   runtime={'session':self.session,'agents':self.agents,'hooks':self.hooks,'memory':self.memory,'Loop':Loop},
+                                   emit=partial(self.emit,event="AssistantToolCallUpdate",agent_name=agent.agent_name) if self.emit else None)
+            if self.session and self.session.mode != mode_before:
+                mode_switched = True
+            # 分发：协议消息 + 落盘
+            agent.message_list.append(tcr.tool_call_result)
             if self.session:
-                self.session.session_message_insert(role='tool_result',content=json.dumps(tool_result,ensure_ascii=False))
-
+                self.session.session_message_insert(role='tool_result',content=json.dumps(tcr.tool_call_result,ensure_ascii=False))
         return mode_switched
 
 
