@@ -71,9 +71,8 @@ class Alear030TUI(App):
         # 触发 UserContent 挂载，并传入 stream_id
         self.user_input._clear()
         self.now_channel.append_once(content_type="UserContent",content={"user_input":inptu_content})
-        # 新一轮：贴底并标记输出中（do_work是异步，False不能写在下一行）
-        self.now_channel.body.scroll_to_end()
-        self.now_channel.outputing = True
+        # 新一轮：Textual anchor贴底
+        self.now_channel.body.stick_bottom()
         # 锁住输入；解锁走 do_work finally
         self.user_input._set_disabled(True) # @claude: 后续有中途打断后，再重看这套 lock
         # 挂 do_work：按当前 channel 找 agent / loop
@@ -93,9 +92,8 @@ class Alear030TUI(App):
         finally:
             self.call_from_thread(self.user_input._set_disabled,False)
             self.call_from_thread(self.user_input._set_focus)
-            # 异常也收尾：关输出标记、恢复贴底
-            self.now_channel.outputing = False
-            self.now_channel.body.body_scroll = True
+            # 异常也收尾：下一轮前再贴底
+            self.call_from_thread(self.now_channel.body.stick_bottom)
 
     # 跑一轮：before_round → 当前 channel 的 loop → after_round
     def _run_round(self,user_input:str=None):
@@ -111,9 +109,8 @@ class Alear030TUI(App):
         # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
         self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
 
-        # 本轮流式结束：关输出标记、恢复贴底（正常路径；异常靠do_work finally）
-        self.now_channel.outputing = False
-        self.now_channel.body.body_scroll = True
+        # 本轮流式结束：下一轮前再贴底（正常路径；异常靠do_work finally）
+        self.call_from_thread(self.now_channel.body.stick_bottom)
 
 
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
