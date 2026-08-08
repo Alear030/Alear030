@@ -61,8 +61,6 @@ class Loop:
             # 流号前置分配，先发 Thinking 骨架事件，input 即显示
             self.stream_id += 1
             stream_key = f'{agent.agent_name}_{self.stream_id}'
-            if self.emit and tui_thinking_enabled:
-                self.emit(event='AssistantThinking',content={},stream_id=stream_key,agent_name=agent.agent_name)
 
             # 发起请求，拿回 stream 对象
             stream = agent.agent_ai.chat.completions.create(**params)
@@ -80,24 +78,31 @@ class Loop:
                     continue
                 delta = chunk.choices[0].delta
 
-                if AssistantThinkingStreamEndFlag and not getattr(delta,"reasoning_content",None):
-                    AssistantThinkingStreamEndFlag = False
-                    if self.emit:
-                        self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
-                    
+                # 处理thinking信息
+                if getattr(delta,'reasoning_content',None):
+                    # 发 thinking 骨架事件
+                    if self.emit and tui_thinking_enabled and not AssistantThinkingStreamEndFlag:
+                        self.emit(event='AssistantThinking',content={},stream_id=stream_key,agent_name=agent.agent_name)
+                    # 标记thinking流已经开始
+                    AssistantThinkingStreamEndFlag = True
+                    # 累积thinking内容
+                    AssistantThinking += delta.reasoning_content
+                    # 发 thinking 内容增量
+                    if self.emit and tui_thinking_enabled:
+                        self.emit(event='AssistantThinking',content={'reasoning_delta':delta.reasoning_content},stream_id=stream_key,agent_name=agent.agent_name)
+
                 # 处理content信息
                 if getattr(delta,'content',None):
+                    
+                    # content 开始了说明thinking结束了，所以此时直接将self.AssistantThinkingStreamEndFlag设置为False
+                    if self.emit and tui_thinking_enabled and AssistantThinkingStreamEndFlag:
+                        AssistantThinkingStreamEndFlag = False
+                        self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
+                    
                     # 发 delta 增量给 TUI，widget 内部走 MarkdownStream 累积
                     AssistantMessage += delta.content
                     if self.emit:
                         self.emit(event='AssistantContent',content={'message_delta':delta.content},stream_id=stream_key,agent_name=agent.agent_name)
-
-                # 处理thinking信息
-                if getattr(delta,'reasoning_content',None):
-                    AssistantThinkingStreamEndFlag = True
-                    AssistantThinking += delta.reasoning_content
-                    if self.emit and tui_thinking_enabled:
-                        self.emit(event='AssistantThinking',content={'reasoning_delta':delta.reasoning_content},stream_id=stream_key,agent_name=agent.agent_name)
 
                 # 处理ToolCalls信息：分片到，按 index 拼回完整调用
                 if delta.tool_calls:
@@ -115,6 +120,14 @@ class Loop:
                                 AssistantToolCalls[tc.index]["function"]["name"] += tc.function.name
                             if tc.function.arguments:
                                 AssistantToolCalls[tc.index]["function"]["arguments"] += tc.function.arguments
+                
+                # 处理thinking流结束信息
+                if AssistantThinkingStreamEndFlag and not getattr(delta,"reasoning_content",None):
+                    # 发 thinking 流结束事件
+                    AssistantThinkingStreamEndFlag = False
+                    if self.emit and tui_thinking_enabled:
+                        self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
+                
                 # 处理finish_reason信息
                 if chunk.choices[0].finish_reason == "length":
                     self.length_end = True
