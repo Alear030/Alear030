@@ -5,7 +5,7 @@ from .tui_widget import tuiwidgets
 
 from textual import on,work
 from textual.app import App
-from textual.events import Mount
+from textual.events import Click, Mount
 
 # 全局变量
 _UserInput = tuiwidgets.widget_list["UserInput"]["widget_cls"]
@@ -61,6 +61,13 @@ class Alear030TUI(App):
     def _compose_init(self):
         self.user_input._set_focus()
 
+    # 保持焦点永远在user_input上
+    @on(Click)
+    def _focus_on_user_input(self,event:Click):
+        if self.user_input.display and not self.user_input.disabled:
+            self.user_input._set_focus()
+        return
+    
     # 输入提交：内容交给当前 channel，并锁输入防连发
     @on(_UserInput.Submitted)
     def _user_input_submitted(self,event:_UserInput.Submitted):
@@ -78,8 +85,6 @@ class Alear030TUI(App):
         # 挂 do_work：按当前 channel 找 agent / loop
         self.do_work(user_input = inptu_content)
 
-    # 保持焦点永远在user_input上
-    
     # 双保险：exit_on_error=False 防 worker 异常杀 App；try 再兜一层
     @work(thread=True, exit_on_error=False)
     def do_work(self,user_input:str=None):

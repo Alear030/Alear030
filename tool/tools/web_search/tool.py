@@ -1,7 +1,9 @@
 import os
+from re import T
 import time
 import json
 
+from dataclasses import asdict
 from dotenv import load_dotenv
 from tool.tool_core import register_tool
 from ddgs import DDGS
@@ -50,6 +52,17 @@ def _search_one(key_word:str)->dict:
 
 @register_tool(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_search(key_words:list[str],**kwargs)->str:
+    emit = kwargs.get('emit',None)
+    tcr = kwargs.get('tcr',None)
+
+    # 更新工具名称
+    if tcr:
+        key_words_str = ' '.join(key_words)
+        tcr.tool_call_name = f"web_search:{key_words_str}"
+        if emit:
+            emit(content=asdict(tcr))
+
+    
     with ThreadPoolExecutor(max_workers=min(len(key_words),5)) as tp:
         search_queue = {
             tp.submit(_search_one,key_word):key_word for key_word in key_words

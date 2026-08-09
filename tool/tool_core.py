@@ -11,7 +11,10 @@ class ToolCallResult:
     tool_name:str = ""                          # 信息性，TUI 路由不依赖
     tool_call_result:dict = field(default_factory=dict)   # {"role","tool_call_id","content"} 协议消息，loop 落盘/回模型
     tool_call_state:dict = field(default_factory=dict)    # {"tool_call_state","tool_call_state_message"} TUI 态
-    tool_call_extra_info:dict = field(default_factory=dict)  # 未来 TUI 新建结果widget 路由
+    tool_call_extra_info:list = field(default_factory=dict)  # 未来 TUI 新建结果widget 路由
+    # tool_call_extra_info 格式说明
+    # [{"id":"","type":"Static","content":"","css":{}}]
+    # horizontal: [{"id":"","type":"Horizontal","content":[{"id":"","type":"Static","content":"","css":{}}],"css":{}}]
 
 
 class _ToolRegister:
