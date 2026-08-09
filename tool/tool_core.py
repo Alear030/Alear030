@@ -128,13 +128,14 @@ class _ToolRegister:
         inject = dict(extra)
         inject["tcr"] = tcr
         if emit:
-            inject["tool_call_tui_emit"] = emit
+            inject["emit"] = emit
         inject.update(hook_extra)
 
-        # 触发 processing：工具真正开跑
-        if emit:
-            tcr.tool_call_state = {'tool_call_state':'processing'}
-            emit(content=asdict(tcr))
+        #tool_call preceed 挪如tool中真正执行"前"
+# 触发 processing：工具真正开跑
+        # if emit:
+        #     tcr.tool_call_state = {'tool_call_state':'processing'}
+        #     emit(content=asdict(tcr))
 
         # 从注册表取出真正要执行的函数，展开调用；工具内部异常收口成 error，不炸穿 ReAct 循环
         tool_func = self.tool_list[tool_name]['function']

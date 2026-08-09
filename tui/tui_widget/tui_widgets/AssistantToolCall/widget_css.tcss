@@ -4,7 +4,12 @@
     margin:1 2 1 0;
 }
 
-.AssistantToolCall_tool_call_horizontal{
+.AssistantToolCall_tool_call_vertical{
+    height:auto;
+    width:100%;
+}
+
+.AssistantToolCall_tool_call_basic_info{
     height:auto;
     width:100%;
 }
@@ -17,11 +22,13 @@
 .AssistantToolCall_tool_call_extrabody{
     height:auto;
     width:100%;
+    margin-left:2;
 }
 
 .AssistantToolCall_basic_error_bar{
     height:auto;
     width:100%;
+    margin-left:2;
 }
 
 .AssistantToolCall_basic_error_pointer{

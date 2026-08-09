@@ -51,20 +51,20 @@ class AssistantToolCall(Widget):
         self.pointer_blinking_target = self.tool_call_pointer
 
     def compose(self):
-        with Horizontal(classes='AssistantToolCall_tool_call_horizontal'):
-            yield self.tool_call_pointer
-            yield self.tool_call_name
-        # 子节点在 compose 声明式挂载，运行时只改 display/content（Textual 容器无 add_child）
+        with Vertical(classes = "AssistantToolCall_tool_call_vertical"):
+            with Horizontal(classes='AssistantToolCall_tool_call_basic_info'):
+                yield self.tool_call_pointer
+                yield self.tool_call_name
+            # 子节点在 compose 声明式挂载，运行时只改 display/content（Textual 容器无 add_child）
 
-        # 每一个ToolCall都包含一个basic_error_bar，用于显示基本错误消息
-        with self.basic_errror_bar:
-            yield self.basic_error_pointer
-            yield self.basic_error_message
+            # 每一个ToolCall都包含一个basic_error_bar，用于显示基本错误消息
+            with self.basic_errror_bar:
+                yield self.basic_error_pointer
+                yield self.basic_error_message
 
-        # extra_body 与标题行平级，避免缩进进 Horizontal 后错误条挤在同行
-        with self.extra_body:
-            pass
-    
+            # extra_body 与标题行平级，避免缩进进 Horizontal 后错误条挤在同行
+            with self.extra_body:
+                pass
     def on_mount(self):
         # 懒建出生即带状态：复用 update_widget 应用初始态（颜色/消息/闪烁）
         self.update_widget(self.widget_content)
