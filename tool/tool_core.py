@@ -8,7 +8,7 @@ from rich_output import rich_print
 @dataclass
 class ToolCallResult:
     tool_call_id:str = ""                       # 路由键，match_tool 从 func 填，channel 据此找 widget
-    tool_name:str = ""                          # 信息性，TUI 路由不依赖
+    tool_call_name:str = ""                     # 信息性，TUI 路由不依赖
     tool_call_result:dict = field(default_factory=dict)   # {"role","tool_call_id","content"} 协议消息，loop 落盘/回模型
     tool_call_state:dict = field(default_factory=dict)    # {"tool_call_state","tool_call_state_message"} TUI 态
     tool_call_extra_info:list = field(default_factory=dict)  # 未来 TUI 新建结果widget 路由
@@ -55,7 +55,7 @@ class _ToolRegister:
 
         for name,arg in func_sig.parameters.items():
             # memory 与 agents/session 一样是 pre_toolUse 注入的运行时对象，模型无法构造，必须从可见 schema 排除
-            if name in ('self','agents','session','memory','tool_call_tui_emit','tcr') or arg.kind == inspect.Parameter.VAR_KEYWORD:
+            if name in ('self','agents','session','memory','emit','tcr') or arg.kind == inspect.Parameter.VAR_KEYWORD:
                 continue
 
             if arg.default is inspect.Parameter.empty:
@@ -95,7 +95,7 @@ class _ToolRegister:
         # 创建本次match_tool的ToolCallResult dataclass用于后续状态数据流转
         tcr:ToolCallResult = ToolCallResult(
             tool_call_id=tool_call_id,
-            tool_name=tool_name
+            tool_call_name=tool_name
         )
 
         # mode 已切换后剩余并行调用不再执行，但 openai 要求每个 tool_call_id 都有 tool 回复
@@ -124,7 +124,7 @@ class _ToolRegister:
         except Exception as ee:
             return self._error_result(tcr,'tool_execution_error',f'pre_toolUse hook 执行失败：{type(ee).__name__}: {ee}。',emit)
 
-        # 组装注入：extra=loop 直传；tcr=工具可改的结果载体；emit（已绑 Update）注入成 tool_call_tui_emit 供工具触发 success/进度
+        # 组装注入：extra=loop 直传；tcr=工具可改的结果载体；emit（已绑 Update）注入成 emit 供工具触发 success/进度
         inject = dict(extra)
         inject["tcr"] = tcr
         if emit:
@@ -147,7 +147,7 @@ class _ToolRegister:
         # success 由工具自己经 emit 触发，match_tool 只兜底发 finished
         if not isinstance(tool_call_return,ToolCallResult):
             tcr.tool_call_id = tool_call_id
-            tcr.tool_name = tool_name
+            tcr.tool_call_name = tool_name
             tcr.tool_call_state = {'tool_call_state':'finished'}
             tcr.tool_call_result = {'role':'tool','tool_call_id':tool_call_id,'content':str(tool_call_return)}
             if emit:
@@ -156,7 +156,7 @@ class _ToolRegister:
             tcr = tool_call_return
             # 工具返回新 dataclass 时，路由键/工具名以 func 为准兜底，协议消息 id 补上
             tcr.tool_call_id = tool_call_id
-            tcr.tool_name = tool_name
+            tcr.tool_call_name = tool_name
             tcr.tool_call_result.setdefault('tool_call_id',tool_call_id)
 
         return tcr

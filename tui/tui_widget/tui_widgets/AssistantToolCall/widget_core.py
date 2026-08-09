@@ -27,7 +27,7 @@ class AssistantToolCall(Widget):
         self.widget_content = widget_content
         # emit 内容整包是 asdict(ToolCallResult)：状态在内层 tool_call_state dict
         self.tool_call_state = (widget_content.get("tool_call_state") or {}).get("tool_call_state") or "waiting"
-        self.tool_name = widget_content.get("tool_name",None)
+        self.tool_name = widget_content.get("tool_call_name",None)
 
         # 每一个ToolCall都包含一个tool_call_pointer，用于显示指针
         self.tool_call_pointer = Static(content="●",classes=f'AssistantToolCall_tool_call_pointer')
@@ -72,8 +72,8 @@ class AssistantToolCall(Widget):
     def update_widget(self,widget_content:dict):
         self.widget_content = widget_content
         # 如果tool_name有变化，则更新tool_call_name
-        if widget_content.get("tool_name",None) and self.tool_name != widget_content['tool_name']:
-            self.tool_name = widget_content['tool_name']
+        if widget_content.get("tool_call_name",None) and self.tool_name != widget_content['tool_call_name']:
+            self.tool_name = widget_content['tool_call_name']
             self.tool_call_name.update(self.tool_name)
         # 如果tool_call_state有变化，则更新tool_call_state
         if widget_content.get("tool_call_state",None):

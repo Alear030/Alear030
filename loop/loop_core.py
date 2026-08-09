@@ -94,7 +94,7 @@ class Loop:
                 # 处理content信息
                 if getattr(delta,'content',None):
                     
-                    # content 开始了说明thinking结束了，所以此时直接将self.AssistantThinkingStreamEndFlag设置为False
+                    # content 开始说明 thinking 已结束：标志置 False，触发 StreamEnd 收尾事件
                     if self.emit and tui_thinking_enabled and AssistantThinkingStreamEndFlag:
                         AssistantThinkingStreamEndFlag = False
                         self.emit(event='AssistantThinkingStreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
