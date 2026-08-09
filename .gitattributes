@@ -1,0 +1,7 @@
+# 文本文件仓库统一存 LF，工作区行尾跟随各机 autocrlf
+* text=auto
+
+# 显式声明二进制，防止 text=auto 误判
+*.mdl -text
+*.msc -text
+*.png -text
