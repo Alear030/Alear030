@@ -2,8 +2,9 @@ import time
 import json
 import requests
 
+from dataclasses import asdict
 from bs4 import BeautifulSoup
-from tool.tool_core import register_tool,tool_call_processing
+from tool.tool_core import register_tool,ToolCallResult
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from loop import *
@@ -37,24 +38,57 @@ def _fetch_one(url:str)->dict:
             text = soup.get_text(separator='\n', strip=True)
             # 去空行，截断到 5000 字符
             lines = [l for l in text.split('\n') if l.strip()]
-            return {'url':url,'content':'\n'.join(lines)[:5000]}
+            return {'url':url,'content':'\n'.join(lines)[:5000],'success':True}
 
         except Exception as e:
             error = e
             time.sleep(1)
 
-    return {'url':url,'content':f'web_fetch 失败: {error}'}
+    return {'url':url,'content':f'web_fetch 失败: {error}','success':False}
 
 
 @register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
-def web_fetch(urls: list[str], **kwargs) -> str:
+def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
 
-    # 执行tool_call_processing
-    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
-    
+    emit = kwargs.get('emit',None)
+    tcr = kwargs.get('tcr',None)
+
+    # tcr 注入判空，match_tool 总传，直接调用兜底报错
+    if tcr is None:
+        return 'web_fetch 缺少 tcr 注入，请通过 match_tool 调用'
+
     # 空列表会让下面的 max_workers=0，ThreadPoolExecutor 直接抛 ValueError
     if not urls:
-        return '错误: urls 不能为空，请至少传入一个 URL'
+        msg = 'web_fetch 未传入 URL，请至少传入一个 URL 重试'
+        tcr.tool_call_state = {'tool_call_state':'error'}
+        tcr.tool_call_extra_info = [{
+            "id":"tool_call_error_info",
+            "type":"Horizontal",
+            "content":[
+                {"id":"tool_call_error_info_pointer","type":"Static","content":"⎿","css":{"color":"rgba(255,255,255,0.5)","width":"2","height":"auto"}},
+                {"id":"tool_call_error_info_message","type":"Static","content":msg,"css":{"color":"rgba(255,255,255,0.5)","width":"100%","height":"auto"}}
+            ],
+            "css":{"width":"100%","height":"auto"}
+        }]
+        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':'empty_urls','message':msg},ensure_ascii=False)}
+        if emit:
+            emit(content=asdict(tcr))
+        return tcr
+
+    # 更新 tool_call_state tool_call_extra_info，开跑前发 processing 进度
+    tcr.tool_call_state = {'tool_call_state':'processing'}
+    tcr.tool_call_extra_info = [{
+        "id": "web_fetch_proceed_info",
+        "type": "Horizontal",
+        "content": [
+            {"id": "web_fetch_proceed_info_pointer", "type": "Static", "content": "⎿", "css": {"color": "rgba(255,255,255,0.5)", "width": "2","height":"auto"}},
+            {"id": "web_fetch_proceed_info_message", "type": "Static", "content": f"fetching {len(urls)} urls...", "css": {"color": "rgba(255,255,255,0.5)", "width": "100%","height":"auto"}}
+        ],
+        "css":{"width":"100%","height":"auto"}
+    }]
+    # 有 emit 则发送 TUI 重新渲染 tool_call_widget
+    if emit:
+        emit(content=asdict(tcr))
 
     with ThreadPoolExecutor(max_workers=min(len(urls),5)) as tp:
         fetch_queue = {
@@ -66,6 +100,35 @@ def web_fetch(urls: list[str], **kwargs) -> str:
                 results.append(thread.result())
             except Exception as e:
                 url = fetch_queue[thread]
-                results.append({'url':url,'content':f'web_fetch 失败: {e}'})
+                results.append({'url':url,'content':f'web_fetch 失败: {e}','success':False})
 
-    return json.dumps(results,ensure_ascii=False)
+    # 任一 URL 成功即整体 success，部分失败条目仍回传模型
+    success_list = [item for item in results if item.get('success')]
+    tool_call_result_flag = bool(success_list)
+    fail_urls = [item['url'] for item in results if not item.get('success')]
+
+    if tool_call_result_flag:
+        state = 'success'
+        state_message = f'web_fetch completed：{len(success_list)}/{len(results)} urls succeeded'
+    else:
+        state = 'error'
+        state_message = f' failed:{", ".join(fail_urls)}'
+
+    tcr.tool_call_state = {'tool_call_state':state}
+    tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(results,ensure_ascii=False)}
+    # 收尾写状态与结果，进度提示替换为结果态
+    tcr.tool_call_extra_info = [{
+        "id": "web_fetch_proceed_info",
+        "type": "Horizontal",
+        "content": [
+            {"id": "web_fetch_proceed_info_pointer", "type": "Static", "content": "⎿", "css": {"color": "rgba(255,255,255,0.5)", "width": "2","height":"auto"}},
+            {"id": "web_fetch_proceed_info_message", "type": "Static", "content": state_message, "css": {"color": "rgba(255,255,255,0.5)", "width": "100%","height":"auto"}}
+        ],
+        "css":{"width":"100%","height":"auto"}
+    }]
+
+    # 发送最终态给 TUI 更新 widget
+    if emit:
+        emit(content=asdict(tcr))
+
+    return tcr

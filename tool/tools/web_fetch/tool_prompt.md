@@ -14,7 +14,8 @@
 - urls (必填): URL 列表，可以是 1 个或多个。多个 URL 会并行抓取，互不阻塞
 
 ### 调用后:
-- 返回 JSON 数组，每个元素为 `{"url": URL, "content": 该页面的正文文本}`
+- 返回 JSON 数组，每个元素为 `{"url": URL, "content": 页面文本或失败说明, "success": 是否抓取成功}`
+- `success` 为 true 时 `content` 是正文文本；为 false 时 `content` 是失败说明
 - 正文文本已去除 script/style/nav/footer/header 标签，并截断到 5000 字符
 - 某个 URL 抓取失败时，只影响它自己的 content（内容为失败说明），不影响其他 URL 的正常返回
 
