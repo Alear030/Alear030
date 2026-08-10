@@ -1,7 +1,7 @@
 import re
 
 from pathlib import Path
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 
 from config import WORK_SPACE
 
@@ -18,6 +18,9 @@ else:
 
 @register_tool(tool_name='file_grep',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_read_tool')
 def file_grep(pattern:str,path:str=None,glob:str=None,**kwargs)->str:
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
+
     search_path = Path(path) if path else WORK_SPACE
 
     if not search_path.is_absolute():

@@ -16,6 +16,12 @@ class ToolCallResult:
     # [{"id":"","type":"Static","content":"","css":{}}]
     # horizontal: [{"id":"","type":"Horizontal","content":[{"id":"","type":"Static","content":"","css":{}}],"css":{}}]
 
+# 工具执行普适性processing helper,用于没有特化emit的tool执行前TUI渲染使用
+def tool_call_processing(tcr,emit):
+    if tcr and emit:
+        tcr.tool_call_state = {'tool_call_state':'processing'}
+        emit(content=asdict(tcr))
+    return
 
 class _ToolRegister:
 
@@ -170,7 +176,6 @@ class _ToolRegister:
         if emit:
             emit(content=asdict(tcr))
         return tcr
-
 
     def get_tools(self,tool_autho:list=None)->list:
         tools = []

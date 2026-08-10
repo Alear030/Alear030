@@ -1,4 +1,4 @@
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 from pathlib import Path
 
 MAX_LINES = 2000
@@ -14,6 +14,9 @@ else:
 
 @register_tool(tool_name='file_read',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_read_tool')
 def file_read(file_path:str,offset:int=0,limit:int=2000,**kwargs)->str:
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
+
     file_path = Path(file_path)
 
     if not file_path.is_absolute():

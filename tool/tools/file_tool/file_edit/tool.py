@@ -1,5 +1,5 @@
 from pathlib import Path
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 
 from config import WORK_SPACE,ROOT_DIRECTORY
 from rich_output import rich_print
@@ -17,6 +17,9 @@ else:
 
 @register_tool(tool_name='file_edit',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_write_tool')
 def file_edit(file_path:str,old_string:str,new_string:str,replace_all:bool=False,**kwargs)->str:
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
+
     path = Path(file_path)
 
     if not path.is_absolute():

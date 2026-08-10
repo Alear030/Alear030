@@ -1,7 +1,7 @@
 import json
 
 from rich_output import rich_print
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 from json import JSONDecodeError
 from openai import OpenAI
 from pathlib import Path
@@ -91,6 +91,9 @@ else:
 
 @register_tool(tool_name='user_intention',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=False,tool_autho='basic_tool')
 def user_intention(user_content:str,**kwargs)->dict:
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
+
     intention_level = MODEL_LEVEL['low_level']
     intention_ai = OpenAI(base_url=intention_level['base_url'],api_key=intention_level['api_key'])
     intention_ai_messages = [

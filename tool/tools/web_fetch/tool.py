@@ -3,7 +3,7 @@ import json
 import requests
 
 from bs4 import BeautifulSoup
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from loop import *
@@ -48,6 +48,10 @@ def _fetch_one(url:str)->dict:
 
 @register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_fetch(urls: list[str], **kwargs) -> str:
+
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
+    
     # 空列表会让下面的 max_workers=0，ThreadPoolExecutor 直接抛 ValueError
     if not urls:
         return '错误: urls 不能为空，请至少传入一个 URL'

@@ -5,7 +5,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
 
 
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 from session import _json_read
 from config import SESSION_MEMORTY_DETAIL_PATH
 from local_model import _get_embedding_model,embedding_to_b64,embedding_from_b64
@@ -61,6 +61,8 @@ def _get_slices(session_ids:list[str]=None):
 
 @register_tool(tool_name='memory_recall',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
 def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:list[str]=None,**kwargs):
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
 
     # 拼接输入的keywords和search target 并得到向量值
     target_text = f"{' '.join(key_words)}  {search_target}"

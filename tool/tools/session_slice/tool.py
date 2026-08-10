@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,tool_call_processing
 from config import SESSION_MEMORTY_DETAIL_PATH
 from session import _json_read
 
@@ -20,6 +20,8 @@ else:
 
 @register_tool(tool_name='session_slice',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
 def session_slice(session_id:str,start_round:int,end_round:int,include_tool_messages:bool=False,**kwargs)->str:
+    # 执行tool_call_processing
+    tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
 
     # 得到对应的session detail json 数据
     session_file = SESSION_MEMORTY_DETAIL_PATH/f'{session_id}.json'
