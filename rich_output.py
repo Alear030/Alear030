@@ -51,7 +51,7 @@ def unregister_output_receiver(recv) -> None:
 # 后续需要增加agent的name、role、type
 def rich_print(message:str,type:str=None):
     # 临时截断：TUI 占终端时 rich 直写会撞崩 Windows 控制台；后续整删 rich_output
-    # return
+    return
     message = message if message else ''
     event_type = type or 'none'
     # 有接收器就全部推给接收器，不再打终端

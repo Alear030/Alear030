@@ -85,7 +85,7 @@ python main.py    # 交互式 REPL；Ctrl+C 触发有序收尾
 
 ## TUI 架构
 
-`tui/tui_core.py` 是 TUI 入口（当前主线）；旧版保留为 `tui/tui_core_backup.py`（不导出、勿复用概念与函数名）。
+`tui/tui_core.py` 是 TUI 入口（当前主线）。
 
 **事件流**：loop 边跑边发流式事件 → TUI 按 agent_name 找 channel → `append_stream` → `build_widget` 渲染。
 
