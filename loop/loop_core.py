@@ -192,13 +192,25 @@ class Loop:
     # 工具调用全生命周期（processing/error/success 触发）收口在 match_tool，这里只做 mode diff 与结果分发
     def _tool_calls_api(self,agent,tool_calls)->bool:
         mode_switched = False
+
+        # emit 包装提前抽取一次，两阶段复用；否则每调用一次 match_tool 都生成一个新 partial 对象，开销大
+        emit_wrapper = partial(self.emit,event="AssistantToolCallUpdate",agent_name=agent.agent_name) if self.emit else None
+        if emit_wrapper:
+            for func in tool_calls:
+                wait_tcr = {
+                    "tool_call_id":func.id,
+                    "tool_call_name":func.function.name,
+                    "tool_call_state":{"tool_call_state":"waiting"}
+                }
+                emit_wrapper(content=wait_tcr)
+        
         for func in tool_calls:
             # 调用前记 mode，回来 diff 是否真的切换（不信任提示词自觉性）
             mode_before = self.session.mode if self.session else None
             # match_tool 接管 mode 旁路、参数解析/校验、hooks、执行、异常、生命周期 emit
             tcr = agent.match_tool(func,verbose=self.verbose,mode_switched=mode_switched,
                                    runtime={'session':self.session,'agents':self.agents,'hooks':self.hooks,'memory':self.memory,'Loop':Loop},
-                                   emit=partial(self.emit,event="AssistantToolCallUpdate",agent_name=agent.agent_name) if self.emit else None)
+                                   emit=emit_wrapper)
             if self.session and self.session.mode != mode_before:
                 mode_switched = True
             # 分发：协议消息 + 落盘
