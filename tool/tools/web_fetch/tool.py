@@ -109,10 +109,10 @@ def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
 
     if tool_call_result_flag:
         state = 'success'
-        state_message = f'web_fetch completed：{len(success_list)}/{len(results)} urls succeeded'
     else:
         state = 'error'
-        state_message = f' failed:{", ".join(fail_urls)}'
+    state_message = f'web_fetch completed：{len(success_list)}/{len(results)} urls succeeded'
+
 
     tcr.tool_call_state = {'tool_call_state':state}
     tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(results,ensure_ascii=False)}
@@ -126,6 +126,17 @@ def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
         ],
         "css":{"width":"100%","height":"auto"}
     }]
+    # 失败 URL 明细：按原 urls 顺序追加失败项行，成功项不上屏
+    fail_items = [item for item in results if not item.get('success')]
+    fail_items.sort(key=lambda item: urls.index(item['url']))
+    for i,item in enumerate(fail_items):
+        reason = item['content'].removeprefix('web_fetch 失败: ')[:100]
+        tcr.tool_call_extra_info.append({
+            "id": f"web_fetch_fail_info_{i}",
+            "type": "Horizontal",
+            "content": [{"id": f"web_fetch_fail_info_{i}_message", "type": "Static", "content": f"{item['url']} -> {reason}", "css": {"color": "rgba(255,255,255,0.5)", "width": "100%","height":"auto","margin-left":"2"}}],
+            "css":{"width":"100%","height":"auto"}
+        })
 
     # 发送最终态给 TUI 更新 widget
     if emit:

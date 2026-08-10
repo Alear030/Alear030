@@ -56,9 +56,24 @@ class ExtraInfoHandler:
         
     # 处理widget的css
     def _widget_css_handler(self,widget:Widget,content:dict):
-        if content.get("css",None):
-            for prop,value in content.get("css",{}).items():
+        if not content.get("css",None):
+            return
+        # 聚合 margin-*/padding-* 子属性为复合属性：setattr 对连字符属性名不生效，Textual 内联只认 margin/padding 元组
+        spacing_parts = {'margin':{},'padding':{}}
+        for prop,value in content.get("css",{}).items():
+            if prop in ('margin','padding'):
+                widget.styles.__setattr__(prop,value)
+            elif prop.startswith('margin-') or prop.startswith('padding-'):
+                group,edge = prop.split('-',1)
+                spacing_parts[group][edge] = value
+            else:
                 setattr(widget.styles,prop,value)
+        for group,parts in spacing_parts.items():
+            if parts:
+                widget.styles.__setattr__(group,(
+                    int(parts.get('top',0)),int(parts.get('right',0)),
+                    int(parts.get('bottom',0)),int(parts.get('left',0))
+                ))
         return
 
     # 将new_widget写入ToolCallWidget.extra_info_widgets，id 已在则整条目覆盖（重建后指向新实例）
