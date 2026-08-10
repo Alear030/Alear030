@@ -169,10 +169,19 @@ class _ToolRegister:
         return tcr
 
 
-    # 失败结果统一构造：协议消息带结构化错误，TUI 态落 error 并 emit
+    # 失败结果统一构造：协议消息带结构化错误；TUI 态落 error，文案走 extra_info（与特化工具同槽）
     def _error_result(self,tcr:ToolCallResult,error_key:str,message:str,emit=None)->ToolCallResult:
         tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':error_key,'message':message},ensure_ascii=False)}
-        tcr.tool_call_state = {'tool_call_state':'basic_error','tool_call_state_message':message}
+        tcr.tool_call_state = {'tool_call_state':'error'}
+        tcr.tool_call_extra_info = [{
+            "id":"tool_call_error_info",
+            "type":"Horizontal",
+            "content":[
+                {"id":"tool_call_error_info_pointer","type":"Static","content":"⎿","css":{"color":"rgba(255,255,255,0.5)","width":"2","height":"auto"}},
+                {"id":"tool_call_error_info_message","type":"Static","content":message,"css":{"color":"rgba(255,255,255,0.5)","width":"100%","height":"auto"}}
+            ],
+            "css":{"width":"100%","height":"auto"}
+        }]
         if emit:
             emit(content=asdict(tcr))
         return tcr

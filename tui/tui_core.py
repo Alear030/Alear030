@@ -38,6 +38,8 @@ class Alear030TUI(App):
         self.now_channel:TuiChannel = None
         self._channel_init()
 
+        # channel下的状态占位栏、用户输入栏、提示栏
+        # @claude 后续再做吧，先集中注意力在tool_call_widgets上面
         self.user_input = tuiwidgets.build_widget(widget_type="UserInput",widget_id="USER_INPUT",widget_content={"placeholder":""})
 
 

@@ -14,7 +14,6 @@ PointerCss = {
     "processing": "rgb(255,255,255)",
     "success": "rgb(0,255,94)",
     "error": "rgb(255,0,0)",
-    "basic_error": "rgb(255,0,0)",
     "finished": "rgb(255,255,255)"
 }
 
@@ -30,16 +29,12 @@ class AssistantToolCall(Widget):
         self.tool_name = widget_content.get("tool_call_name",None)
 
         # 每一个ToolCall都包含一个tool_call_pointer，用于显示指针
-        self.tool_call_pointer = Static(content="●",classes=f'AssistantToolCall_tool_call_pointer')
-        self.tool_call_name = Static(content=f"{self.tool_name}",classes=f'AssistantToolCall_tool_call_name')
+        self.tool_call_basicInfo_horizontal = Horizontal(classes="AssistantToolCall_tool_call_basic_info")
+        self.tool_call_basicInfo_pointer = Static(content="●",classes="AssistantToolCall_tool_call_basicInfo_pointer")
+        self.tool_call_basicInfo_name = Static(content=f"{self.tool_name}",classes="AssistantToolCall_tool_call_basicInfo_name")
+        self.tool_call_basicInfo_message = Static(content="",classes="AssistantToolCall_tool_call_basicInfo_message")
 
-        # 每一个ToolCall都包含一个basic_error_bar，用于显示基本错误消息
-        self.basic_errror_bar = Horizontal(classes="AssistantToolCall_basic_error_bar")
-        self.basic_error_pointer = Static(content = "⎿",classes = "AssistantToolCall_basic_error_pointer")
-        self.basic_error_message = Static(content="",classes=f'AssistantToolCall_basic_error_message')
-        self.basic_errror_bar.display = False
-
-        # 每一个ToolCall都包含一个extra_body，用于显示额外内容
+        # 每一个ToolCall都包含一个extra_body，用于显示额外内容（含兜底错误 ⎿ 行）
         self.extra_body = Vertical(classes='AssistantToolCall_tool_call_extrabody')
         self.extra_body.display = False
         self.extra_info_widgets:dict[str,Widget] = {}
@@ -48,21 +43,17 @@ class AssistantToolCall(Widget):
 
         # 每一个ToolCall都包含一个pointer_blinking，用于显示指针闪烁
         self.pointer_blinking = False
-        self.pointer_blinking_target = self.tool_call_pointer
+        self.pointer_blinking_target = self.tool_call_basicInfo_pointer
 
     def compose(self):
         with Vertical(classes = "AssistantToolCall_tool_call_vertical"):
-            with Horizontal(classes='AssistantToolCall_tool_call_basic_info'):
-                yield self.tool_call_pointer
-                yield self.tool_call_name
+            with self.tool_call_basicInfo_horizontal:
+                yield self.tool_call_basicInfo_pointer
+                yield self.tool_call_basicInfo_name
+                yield self.tool_call_basicInfo_message
+
             # 子节点在 compose 声明式挂载，运行时只改 display/content（Textual 容器无 add_child）
-
-            # 每一个ToolCall都包含一个basic_error_bar，用于显示基本错误消息
-            with self.basic_errror_bar:
-                yield self.basic_error_pointer
-                yield self.basic_error_message
-
-            # extra_body 与标题行平级，避免缩进进 Horizontal 后错误条挤在同行
+            # extra_body 与标题行平级，错误/进度详情经 tool_call_extra_info 挂入
             with self.extra_body:
                 pass
     def on_mount(self):
@@ -71,25 +62,24 @@ class AssistantToolCall(Widget):
 
     def update_widget(self,widget_content:dict):
         self.widget_content = widget_content
+
         # 如果tool_name有变化，则更新tool_call_name
         if widget_content.get("tool_call_name",None) and self.tool_name != widget_content['tool_call_name']:
             self.tool_name = widget_content['tool_call_name']
-            self.tool_call_name.update(self.tool_name)
+            self.tool_call_basicInfo_name.update(self.tool_name)
+
         # 如果tool_call_state有变化，则更新tool_call_state
         if widget_content.get("tool_call_state",None):
             self.tool_call_state = widget_content['tool_call_state']['tool_call_state']
+
+        # 如果tool_call_message有变化，则更新tool_call_message
+        if widget_content.get("tool_call_state") and widget_content['tool_call_state'].get("tool_call_state_message",None) and self.tool_call_basicInfo_message.content != widget_content['tool_call_state']['tool_call_state_message']:
+            self.tool_call_basicInfo_message.update(widget_content['tool_call_state']['tool_call_state_message'])
         
         # 处理指针颜色
-        if self.tool_call_state not in ("waiting","processing","success","error","finished","basic_error"):
+        if self.tool_call_state not in ("waiting","processing","success","error","finished"):
             return
-        self.tool_call_pointer.styles.color = PointerCss[self.tool_call_state]
-        
-        # 处理基本错误消息：节点已随 compose 挂载，只改内容与容器显隐
-        # extra_body 是父容器，只开 bar 不够（父 display=False 时子节点不可见）
-        if self.tool_call_state == "basic_error":
-            self.basic_error_message.update(widget_content['tool_call_state']['tool_call_state_message'])
-            self.extra_body.display = True
-            self.basic_errror_bar.display = True
+        self.tool_call_basicInfo_pointer.styles.color = PointerCss[self.tool_call_state]
 
         # 如果widget_content中包含tool_call_extra_info，则调用_update_extra_body方法更新额外内容
         if widget_content.get("tool_call_extra_info",None):
@@ -136,4 +126,4 @@ class AssistantToolCall(Widget):
         if not self.pointer_blinking:
             return
         self.pointer_blinking = False
-        self.tool_call_pointer.styles.animate("opacity",1.0,duration=0)
+        self.tool_call_basicInfo_pointer.styles.animate("opacity",1.0,duration=0)

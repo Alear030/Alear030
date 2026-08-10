@@ -14,31 +14,23 @@
     width:100%;
 }
 
-.AssistantToolCall_tool_call_pointer{
+.AssistantToolCall_tool_call_basicInfo_pointer{
     height:auto;
     width:2;
+}
+
+.AssistantToolCall_tool_call_basicInfo_name{
+    height:auto;
+    width:auto;
+}
+
+.AssistantToolCall_tool_call_basicInfo_message{
+    height:auto;
+    width:100%;
 }
 
 .AssistantToolCall_tool_call_extrabody{
     height:auto;
     width:100%;
     margin-left:2;
-}
-
-.AssistantToolCall_basic_error_bar{
-    height:auto;
-    width:100%;
-    margin-left:2;
-}
-
-.AssistantToolCall_basic_error_pointer{
-    height:auto;
-    width:2;
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.AssistantToolCall_basic_error_message{
-    height:auto;
-    width:100%;
-    color: rgba(255, 255, 255, 0.5);
 }

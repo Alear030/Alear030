@@ -37,10 +37,21 @@ def web_search(key_words:list[str],**kwargs)->ToolCallResult:
     if tcr is None:
         return 'web_search 缺少 tcr 注入，请通过 match_tool 调用'
 
-    # 空关键词短路，避免线程池 max_workers=0 报错
+    # 空/空白关键词短路，避免线程池 max_workers=0 或空串进搜索
+    key_words = [k for k in (key_words or []) if k and str(k).strip()]
     if not key_words:
-        tcr.tool_call_state = {'tool_call_state':'error','tool_call_state_message':'web_search 收到空关键词列表'}
-        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':'empty_key_words','message':'web_search 收到空关键词列表'},ensure_ascii=False)}
+        msg = 'web_search 未传入关键词，请传入关键词重试'
+        tcr.tool_call_state = {'tool_call_state':'error'}
+        tcr.tool_call_extra_info = [{
+            "id":"tool_call_error_info",
+            "type":"Horizontal",
+            "content":[
+                {"id":"tool_call_error_info_pointer","type":"Static","content":"⎿","css":{"color":"rgba(255,255,255,0.5)","width":"2","height":"auto"}},
+                {"id":"tool_call_error_info_message","type":"Static","content":msg,"css":{"color":"rgba(255,255,255,0.5)","width":"100%","height":"auto"}}
+            ],
+            "css":{"width":"100%","height":"auto"}
+        }]
+        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':'empty_key_words','message':msg},ensure_ascii=False)}
         if emit:
             emit(content=asdict(tcr))
         return tcr
@@ -108,9 +119,9 @@ def web_search(key_words:list[str],**kwargs)->ToolCallResult:
         state_message = f'web_search completed：{len(success_list)}/{len(results)} keywords succeeded'
     else:
         state = 'error'
-        state_message = f'web_search failed：{", ".join(fail_key_words)}'
+        state_message = f' failed:{", ".join(fail_key_words)}'
 
-    tcr.tool_call_state = {'tool_call_state':state,'tool_call_state_message':state_message}
+    tcr.tool_call_state = {'tool_call_state':state}
     tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(results,ensure_ascii=False)}
     # 收尾写状态与结果，进度提示替换为结果态
     tcr.tool_call_extra_info = [{
