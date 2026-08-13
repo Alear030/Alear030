@@ -1,5 +1,5 @@
 from textual.widgets import Static
-from textual.containers import Horizontal
+from textual.containers import Horizontal,Vertical
 from textual.widget import Widget
 from typing import Callable
 
@@ -10,11 +10,13 @@ class ExtraInfoHandler:
         self.ExtraInfoBuilder:dict[str,callable] = {
             "Static":self._build_static,
             "Horizontal":self._build_horizontal,
+            "Vertical":self._build_vertical,
             "default":self._build_default
         }
         self.ExtraInfoUpdater:dict[str,callable] = {
             "Static":self._update_static,
             "Horizontal":self._update_horizontal,
+            "Vertical":self._update_vertical,
             "default":self._update_default
         }
     
@@ -108,6 +110,16 @@ class ExtraInfoHandler:
         self._widget_css_handler(new_widget,content)
         self._update_widget_list(new_widget,content)
         return new_widget
+
+    # 构建Vertical类型的extra_info
+    def _build_vertical(self,content:dict):
+        widget_list = []
+        for item in content.get("content",[]):
+            widget_list.append(self.ExtraInfoBuilder[item.get("type","default")](item))
+        new_widget = Vertical(id=content.get("id",None),*widget_list)
+        self._widget_css_handler(new_widget,content)
+        self._update_widget_list(new_widget,content)
+        return new_widget
         
 
     # 构建无法识别的extra_info_type的extra_info
@@ -134,6 +146,15 @@ class ExtraInfoHandler:
         self._widget_css_handler(widget,content)
         self._update_widget_list(widget,content)
         return
+
+    # 更新Vertical类型的extra_info
+    def _update_vertical(self,widget:Vertical,content:dict):
+        for item in content.get("content",[]):
+            self.ExtraInfoUpdater[item.get("type","default")](widget.get_child_by_id(item.get("id",None)),item)
+        self._widget_css_handler(widget,content)
+        self._update_widget_list(widget,content)
+        return
+
 
     # 更新无法识别的extra_info_type的extra_info
     def _update_default(self,widget:Static,content:dict):

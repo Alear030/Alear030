@@ -100,6 +100,7 @@ def _question_check(tcr,emit,question_info)->bool:
 
     return True
 
+
 # done(@claude): 重写 tool_prompt（硬契约+场景教导）并同步 tool_desc 支持多题
 @register_tool(
     tool_name='ask_user_question',
@@ -141,7 +142,49 @@ def ask_user_question(question_info:list[dict],**kwargs)->ToolCallResult:
         tcr.tool_call_state = {'tool_call_state':'success'}
         tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(final_answer,ensure_ascii=False)}
 
-    if emit:
+    if emit and final_answer:
+        # queue 回的就是 question_info 列表，不是包了一层的 dict
+        user_anwsers = []
+        for index,question in enumerate(final_answer):
+            current_question = question.get("question") or ""
+            answer = question.get("answer") or {}
+            selected = answer.get("options") or []
+            labels = [option.get("label") for option in selected if isinstance(option,dict) and option.get("label")]
+            current_answer = " / ".join(labels)
+            user_input = answer.get("user_input")
+            if user_input:
+                current_answer = f"{current_answer} / {user_input}" if current_answer else user_input
+            if not current_answer:
+                current_answer = "未作答"
+            user_anwsers.append({
+                "id":f"tool_call_extra_info_userAnwser_{index}",
+                "type":"Static",
+                "content":f"{current_question} → {current_answer}",
+                "css":{"color":"rgba(255,255,255,0.5)","width":"100%","height":"auto"}
+            })
+
+        extra_info = [
+            {
+                "id":"tool_call_extra_info",
+                "type":"Horizontal",
+                "content":[
+                    {
+                        "id":"tool_call_extra_info_pointer",
+                        "type":"Static",
+                        "content":"⎿",
+                        "css":{"color":"rgba(255,255,255,0.5)","width":"2","height":"auto"}
+                    },
+                    {
+                        "id":"tool_call_extra_info_userAnwser",
+                        "type":"Vertical",
+                        "content":user_anwsers,
+                        "css":{"width":"1fr","height":"auto"}
+                    }
+                ],
+                "css":{"width":"100%","height":"auto"}
+            }
+        ]
+        tcr.tool_call_extra_info = extra_info
         emit(content=asdict(tcr))
 
     return tcr    
