@@ -90,8 +90,10 @@ Alear030/
 │       │   └── plan_mode_off/  # 结束 plan 执行模式
 │       ├── subagent_tool/      # 并行子 agent 集群（仅只读工具权限）
 │       │   └── subagent_create/# 并行创建并运行多个 subagent
-│       ├── skill_list/         # 技能发现与加载（目录内双注册：skill_load 启用 / skill_list 当前禁用）
-│       ├── skill_finish/       # 技能创建收尾：确认后回写 skill_info
+│       ├── skill_tool/         # 技能工具集群
+│       │   ├── skill_list/     # 扫描磁盘技能列表（当前禁用）
+│       │   ├── skill_load/     # 按目录名加载 skill.md 正文
+│       │   └── skill_finish/   # 技能创建收尾：确认后回写 skill_info
 │       ├── user_intention/     # 用户意图识别（当前禁用）
 │       └── interaction/        # 用户交互：反向提问 / 澄清
 │           └── askUserQuestion/   # ask_user_question 工具实现

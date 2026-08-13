@@ -6,9 +6,9 @@ from config import ROOT_DIRECTORY
 from tool.tool_core import register_tool,tool_call_processing
 
 tool_desc = '用于经由系统提示创建技能，并成功将技能文件落盘后，对整个技能创建过程进行收尾结束工作'
-tool_prompt_file = Path(__file__).parent/"tool_prompt.md"
+tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
 if tool_prompt_file.exists():
-    tool_prompt = tool_prompt_file.read_text(encoding='utf-8').strip()
+    tool_prompt = tool_prompt_file.read_text(encoding='utf-8').strip() or None
 else:
     tool_prompt = None
 
@@ -35,5 +35,5 @@ def skill_finish(task_id:int,skill_name:str,**kwargs):
     if not skill_desc:
         return f'skill_finish 失败:{skill_name}/skill.md frontmatter 缺少 description'
 
-    ok = memory.advanced_nodes_skillInfo(task_id=task_id, skill_name=skill_name, skill_desc=skill_desc)
+    ok = memory.advanced_nodes_skillInfo(task_id=task_id,skill_name=skill_name,skill_desc=skill_desc)
     return f'skill_finish 完成:task_id={task_id} skill_name={skill_name}' if ok else f'skill_finish 失败:advanced_task_node 中无 task_id={task_id}'

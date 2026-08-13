@@ -242,7 +242,7 @@ after_session / final_memory_pipeline（后台）
 
 - **依赖边界**：`main.py` 负责高层运行实例装配，工具所需运行时对象由 `pre_toolUse` 注入（见"Hook 系统"表）；底层 registry、类型、配置和存储组件允许直接 import。新增依赖时优先避免实例级全局耦合与循环引用，不追求模块间绝对零 import
 - **新增 Hook/Prompt/Tool**：发现机制与新增要求见"三套自动发现规则"表
-- **工具注入参数**：pre_toolUse 注入的 agents/session/memory 从 `**kwargs` 取（`kwargs.get('agents')`），判空用「报错返回」而非静默跳过（参考 `tool/tools/skill_finish/tool.py`）
+- **工具注入参数**：pre_toolUse 注入的 agents/session/memory 从 `**kwargs` 取（`kwargs.get('agents')`），判空用「报错返回」而非静默跳过（参考 `tool/tools/skill_tool/skill_finish/tool.py`）
 - **外科手术式改动**：改动范围由机制的整体收口需求界定，不按任务字面最小化。修复牵涉调用链/共享事实源/多模块联动时，主动扩大探索、把机制级连带项列入方案；任务字面不足以达成目标时显式提出超范围项交用户拍板——**提出不算越界，回避才算越界**。移动功能时不顺手清理任务无关的历史代码
 
 ## 提交规范
