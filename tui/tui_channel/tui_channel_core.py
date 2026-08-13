@@ -61,11 +61,18 @@ class TuiChannel:
 
     def handle_loop_emit(self,event:str=None,content:dict=None,stream_id:str=None,agent_name:str=None):
         if event not in event_methods.keys():
-            return # @claude 后续增加System_error widget承接
+            self.append_once(content_type="SystemError",content={"message":f"未知事件: {event}"})
+            return
         method_name = event_methods[event]
         if not getattr(self,method_name,None):
-            return # @claude 后续增加System_error widget承接
+            self.append_once(content_type="SystemError",content={"message":f"未知事件: {event}"})
+            return
         getattr(self,method_name)(content=content,agent_name=agent_name,stream_id=stream_id)
+
+    # SystemError 一次性挂滚区
+    @event_register(event="SystemError")
+    def _SystemError_method(self,content:dict,**args):
+        self.append_once(content_type="SystemError",content=content)
 
     # AssistantContent 处理方法
     @event_register(event="AssistantContent")

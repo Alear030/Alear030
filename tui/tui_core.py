@@ -89,9 +89,13 @@ class Alear030TUI(App):
     def do_work(self,user_input:str=None):
         try:
             self._run_round(user_input=user_input)
-        except Exception:
-            # @claude: do_work except 里挂 system_error widget（当前只吞异常保活），后续增加对应的SystemError Widget进行TUI渲染
-            pass
+        except Exception as ee:
+            # done(@claude): do_work except 挂 SystemError，不再空 pass
+            self.call_from_thread(
+                self.now_channel.append_once,
+                content_type="SystemError",
+                content={"message":f"{type(ee).__name__}: {ee}"},
+            )
 
         finally:
             self.call_from_thread(self.bottom_bar.UserInput_set_disabled,False)
@@ -119,7 +123,13 @@ class Alear030TUI(App):
 
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
         if agent_name not in self.channels.keys():
-            return # @claude 后续增加System_error widget展示错误
+            # done(@claude): 未知 agent 挂 SystemError 到 now_channel，不再静默 return
+            self.call_from_thread(
+                self.now_channel.append_once,
+                content_type="SystemError",
+                content={"message":f"未知 agent_name: {agent_name}"},
+            )
+            return
         
         method_name = self.bottom_bar.event_methods.get(event,None)
         if method_name is not None:

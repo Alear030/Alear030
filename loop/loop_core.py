@@ -302,6 +302,8 @@ class Loop:
             result = f'[系统错误] 模型调用失败，本轮未完成：{ee}'
             if self.session:
                 self.session.round += 1
+            if self.emit:
+                self.emit(event='SystemError',content={'message':result},agent_name=agent.agent_name)
 
         # @claude bug:loop_run 用 if self.session 当打印 agent_content 的条件不精确
         # memory agent 复用全局 loop 也带 session,后台记忆提炼 JSON 被误打印成主回复干扰用户

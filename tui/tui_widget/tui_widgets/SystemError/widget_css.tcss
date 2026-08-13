@@ -1,0 +1,22 @@
+.SystemError{
+    height: auto;
+    padding:0 1;
+    margin:1 2 1 0;
+}
+
+.SystemError_horizontal{
+    height:auto;
+    width:100%;
+}
+
+.SystemError_pointer{
+    height:auto;
+    width:2;
+    color:#ED3A3A;
+}
+
+.SystemError_content{
+    height:auto;
+    width:1fr;
+    color:#ED3A3A;
+}
