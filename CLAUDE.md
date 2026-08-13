@@ -100,6 +100,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
 - Textual 8 自定义 Widget 不写 `height` 默认填满父容器；消息/条目类 widget 的 css 第一条写 `height: auto`（内置 Static/Markdown 的 DEFAULT_CSS 自带 auto）
 - `App.__init__` 的 `css_path` 是关键字参数（第 1 位置参数是 driver_class）；`set_focus` 传 widget 对象，不传 CSS 选择器字符串
 - `call_from_thread(func, *args)` 传函数引用；带括号 = 当前线程立即执行，不会送回 UI 线程。widget 更新必须在 UI 线程：worker 线程迭代流式 → emit → `call_from_thread` 送回 UI 再 mount/update
+- `tool_call_extra_info` 的 css 走 `ExtraInfoHandler._widget_css_handler`：写 `margin-*`/`padding-*` 子属性会被聚合为 `margin`/`padding` 元组（Textual 内联只认复合属性，`setattr` 对连字符属性名不生效）；单词属性（color/width/height）直接生效
 
 ## 核心运行数据流
 
