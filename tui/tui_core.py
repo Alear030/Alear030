@@ -59,13 +59,12 @@ class Alear030TUI(App):
     # Mount 后聚焦 USER_INPUT
     @on(message_type=Mount)
     def _compose_init(self):
-        self.bottom_bar.UserInput_set_focus()
+        self.bottom_bar.always_on_focus()
 
     # 保持焦点永远在user_input上
     @on(Click)
     def _focus_on_user_input(self,event:Click):
-        if self.bottom_bar.user_input.display and not self.bottom_bar.user_input.user_input_core.disabled:
-            self.bottom_bar.UserInput_set_focus()
+        self.bottom_bar.always_on_focus()
         return
     
     # 输入提交：内容交给当前 channel，并锁输入防连发

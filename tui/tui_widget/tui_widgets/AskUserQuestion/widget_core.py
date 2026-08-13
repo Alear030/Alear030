@@ -38,20 +38,21 @@ def _build_question_area_list(question_info:list)->list:
             question_option_item_horizontal = Horizontal(classes='AskUserQuestion_question_option_item_horizontal')
             # pointer：首项>其余空格；id=POINTER_{题index}_{选项i}，↑↓高亮按此改
             question_option_item_pointer = Static(
-                content=">" if i == 0 else " ",
+                content="❯" if i == 0 else " ",
                 classes="AskUserQuestion_question_option_item_pointer",
                 id=f"ASK_USER_QUESTION_QUESTION_OPTION_ITEM_POINTER_{index}_{i}",
             )
             if i == len(options):
-                # 末位自行输入行：pointer+序号label + Input；id只带题index供↑↓focus
+                # 末位自行输入行：pointer + 序号 + Input 同一 horizontal，避免 Input 掉到下一行错位
                 question_option_item_label = Static(
-                    content=f'{i+1}. {("[ ] " if is_multi else "")}',
-                    classes="AskUserQuestion_question_option_item_label",
+                    content=f'{i+1}. ',
+                    classes="AskUserQuestion_question_option_item_index",
                 )
                 question_option_userInput = Input(
                     placeholder="Type something",
                     classes="AskUserQuestion_question_option_userInput",
                     id=f"ASK_USER_QUESTION_QUESTION_OPTION_USER_INPUT_{index}",
+                    select_on_focus=False,
                 )
                 question_options_list.append({
                     "question_option_item_vertical":question_option_item_vertical,
@@ -89,9 +90,9 @@ def _build_question_area_list(question_info:list)->list:
                     "row_action":row_action,
                 })
                 continue
-            # label：序号 + 多选[ ] + 选项文案
+            # label：序号 + 多选□ + 选项文案
             question_option_item_label = Static(
-                content=f'{i+1}. {("[ ] " if is_multi else "")}{options[i].get("label","") if isinstance(options[i],dict) else ""}',
+                content=f'{i+1}. {("□ " if is_multi else "")}{options[i].get("label","") if isinstance(options[i],dict) else ""}',
                 classes="AskUserQuestion_question_option_item_label",
             )
             # description：选项下方灰字说明
@@ -134,9 +135,14 @@ class AskUserQuestion(Widget):
         self.current_question_index = 0
         self.current_option_index = 0
         self.is_multi_question = len(self.question_info) > 1
+        # 多题 header tab 的 Static 引用，index 对齐 question_info，供作答后回写完成态
+        self.header_marks = []
 
         self._is_submitted = False
         self.event_stop = event_stop
+        
+        # 自行输入 Input 引用，供 focus 回 AskUserQuestion 时聚焦
+        self.askquestion_user_input = None
 
     def compose(self):
         with Vertical(classes='AskUserQuestion_vertical'):
@@ -146,14 +152,16 @@ class AskUserQuestion(Widget):
                 with Horizontal(classes='AskUserQuestion_header'):
                     yield Static(content="←",classes="AskUserQuestion_header_left")
                     for i,question in enumerate(self.question_info):
-                        mark = "[ ]"
+                        mark = "□"
                         header_text = (question.get("header") or question.get("question") or "").strip()
-                        yield Static(
+                        header_question = Static(
                             content=f"{mark} {header_text}",
                             classes="AskUserQuestion_header_question",
                             id=f"ASK_USER_QUESTION_HEADER_QUESTION_{i}",
                         )
-                    yield Static(content="submit",classes="AskUserQuestion_header_preview")
+                        self.header_marks.append(header_question)
+                        yield header_question
+                    # yield Static(content="submit",classes="AskUserQuestion_header_preview")@claude: 后续接入整体的回答的展示预览
                     yield Static(content="→",classes="AskUserQuestion_header_right")
 
             # 逐题挂载：index与QUESTION_AREA_{index}对齐，compose里用display按index显隐切题
@@ -163,18 +171,19 @@ class AskUserQuestion(Widget):
                 with question_area:
                     yield item["question_content"]
                     with item["question_options_area"]:
-                        # 逐行：vertical→horizontal(pointer+label)→description/userInput
+                        # 逐行：vertical→horizontal(pointer+label[+userInput])→description
                         for option in item["question_options_list"]:
                             with option["question_option_item_vertical"]:
                                 with option["question_option_item_horizontal"]:
                                     yield option["question_option_item_pointer"]
-                                    yield option["question_option_item_label"]
-                                # 三态：userInput / description 再挂子节点；next·submit 行只有 horizontal 内 pointer+label，此处不 yield
-                                if option.get("question_option_userInput") is not None:
-                                    yield option["question_option_userInput"]
-                                elif option.get("question_option_item_description") is not None:
+                                    # 自行输入：序号与 Input 同行；普通/next·submit：只挂 label
+                                    if option.get("question_option_item_label") is not None:
+                                        yield option["question_option_item_label"]
+                                    if option.get("question_option_userInput") is not None:
+                                        yield option["question_option_userInput"]
+                                # description 挂在 horizontal 下方
+                                if option.get("question_option_item_description") is not None:
                                     yield option["question_option_item_description"]
-                                # else：row_action 行，不再挂子节点
                 # index==0只显首题，其余先藏；←→切题时再改display
                 question_area.display = (index == 0)
     
@@ -182,6 +191,48 @@ class AskUserQuestion(Widget):
     @on(Mount)
     def widget_mounted(self):
         self.focus()
+        if self.is_multi_question:
+            # 等首帧真正布局完（self.size 落定）再测，避免拿到还没结算的 0 尺寸
+            self.call_after_refresh(self._apply_fixed_question_height)
+            self._set_header_tab_highlight()
+        self._set_option_row_highlight(self.question_area_list[0], 0, True)
+
+    # 多题时把每题的框高统一定死成"这批题里最高的那题"，切题只换内容不改容器高度，避免顶动聊天区。
+    # 高度直接问 Textual 自己的布局引擎要（get_content_height），不手工数行——题目结构以后怎么变都不用跟着改这里
+    def _apply_fixed_question_height(self):
+        width = self.size.width
+        max_rows = max(
+            item["question_area"].get_content_height(self.size, self.screen.size, width)
+            for item in self.question_area_list
+        )
+        for item in self.question_area_list:
+            item["question_area"].styles.height = max_rows
+
+    # 当前题 header tab 反色高亮；已答 □/■ 文案不动
+    def _set_header_tab_highlight(self):
+        if not self.header_marks:
+            return
+        for i,header_static in enumerate(self.header_marks):
+            if i == self.current_question_index:
+                header_static.add_class("AskUserQuestion_header_question_current")
+            else:
+                header_static.remove_class("AskUserQuestion_header_question_current")
+
+    # 整行强调色：聚焦行 pointer 换❯+pointer/label 同色，离焦行清回默认
+    def _set_option_row_highlight(self,question_item:dict,option_index:int,focused:bool):
+        row = question_item["question_options_list"][option_index]
+        pointer = row["question_option_item_pointer"]
+        label = row.get("question_option_item_label")
+        if focused:
+            pointer.update("❯")
+            pointer.styles.color = "rgb(255,255,225)"
+            if label is not None:
+                label.styles.color = "rgb(255,255,225)"
+        else:
+            pointer.update(" ")
+            pointer.styles.color = None
+            if label is not None:
+                label.styles.color = None
 
     # keyboard event
     @on(events.Key)
@@ -192,6 +243,9 @@ class AskUserQuestion(Widget):
             return
         
         elif event.key == "left" or event.key == "right":
+            # 自行输入聚焦中：不拦 ←→，交给 Input 移光标
+            if self.askquestion_user_input is not None and self.app.focused is self.askquestion_user_input:
+                return
             self._left_right_handler(event.key)
             event.stop()
             return
@@ -210,9 +264,6 @@ class AskUserQuestion(Widget):
     # input类型问题，保存用户输入为答案
     @on(Input.Changed)
     def _userInput_changed(self,event:Input.Changed):
-        current_question = self.question_area_list[self.current_question_index]
-        current_question_isMulti = current_question["is_multi"]
-
         text = (event.input.value or "").strip()
 
         answer = self.question_info[self.current_question_index].get("answer")
@@ -220,39 +271,28 @@ class AskUserQuestion(Widget):
             answer = {"options":[],"user_input":None}
         answer["user_input"] = text if text else None
         self.question_info[self.current_question_index]["answer"] = answer
-        
-        if not current_question_isMulti:
-            return
-        for row in current_question["question_options_list"]:
-            if row.get("question_option_userInput") is None:
-                continue
-            n = len(self.question_info[self.current_question_index].get("options")or[])+1
-
-            if text:
-                row["question_option_item_label"].update(f"{n}. [✅️]")
-            else:
-                row["question_option_item_label"].update(f"{n}. [ ]")
-            break
+        self._refresh_header_mark(self.current_question_index)
 
 
     # ↑↓：只挪本题 pointer，不写 question_anwser
     def _up_down_handler(self,direction:str):
-        options_list = self.question_area_list[self.current_question_index]["question_options_list"]
+        current_question_item = self.question_area_list[self.current_question_index]
+        options_list = current_question_item["question_options_list"]
         if direction == "up":
             # 已在首行，顶死
             if self.current_option_index == 0:
                 return
-            # 上一行亮>，当前行清成空格，再回退 current_option_index
-            options_list[self.current_option_index - 1]["question_option_item_pointer"].update(">")
-            options_list[self.current_option_index]["question_option_item_pointer"].update(" ")
+            # 上一行亮，当前行清，再回退 current_option_index
+            self._set_option_row_highlight(current_question_item, self.current_option_index - 1, True)
+            self._set_option_row_highlight(current_question_item, self.current_option_index, False)
             self.current_option_index -= 1
         elif direction == "down":
             # 已在末行（含自行输入），顶死
             if self.current_option_index == len(options_list) - 1:
                 return
-            # 下一行亮>，当前行清成空格，再推进 current_option_index
-            options_list[self.current_option_index + 1]["question_option_item_pointer"].update(">")
-            options_list[self.current_option_index]["question_option_item_pointer"].update(" ")
+            # 下一行亮，当前行清，再推进 current_option_index
+            self._set_option_row_highlight(current_question_item, self.current_option_index + 1, True)
+            self._set_option_row_highlight(current_question_item, self.current_option_index, False)
             self.current_option_index += 1
 
         # 落到自行输入行 → focus Input；否则 focus 回 AskUserQuestion
@@ -260,7 +300,10 @@ class AskUserQuestion(Widget):
         user_input = now_row.get("question_option_userInput")
         if user_input is not None:
             user_input.focus()
+            self.askquestion_user_input = user_input
             return
+        else:
+            self.askquestion_user_input = None
         self.focus()
 
     # ←→：多题才切；先reset离开题，再对调question_area.display，最后改current_question_index
@@ -286,14 +329,17 @@ class AskUserQuestion(Widget):
             self.question_area_list[self.current_question_index]["question_area"].display = False
             self.current_question_index += 1
 
+        # 进入题目时首行统一点亮；切题离开自行输入行，清掉 Input 焦点标记
+        self.askquestion_user_input = None
+        self._set_header_tab_highlight()
+        self._set_option_row_highlight(self.question_area_list[self.current_question_index], 0, True)
         self.focus()
 
-    # 离开某题时：pointer全部清空格，首行重新亮>，current_option_index归零（再进来从首行开始）
+    # 离开某题时：全部清成离焦态，current_option_index归零（进入新题时另行点亮首行）
     def _reset_question_item_pointer(self,question_index:int):
-        options_list = self.question_area_list[question_index]["question_options_list"]
-        for option in options_list:
-            option["question_option_item_pointer"].update(" ")
-        options_list[0]["question_option_item_pointer"].update(">")
+        question_item = self.question_area_list[question_index]
+        for i in range(len(question_item["question_options_list"])):
+            self._set_option_row_highlight(question_item, i, False)
         self.current_option_index = 0
 
     # Enter：单选提交；多选切题/提交
@@ -323,6 +369,9 @@ class AskUserQuestion(Widget):
             if not isinstance(answer,dict) or not answer.get("user_input"):
                 return
             answer["options"] = []
+            # 自行输入作答：清掉选项上的 ●
+            self._update_single_select_marks(current_question,self.question_info[self.current_question_index].get("options") or [],None)
+            self._refresh_header_mark(self.current_question_index)
             self._after_single_answered()
             return
 
@@ -345,20 +394,18 @@ class AskUserQuestion(Widget):
         if current_question_isMulti:
             if option in answer_selected:
                 answer_selected.remove(option)
-                current_row["question_option_item_label"].update(f"{option_i+1}. [ ] {label_text}")
+                current_row["question_option_item_label"].update(f"{option_i+1}. □ {label_text}")
             else:
                 answer_selected.append(option)
-                current_row["question_option_item_label"].update(f"{option_i+1}. [✅️] {label_text}")
+                current_row["question_option_item_label"].update(f"{option_i+1}. ■ {label_text}")
+            self._refresh_header_mark(self.current_question_index)
         else:
-            # 单选：只留这一项；高亮当前 label，其余恢复默认色
-            for row in current_question["question_options_list"]:
-                if row.get("question_option_userInput") is not None or row.get("row_action") is not None:
-                    continue
-                row["question_option_item_label"].styles.color = None
-            current_row["question_option_item_label"].styles.color = "rgb(0,128,0)"
+            # 单选：只留这一项；选中项 label 后挂 ●，其余去掉
+            self._update_single_select_marks(current_question,options,option_i)
             answer_selected.clear()
             answer_selected.append(option)
             answer["user_input"] = None
+            self._refresh_header_mark(self.current_question_index)
             self._after_single_answered()
     
     def _after_single_answered(self):
@@ -366,6 +413,40 @@ class AskUserQuestion(Widget):
             self._left_right_handler("right")
             return
         self._submit_handler()
+
+    # 单选选中态：选中项 label 后挂 ●；selected_index 为 None 时全部清掉
+    def _update_single_select_marks(self,question_item:dict,options:list,selected_index:int|None):
+        for i,row in enumerate(question_item["question_options_list"]):
+            if row.get("question_option_userInput") is not None or row.get("row_action") is not None:
+                continue
+            if i >= len(options):
+                continue
+            opt = options[i]
+            text = opt.get("label") if isinstance(opt,dict) else ""
+            if selected_index is not None and i == selected_index:
+                row["question_option_item_label"].update(f"{i+1}. {text} ●")
+            else:
+                row["question_option_item_label"].update(f"{i+1}. {text}")
+
+    # 该题是否已作答：单选/多选看 options 非空，自行输入看 user_input 有值
+    def _is_question_answered(self,question_index:int)->bool:
+        answer = self.question_info[question_index].get("answer")
+        if not isinstance(answer,dict):
+            return False
+        options = answer.get("options")
+        if isinstance(options,list) and len(options) > 0:
+            return True
+        return bool(answer.get("user_input"))
+
+    # 按作答状态回写 header tab；用 □/■ 避开终端把 ☑ 渲成 emoji 导致错位
+    def _refresh_header_mark(self,question_index:int):
+        if not self.header_marks:
+            return
+        header_static = self.header_marks[question_index]
+        question = self.question_info[question_index]
+        header_text = (question.get("header") or question.get("question") or "").strip()
+        mark = "■" if self._is_question_answered(question_index) else "□"
+        header_static.update(f"{mark} {header_text}")
     
     def _submit_handler(self):
         if self.queue is None or self._is_submitted:

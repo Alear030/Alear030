@@ -56,6 +56,22 @@ class BottomBar(Widget):
 
     def UserInput_set_disabled(self, disabled: bool):
         self.user_input._set_disabled(disabled)
+    
+    # Click/Mount 把焦点拉回底部：Ask 挂起时不抢回 UserInput
+    def always_on_focus(self):
+        if self.askuserquestion is not None:
+            # 落到自行输入行才有这个 Input；否则焦在 Ask 上接↑↓
+            ask_input = self.askuserquestion.askquestion_user_input
+            if ask_input is not None:
+                # 已在 Input 上再 focus 会整段全选，跳过
+                if self.app.focused is not ask_input:
+                    ask_input.focus()
+                return
+            if self.app.focused is not self.askuserquestion:
+                self.askuserquestion.focus()
+            return
+        if self.user_input.display and not self.user_input.disabled:
+            self.user_input._set_focus()
 
     # AskUserQuestion相关方法
     @event_register(event="AskUserQuestion")

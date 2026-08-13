@@ -3,6 +3,8 @@
     max-height: 20;
     width: 100%;
     scrollbar-size: 0 0;
+    border-top: solid white;
+    padding: 0 1;
 }
 
 .AskUserQuestion_vertical {
@@ -28,6 +30,11 @@
     padding: 0 1;
 }
 
+.AskUserQuestion_header_question_current {
+    background: #e0e0e0;
+    color: #1e1e1e;
+}
+
 .AskUserQuestion_header_preview {
     width: auto;
     height: 1;
@@ -48,7 +55,7 @@
 .AskUserQuestion_question_content {
     height: auto;
     width: 100%;
-    padding: 0 0 1 0;
+    margin: 1 0 1 1;
 }
 
 .AskUserQuestion_question_option_item_vertical {
@@ -72,6 +79,12 @@
     height: auto;
 }
 
+
+.AskUserQuestion_question_option_item_index {
+    width: auto;
+    height: 1;
+}
+
 .AskUserQuestion_question_option_item_description {
     height: auto;
     width: 100%;
@@ -81,9 +94,9 @@
 
 .AskUserQuestion_question_option_userInput {
     height: 1;
-    width: 100%;
+    width: 1fr;
     border: none;
-    padding: 0 0 0 2;
+    padding: 0;
     background: transparent;
     color: $text;
 }
