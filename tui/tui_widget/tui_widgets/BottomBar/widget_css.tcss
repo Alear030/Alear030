@@ -1,0 +1,19 @@
+.BottomBar {
+    height: auto;
+    dock: bottom;
+    width: 100%;
+    padding: 0 1;
+    color: $text;
+    scrollbar-size: 0 0;
+}
+
+.BottomBar_vertical {
+    height: auto;
+    width: 100%;
+}
+
+/* 承装 UserInput+StateBar；藏它时 bottom_bar_vertical 仍在，可挂 Ask */
+.BottomBar_default_vertical {
+    height: auto;
+    width: 100%;
+}

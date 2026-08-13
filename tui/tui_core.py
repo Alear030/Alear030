@@ -39,9 +39,7 @@ class Alear030TUI(App):
         self._channel_init()
 
         # channel下的状态占位栏、用户输入栏、提示栏
-        # @claude 后续再做吧，先集中注意力在tool_call_widgets上面
-        self.user_input = tuiwidgets.build_widget(widget_type="UserInput",widget_id="USER_INPUT",widget_content={"placeholder":""})
-
+        self.bottom_bar = tuiwidgets.build_widget(widget_type="BottomBar",widget_id="BOTTOM_BAR",widget_content={"state":"default"})
 
     # 登记常驻 channel
     def _channel_init(self):
@@ -53,7 +51,7 @@ class Alear030TUI(App):
     # 挂布局：header + main channel 滚动区 + 输入框
     def compose(self):
         yield self.channels["main"].body
-        yield self.user_input
+        yield self.bottom_bar
 
     # @claude 一次性渲染不再需要独立 emit_once 方法：loop 侧 emit 泛化后，新增一次性事件（如 system_message）经事件分发路由 channel.append_once 即可
 
@@ -61,13 +59,13 @@ class Alear030TUI(App):
     # Mount 后聚焦 USER_INPUT
     @on(message_type=Mount)
     def _compose_init(self):
-        self.user_input._set_focus()
+        self.bottom_bar.UserInput_set_focus()
 
     # 保持焦点永远在user_input上
     @on(Click)
     def _focus_on_user_input(self,event:Click):
-        if self.user_input.display and not self.user_input.disabled:
-            self.user_input._set_focus()
+        if self.bottom_bar.user_input.display and not self.bottom_bar.user_input.user_input_core.disabled:
+            self.bottom_bar.UserInput_set_focus()
         return
     
     # 输入提交：内容交给当前 channel，并锁输入防连发
@@ -78,12 +76,12 @@ class Alear030TUI(App):
         if not inptu_content:
             return
         # 触发 UserContent 挂载，并传入 stream_id
-        self.user_input._clear()
+        self.bottom_bar.UserInput_clear()
         self.now_channel.append_once(content_type="UserContent",content={"user_input":inptu_content})
         # 新一轮：Textual anchor贴底
         self.now_channel.body.stick_bottom()
         # 锁住输入；解锁走 do_work finally
-        self.user_input._set_disabled(True) # @claude: 后续有中途打断后，再重看这套 lock
+        self.bottom_bar.UserInput_set_disabled(True) # @claude: 后续有中途打断后，再重看这套 lock
         # 挂 do_work：按当前 channel 找 agent / loop
         self.do_work(user_input = inptu_content)
 
@@ -97,8 +95,8 @@ class Alear030TUI(App):
             pass
 
         finally:
-            self.call_from_thread(self.user_input._set_disabled,False)
-            self.call_from_thread(self.user_input._set_focus)
+            self.call_from_thread(self.bottom_bar.UserInput_set_disabled,False)
+            self.call_from_thread(self.bottom_bar.UserInput_set_focus)
             # 异常也收尾：下一轮前再贴底
             self.call_from_thread(self.now_channel.body.stick_bottom)
 
@@ -123,5 +121,11 @@ class Alear030TUI(App):
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
         if agent_name not in self.channels.keys():
             return # @claude 后续增加System_error widget展示错误
+        
+        method_name = self.bottom_bar.event_methods.get(event,None)
+        if method_name is not None:
+            self.call_from_thread(getattr(self.bottom_bar,method_name),content=content)
+            return
+
         target_channel = self.channels[agent_name]
         self.call_from_thread(target_channel.handle_loop_emit,event=event,content=content,agent_name=agent_name,stream_id=stream_id)

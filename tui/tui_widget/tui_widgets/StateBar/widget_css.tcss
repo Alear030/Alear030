@@ -1,0 +1,15 @@
+StateBar {
+    height: auto;
+    width: 100%;
+}
+
+.StateBar_horizontal {
+    height: auto;
+    width: 100%;
+}
+
+.StateBar_state_content {
+    height: 1;
+    width: 1fr;
+    color: $text-muted;
+}

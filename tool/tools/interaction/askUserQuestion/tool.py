@@ -1,140 +1,147 @@
 import json
 
 from pathlib import Path
+from dataclasses import asdict
+import queue
 
-from tool.tool_core import register_tool
+from tool.tool_core import register_tool,ToolCallResult
 
 
 tool_prompt_file = Path(__file__).parent / 'tool_prompt.md'
 tool_prompt = tool_prompt_file.read_text(encoding='utf-8').strip() if tool_prompt_file.exists() else None
 
+question_excample = [
+    {
+        "header":"颜色偏好",
+        "question":"你喜欢什么颜色？",
+        "multi-option":True,
+        "options":[
+            {"label":"红色","description":"红色是喜庆的颜色"}, 
+            {"label":"绿色","description":"绿色是希望的颜色"},
+            {"label":"蓝色","description":"蓝色是冷静的颜色"}
+        ],
+        "answer":{
+            "options":[
+                {"label":"红色","description":"红色是喜庆的颜色"},
+                {"label":"绿色","description":"绿色是希望的颜色"}
+            ],
+            "user_input":None
+        }
+    },
+    {
+        "header":"颜色原因",
+        "question":"为什么你必须喜欢一个颜色？",
+        "multi-option":False,
+        "options":[
+            {"label":"红色","description":"红色是喜庆的颜色"}, 
+            {"label":"绿色","description":"绿色是希望的颜色"},
+            {"label":"蓝色","description":"蓝色是冷静的颜色"}
+        ],
+        "answer":{
+            "options":[
+                {"label":"红色","description":"红色是喜庆的颜色"}
+            ],
+            "user_input":None
+        }
+    }
+]
 
-# 统一组装工具层的结构化 JSON 返回协议。
-def _result(status, question, answer_type=None, selected_index=None, selected_option=None, answer=None, error=None):
-    return json.dumps({
-        'status': status,
-        'question': question,
-        'answer_type': answer_type,
-        'selected_index': selected_index,
-        'selected_option': selected_option,
-        'answer': answer,
-        'error': error
-    }, ensure_ascii=False)
+# 校验失败统一落 error 结果并 emit，返回 False 供调用方短路返回
+def _question_error(tcr,error_key:str,message:str)->bool:
+    tcr.tool_call_state = {'tool_call_state':'error'}
+    tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':error_key,'message':message},ensure_ascii=False)}
+    tcr.tool_call_extra_info = [{
+        "id":"tool_call_error_info",
+        "type":"Horizontal",
+        "content":[
+            {"id":"tool_call_error_info_pointer","type":"Static","content":"⎿","css":{"color":"rgba(255,255,255,0.5)","width":"2","height":"auto"}},
+            {"id":"tool_call_error_info_message","type":"Static","content":message,"css":{"color":"rgba(255,255,255,0.5)","width":"100%","height":"auto"}}
+        ],
+        "css":{"width":"100%","height":"auto"}
+    }]
+    return False
 
 
-# 反复读取非空输入；中断时返回 None 交由调用方决定取消语义。
-def _read_nonempty(prompt):
-    while True:
-        try:
-            answer = input(prompt).strip()
-        except (EOFError, KeyboardInterrupt):
-            # 输入中断统一交给上层转为结构化 cancelled，避免把 REPL 一并终止。
-            return None
-        if answer:
-            return answer
-        print('输入不能为空，请重新输入。')
+# 校验 question_info：非空 list，每项结构能给 TUI 挂题
+# 单/多选只认 multi-option（True=多选；缺省当单选）；user_input 为可选布尔
+def _question_check(tcr,emit,question_info)->bool:
+    # 空列表没有可展示内容
+    if not isinstance(question_info,list) or not question_info:
+        return _question_error(tcr,'invalid_question_info','question_info 必须是非空列表。')
 
+    # 逐项：挡坏类型/空题干/错布尔，再强制非空 options
+    for index,item in enumerate(question_info):
+        if not isinstance(item,dict):
+            return _question_error(tcr,'invalid_question_item',f'第{index+1}项必须是 dict 对象。')
 
+        if not isinstance(item.get('question'),str) or not item['question'].strip():
+            return _question_error(tcr,'invalid_question_text',f'第{index+1}项 question 必须是非空字符串。')
+
+        # header 给多题 tab 用，缺了 TUI 只剩空 [ ]
+        if not isinstance(item.get('header'),str) or not item['header'].strip():
+            return _question_error(tcr,'invalid_question_header',f'第{index+1}项 header 必须是非空字符串。')
+
+        # 写了 multi-option 就必须是 bool，避免模型塞字符串
+        if 'multi-option' in item and not isinstance(item.get('multi-option'),bool):
+            return _question_error(tcr,'invalid_question_multi_option',f'第{index+1}项 multi-option 必须是布尔值。')
+
+        if 'user_input' in item and not isinstance(item['user_input'],bool):
+            return _question_error(tcr,'invalid_question_user_input',f'第{index+1}项 user_input 必须是布尔值。')
+
+        # options 是挂选项行的事实源，空则 TUI 无内容可点
+        options = item.get('options')
+        if not isinstance(options,list) or not options:
+            return _question_error(tcr,'invalid_question_options',f'第{index+1}项必须提供非空 options 列表。')
+        for option in options:
+            if not isinstance(option,dict) or not isinstance(option.get('label'),str) or not option['label'].strip():
+                return _question_error(tcr,'invalid_question_options',f'第{index+1}项 options 中每项都必须包含非空字符串 label。')
+            if 'value' in option and not isinstance(option['value'],str):
+                return _question_error(tcr,'invalid_question_options',f'第{index+1}项 options 中 value 必须是字符串。')
+
+    return True
+
+# done(@claude): 重写 tool_prompt（硬契约+场景教导）并同步 tool_desc 支持多题
 @register_tool(
     tool_name='ask_user_question',
-    tool_desc='当任务缺少会实质改变后续路径的用户目标、偏好或取舍时，向用户发起一个问题并等待结构化回答。',
+    tool_desc='当任务缺少会实质改变后续路径的用户目标、偏好或取舍时，向用户发起一个或多个问题并等待结构化回答。',
     tool_prompt=tool_prompt,
     tool_enabled=True,
     tool_autho='interaction_tool'
 )
-# 向用户收集开放回答或有限选项，并按统一 JSON 协议返回结果。
-def ask_user_question(question: str, options: list[dict] = None, **kwargs) -> str:
-    # 先拒绝无效问题，避免进入任何交互后才发现没有可展示的内容。
-    if not isinstance(question, str) or not question.strip():
-        return _result(
-            'error',
-            question if isinstance(question, str) else None,
-            error={'code': 'invalid_question', 'message': 'question 必须是非空字符串。'}
-        )
+def ask_user_question(question_info:list[dict],**kwargs)->ToolCallResult:
 
-    question = question.strip()
-    # 未提供选项时保留自由输入路径，调用方不必为了开放问题伪造菜单。
-    if options is None:
-        print(f'\n[需要你的决定]\n{question}')
-        answer = _read_nonempty('请输入你的想法: ')
-        if answer is None:
-            return _result(
-                'cancelled',
-                question,
-                error={'code': 'input_interrupted', 'message': '用户输入被中断。'}
-            )
-        return _result('answered', question, 'custom', answer=answer)
+    emit = kwargs.get('emit',None)
+    tcr = kwargs.get('tcr',None)
 
-    # 选项数量受限于交互菜单；范围外直接返回协议错误，不进入后续编号处理。
-    if not isinstance(options, list) or not 2 <= len(options) <= 4:
-        return _result(
-            'error',
-            question,
-            error={'code': 'invalid_options', 'message': 'options 必须是包含 2-4 项的列表，或省略以使用自由输入。'}
-        )
+    if tcr is None:
+        return 'ask_user_question 缺少 tcr 注入，请告知Alear030大人进行修复'
 
-    # 展示前将选项校验、去空白并复制为稳定的菜单/回传数据。
-    normalized_options = []
-    for option in options:
-        if not isinstance(option, dict) or not isinstance(option.get('label'), str) or not option['label'].strip():
-            return _result(
-                'error',
-                question,
-                error={'code': 'invalid_options', 'message': '每个选项都必须包含非空字符串 label。'}
-            )
-        if 'description' in option and not isinstance(option['description'], str):
-            return _result(
-                'error',
-                question,
-                error={'code': 'invalid_options', 'message': '选项 description 缺省或为字符串。'}
-            )
-        normalized_options.append({
-            'label': option['label'].strip(),
-            'description': option.get('description', '').strip()
-        })
+    # 对question_info进行校验，失败则返回错误信息
+    if not _question_check(tcr,emit,question_info):
+        if emit:
+            emit(content=asdict(tcr))
+        return tcr
 
-    # 准备并展示编号菜单；末位固定留给自由输入，编号同时作为 selected_index 返回。
-    custom_index = len(normalized_options) + 1
-    print(f'\n[需要你的决定]\n{question}')
-    for index, option in enumerate(normalized_options, start=1):
-        print(f'{index}. {option["label"]}')
-        if option['description']:
-            print(f'   {option["description"]}')
-    print(f'{custom_index}. 其他，请自行输入')
+    # 创建一个队列，用于TUI和tool之间通信 并发送给TUI 阻塞等待用户回答
+    ask_user_question_queue = queue.Queue()
+    emit(
+        event = "AskUserQuestion",
+        content = {
+            "question_info":question_info,
+            "queue":ask_user_question_queue
+        }
+    )
+    final_answer = ask_user_question_queue.get()
 
-    # 循环读取菜单编号；非法输入留在当前步骤重试，中断则返回 cancelled。
-    while True:
-        try:
-            selected = input('请选择编号: ').strip()
-        except (EOFError, KeyboardInterrupt):
-            return _result(
-                'cancelled',
-                question,
-                error={'code': 'input_interrupted', 'message': '用户输入被中断。'}
-            )
-        if not selected.isdigit() or not 1 <= int(selected) <= custom_index:
-            print(f'请输入 {1}-{custom_index} 之间的编号。')
-            continue
+    # 如果用户未回答问题，则返回错误信息
+    if not final_answer:
+        tcr.tool_call_state = {'tool_call_state':'error'}
+        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':'no_answer','message':'用户未回答问题'},ensure_ascii=False)}
+    else:
+        tcr.tool_call_state = {'tool_call_state':'success'}
+        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(final_answer,ensure_ascii=False)}
 
-        selected_index = int(selected)
-        # 末位是自由输入分支，返回 custom 类型结果。
-        if selected_index == custom_index:
-            answer = _read_nonempty('请输入你的想法: ')
-            if answer is None:
-                return _result(
-                    'cancelled',
-                    question,
-                    error={'code': 'input_interrupted', 'message': '用户输入被中断。'}
-                )
-            return _result('answered', question, 'custom', answer=answer)
+    if emit:
+        emit(content=asdict(tcr))
 
-        # 其余编号映射到预设选项，返回 option 类型结果。
-        selected_option = normalized_options[selected_index - 1]
-        return _result(
-            'answered',
-            question,
-            'option',
-            selected_index=selected_index,
-            selected_option=selected_option,
-            answer=selected_option['label']
-        )
+    return tcr    

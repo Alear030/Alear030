@@ -1,19 +1,11 @@
-/* 输入条：钉在底部；高度由 _sync_height 写（含上下边框 2 行） */
+/* 输入条：高度由 _sync_height 写 */
 .UserInput {
-    dock: bottom;
-    min-height: 3;   /* 1 内容 + 2 边框 */
-    max-height: 11;  /* 9 内容 + 2 边框 */
-    border: none;
-    border-top: solid white;
-    border-bottom: solid white;
+    min-height: 1;
+    max-height: 9;
     padding: 0 1;
-    margin: 0 1;
+    margin: 0 0;
     color: $text;
     scrollbar-size: 0 0;
-}
-
-.UserInput:focus-within {
-    border: none;
     border-top: solid white;
     border-bottom: solid white;
 }
@@ -23,7 +15,7 @@
     height: auto;
     color: $text-muted;
     content-align: left top;
-    padding: 0 1 0 0;
+    padding: 0 0 0 0;
 }
 
 .UserInputCore {
@@ -42,5 +34,4 @@
     background: #e0e0e0;
     text-style: none;
 }
-
 

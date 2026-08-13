@@ -1,7 +1,6 @@
 import json
 
 from openai.types.chat import ChatCompletionMessage
-from functools import partial
 
 from rich_output import rich_print
 from .orchestrator import PlanRunner
@@ -193,8 +192,12 @@ class Loop:
     def _tool_calls_api(self,agent,tool_calls)->bool:
         mode_switched = False
 
-        # emit 包装提前抽取一次，两阶段复用；否则每调用一次 match_tool 都生成一个新 partial 对象，开销大
-        emit_wrapper = partial(self.emit,event="AssistantToolCallUpdate",agent_name=agent.agent_name) if self.emit else None
+        # emit 包装提前抽取，两阶段复用；事件名默认 AssistantToolCallUpdate，工具可覆盖
+        def _emit_wrapper(content,event="AssistantToolCallUpdate"):
+            if self.emit:
+                self.emit(event=event,content=content,agent_name=agent.agent_name)
+        # self.emit 为空则不发，保持无 TUI 时 match_tool 照常可用
+        emit_wrapper = _emit_wrapper if self.emit else None
         if emit_wrapper:
             for func in tool_calls:
                 wait_tcr = {

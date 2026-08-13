@@ -34,7 +34,7 @@ class UserInput(Widget):
 
     def compose(self):
         with Horizontal():
-            self.pointer = Static(">", classes='UserInput_pointer')
+            self.pointer = Static("❯", classes='UserInput_pointer')
             self.user_input_core = UserInputCore(
                 id=self.widget_id,
                 classes="UserInputCore",
