@@ -1,8 +1,9 @@
 from ...tui_widgets import widget_register
 
+import asyncio
 from time import monotonic
 from pathlib import Path
-from textual import on
+from textual import on, work
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.containers import Horizontal
@@ -13,7 +14,7 @@ css_file = Path(__file__).parent/'widget_css.tcss'
 
 @widget_register(widget_type="AssistantThinking",widget_css_file=css_file,widget_enable=True)
 class AssistantThinking(Widget):
-    # brief计时条 / details全文：点击互切；流式delta先攒holder再定时刷
+    # brief计时条 / details全文：点击互切；details走Static串行泵纯文本刷
     def __init__(self,widget_content:dict=None,widget_id:str=None):
         super().__init__(classes='AssistantThinking')
         self.widget_id = widget_id
@@ -24,15 +25,21 @@ class AssistantThinking(Widget):
         self._timer = None
         self.brief_bar_display = True
 
-        # 全文缓存；holder攒增量，0.5s定时合入；pending兜mount前delta
+        # 全文权威；frag待泵；pending兜mount前
         self.thinking_content = ""
-        self.thinking_content_holder = ""
-        self.thinking_content_holder_timer = None
+        self._frag_buf:list[str] = []
         self.thinking_content_pending:list[str] = []
+        self._stream_worker = False
 
         # 防stream_end / finalize重复收尾
         self.has_been_finalized = False
-        
+
+        # 首段进权威+pending；Static空起步，首段也走泵
+        first_delta = str((widget_content or {}).get('reasoning_delta', ''))
+        if first_delta:
+            self.thinking_content = first_delta
+            self.thinking_content_pending.append(first_delta)
+
         # brief条：● + Thinking计时
         self.assistant_thinking_brief_pointer = Static(content='●',classes='AssistantThinking_assistant_thinking_output_brief_pointer')
         self.assistant_thinking_brief_timer = Static(content=f'Alear030 Thinking in {self.elapsed_time:.1f}s',classes='AssistantThinking_assistant_thinking_output_brief_timer')
@@ -43,7 +50,7 @@ class AssistantThinking(Widget):
         )
         self.assistant_thinking_brief_bar.display = self.brief_bar_display
 
-        # details条：● + thinking全文；默认藏
+        # details条：● + thinking纯文本；默认藏
         self.assistant_thinking_details_pointer = Static(content='●',classes='AssistantThinking_assistant_thinking_output_details_pointer')
         self.assistant_thinking_details_content = Static(content='',classes='AssistantThinking_assistant_thinking_output_details_content')
         self.assistant_thinking_details_bar = Horizontal(
@@ -61,22 +68,21 @@ class AssistantThinking(Widget):
         yield self.assistant_thinking_brief_bar
         yield self.assistant_thinking_details_bar
 
-    # mount：开计时；若已finalize做终结补偿，否则冲刷pending
+    # mount：开计时；冲pending；已finalize定稿，否则开泵
     @on(Mount)
     def _on_mount(self):
         self._timer = self.set_interval(1.0,self._refresh_timer)
         self._refresh_timer()
+        self._flush_pending_to_buf()
         if self.has_been_finalized:
-            # Stream已经结束，做一次终结补偿，确保brief timer和details content都显示完整
             self.assistant_thinking_brief_timer.update(f'Alear030 Done Thinking in {self.elapsed_time:.1f}s')
-            self._flush_thinking_pending()
-            self._thinking_content_holder_handle()
+            self._safety_update()
             if self._timer:
                 self._timer.stop()
                 self._timer = None
         else:
-            # Stream还在进行中，将mount之前的pending内容一次性刷新
-            self._flush_thinking_pending()
+            if self._frag_buf:
+                self._ensure_stream_pump()
             self._start_pointer_blinking()
 
     # 有全文才允许点：brief ↔ details
@@ -99,71 +105,82 @@ class AssistantThinking(Widget):
     def _refresh_timer(self):
         self.elapsed_time = monotonic() - self.strt_time
         self.assistant_thinking_brief_timer.update(f'Alear030 Thinking in {self.elapsed_time:.1f}s')
-    
-    # pending合入holder再刷details
-    def _flush_thinking_pending(self):
+
+    # mount前pending并入frag缓冲
+    def _flush_pending_to_buf(self):
         if self.thinking_content_pending:
-            for pending in self.thinking_content_pending:
-                self.thinking_content_holder += pending
+            self._frag_buf.extend(self.thinking_content_pending)
             self.thinking_content_pending = []
-            self._thinking_content_holder_handle()
 
-    # holder合入全文并update details Static
-    def _thinking_content_holder_handle(self):
-        if self.thinking_content_holder:
-            self.thinking_content = self.thinking_content + self.thinking_content_holder
-            self.thinking_content_holder = ""
+    # 确保唯一@work泵在跑
+    def _ensure_stream_pump(self):
+        if self._stream_worker:
+            return
+        self._stream_worker = True
+        self._stream_pump()
+
+    # 串行泵：有frag就用权威全文刷Static → finalize且缓冲空则停
+    @work
+    async def _stream_pump(self):
+        try:
+            while True:
+                if self._frag_buf:
+                    self._frag_buf.clear()
+                    if self.thinking_content:
+                        self.assistant_thinking_details_content.update(self.thinking_content.rstrip('\n'))
+                    continue
+                if self.has_been_finalized:
+                    break
+                await asyncio.sleep(0.05)
+        finally:
+            self._stream_worker = False
+            if self.has_been_finalized:
+                self.call_after_refresh(self._safety_update)
+
+    # 用全文权威做一次Static.update定稿
+    def _safety_update(self):
+        if self.thinking_content:
             self.assistant_thinking_details_content.update(self.thinking_content.rstrip('\n'))
-            self.thinking_content_holder_timer = None
 
-    # 流式增量：未mount进pending；已mount攒holder，0.5s定时合入
+    # 流式增量：同步权威；未mount进pending；已mount进frag并开泵
     def update_widget(self,widget_content:dict):
-        delta = widget_content.get('reasoning_delta','')
-
+        delta = widget_content.get('reasoning_delta') or ''
         if not delta:
             return
+        self.thinking_content += delta
         if not self.is_mounted:
             self.thinking_content_pending.append(delta)
             return
+        self._frag_buf.append(delta)
+        self._ensure_stream_pump()
 
-        self.thinking_content_holder += delta
-        if not self.thinking_content:
-            self._thinking_content_holder_handle()
-            return
-
-        if self.thinking_content_holder_timer is None:
-            self.thinking_content_holder_timer = self.set_timer(0.25,self._thinking_content_holder_handle)
-
-    # 流结束：改Done文案、冲刷pending/holder、停计时和holder定时器
+    # 流结束：改Done文案、停计时；泵排空后定稿
     def thinking_stream_end(self):
         if self.has_been_finalized:
             return
         self.has_been_finalized = True
         self._pointer_blinking_stop()
-        
+
         self.elapsed_time = monotonic() - self.strt_time
-        if self.is_mounted:
-            self.assistant_thinking_brief_timer.update(f'Alear030 Done Thinking in {self.elapsed_time:.1f}s')
-            self._flush_thinking_pending()
-            self._thinking_content_holder_handle()
-        
         if self._timer:
             self._timer.stop()
             self._timer = None
-        
-        if self.thinking_content_holder_timer:
-            self.thinking_content_holder_timer.stop()
-            self.thinking_content_holder_timer = None
-        
 
+        if not self.is_mounted:
+            return
+
+        self.assistant_thinking_brief_timer.update(f'Alear030 Done Thinking in {self.elapsed_time:.1f}s')
+        self._flush_pending_to_buf()
+        if self._frag_buf or self._stream_worker:
+            self._ensure_stream_pump()
+        else:
+            self.call_after_refresh(self._safety_update)
 
     # channel StreamEnd收口：转thinking_stream_end
     def finalize(self):
         self._pointer_blinking_stop()
         self.thinking_stream_end()
-        
 
-    
     # 效果方法
     def _start_pointer_blinking(self):
         if self.pointer_blinking:
