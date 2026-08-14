@@ -17,7 +17,7 @@ class SystemError(Widget):
         self.error_message = self._get_error_message()
 
         self.error_pointer = Static(content='!',classes='SystemError_pointer')
-        self.error_content = Static(content=self.error_message,classes='SystemError_content')
+        self.error_content = Static(content=self.error_message,markup=False,classes='SystemError_content')
 
     def compose(self):
         with Horizontal(classes="SystemError_horizontal"):

@@ -52,7 +52,7 @@ class AssistantThinking(Widget):
 
         # details条：● + thinking纯文本；默认藏
         self.assistant_thinking_details_pointer = Static(content='●',classes='AssistantThinking_assistant_thinking_output_details_pointer')
-        self.assistant_thinking_details_content = Static(content='',classes='AssistantThinking_assistant_thinking_output_details_content')
+        self.assistant_thinking_details_content = Static(content='',markup=False,classes='AssistantThinking_assistant_thinking_output_details_content')
         self.assistant_thinking_details_bar = Horizontal(
             self.assistant_thinking_details_pointer,
             self.assistant_thinking_details_content,

@@ -95,7 +95,7 @@ class ExtraInfoHandler:
     def _build_static(self,content:dict):
         new_widget = Static(
             id=content.get("id",None),
-            content=content.get("content",None)
+            content=content.get("content",None),markup=False
         )
         self._widget_css_handler(new_widget,content)
         self._update_widget_list(new_widget,content)
@@ -125,7 +125,7 @@ class ExtraInfoHandler:
     # 构建无法识别的extra_info_type的extra_info
     def _build_default(self,content:dict):
         extra_info = f"Info_ID:{content.get('id',None)} Info_Type:{content.get('type',None)} Info_Content:{content.get('content',None)}"
-        new_widget = Static(id=content.get("id",None),content=extra_info)
+        new_widget = Static(id=content.get("id",None),content=extra_info,markup=False)
         self._widget_css_handler(new_widget,content)
         self._update_widget_list(new_widget,content)
         return new_widget

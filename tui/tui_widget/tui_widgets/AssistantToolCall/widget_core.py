@@ -32,7 +32,7 @@ class AssistantToolCall(Widget):
         self.tool_call_basicInfo_horizontal = Horizontal(classes="AssistantToolCall_tool_call_basic_info")
         self.tool_call_basicInfo_pointer = Static(content="●",classes="AssistantToolCall_tool_call_basicInfo_pointer")
         self.tool_call_basicInfo_name = Static(content=f"{self.tool_name}",classes="AssistantToolCall_tool_call_basicInfo_name")
-        self.tool_call_basicInfo_message = Static(content="",classes="AssistantToolCall_tool_call_basicInfo_message")
+        self.tool_call_basicInfo_message = Static(content="",markup=False,classes="AssistantToolCall_tool_call_basicInfo_message")
 
         # 每一个ToolCall都包含一个extra_body，用于显示额外内容（含兜底错误 ⎿ 行）
         self.extra_body = Vertical(classes='AssistantToolCall_tool_call_extrabody')

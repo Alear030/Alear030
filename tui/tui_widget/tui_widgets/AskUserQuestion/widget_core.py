@@ -22,7 +22,7 @@ def _build_question_area_list(question_info:list)->list:
         # question_area：一整题的外壳Vertical；id带index，切题时按ASK_USER_QUESTION_QUESTION_AREA_{index}找
         question_area = Vertical(classes='AskUserQuestion_question_area',id=f"ASK_USER_QUESTION_QUESTION_AREA_{index}")
         # question_content：显示本题question文案的Static
-        question_content = Static(content=question.get("question","") or "",classes="AskUserQuestion_question_content")
+        question_content = Static(content=question.get("question","") or "",markup=False,classes="AskUserQuestion_question_content")
         # question_options_area：承装本题全部选项行的Vertical
         question_options_area = Vertical(classes='AskUserQuestion_question_options_area')
         question_options_list = []
@@ -93,11 +93,13 @@ def _build_question_area_list(question_info:list)->list:
             # label：序号 + 多选□ + 选项文案
             question_option_item_label = Static(
                 content=f'{i+1}. {("□ " if is_multi else "")}{options[i].get("label","") if isinstance(options[i],dict) else ""}',
+                markup=False,
                 classes="AskUserQuestion_question_option_item_label",
             )
             # description：选项下方灰字说明
             question_option_item_description = Static(
                 content=(options[i].get("description") or options[i].get("value") or "") if isinstance(options[i],dict) else "",
+                markup=False,
                 classes="AskUserQuestion_question_option_item_description",
             )
             question_options_list.append({
@@ -156,6 +158,7 @@ class AskUserQuestion(Widget):
                         header_text = (question.get("header") or question.get("question") or "").strip()
                         header_question = Static(
                             content=f"{mark} {header_text}",
+                            markup=False,
                             classes="AskUserQuestion_header_question",
                             id=f"ASK_USER_QUESTION_HEADER_QUESTION_{i}",
                         )
