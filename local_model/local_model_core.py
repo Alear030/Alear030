@@ -34,6 +34,7 @@ class _EmbeddingProxy:
             texts = [texts]
         if not isinstance(texts, list) or not texts:
             raise ValueError('encode 需要非空文本列表')
+        # EmbeddingNotReadyError 原样冒泡，召回/切片各自决定立刻返回还是跳过
         vectors = get_embedding_client().encode([str(t) for t in texts])
         return np.asarray(vectors, dtype=np.float32)
 
@@ -47,13 +48,12 @@ def _get_embedding_model():
     return _proxy
 
 
-def prewarm_embedding_model() -> bool:
-    """拉起 embedding worker 并异步 warmup；立即返回，不阻塞 TUI 启动。
+def get_embedding_status() -> dict:
+    return get_embedding_client().get_status()
 
-    权重缺失时直接跳过:不在后台静默下载 195MB,留给首次真正需要它的调用(worker 内)处理。
-    """
-    if not _weights_ready():
-        return False
+
+def prewarm_embedding_model() -> bool:
+    """拉起 embedding worker 并异步 boot（缺权重也在 worker 内下载+加载）；立即返回，不阻塞 TUI。"""
     get_embedding_client().warmup_async()
     return True
 

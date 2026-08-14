@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 from tool.tool_core import register_tool,tool_call_processing
 from session import _json_read
 from config import SESSION_MEMORTY_DETAIL_PATH
-from local_model import _get_embedding_model,embedding_to_b64,embedding_from_b64
+from local_model import _get_embedding_model,embedding_to_b64,embedding_from_b64,get_embedding_status
+from local_model.embedding_client import EmbeddingNotReadyError
 
 # 设置tool的desc和prompt基本信息
 tool_desc = '用于历史对话片段召回&回忆'
@@ -59,14 +60,40 @@ def _get_slices(session_ids:list[str]=None):
     return slice_results,failed
 
 
+def _not_ready_json(embed_status: dict) -> str:
+    phase = embed_status.get('phase') or 'idle'
+    if phase == 'failed':
+        error_text = str(embed_status.get('error') or '')[:200]
+        return json.dumps({
+            'status':'failed',
+            'phase':phase,
+            'message':f'嵌入模型加载失败，召回暂不可用: {error_text}',
+        },ensure_ascii=False)
+    return json.dumps({
+        'status':'weights_loading',
+        'phase':phase,
+        'message':'嵌入模型权重仍在后台下载/加载，召回暂不可用，请稍后重试 memory_recall，不要连续立即重试。',
+    },ensure_ascii=False)
+
+
 @register_tool(tool_name='memory_recall',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='memory_tool')
 def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:list[str]=None,**kwargs):
     # 执行tool_call_processing
     tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
 
+    # 权重下载/加载未完成或 failed 时立刻 JSON 返回，禁止 encode 卡 120s
+    embed_status = get_embedding_status()
+    phase = embed_status.get('phase') or 'idle'
+    if phase != 'ready':
+        return _not_ready_json(embed_status)
+
     # 拼接输入的keywords和search target 并得到向量值
     target_text = f"{' '.join(key_words)}  {search_target}"
-    target_vec = _get_embedding_model().encode([target_text])[0]
+    try:
+        target_vec = _get_embedding_model().encode([target_text])[0]
+    except EmbeddingNotReadyError as ee:
+        # status 与 encode 之间 worker 可能已死/掉出 ready
+        return _not_ready_json({'phase': ee.phase, 'error': ee.worker_error})
 
     # 得到slices并对每一个slice的embedding和target_embedding计算余弦相似度；
     # session_ids 非空时收窄扫描范围,为空则维持原有全量扫描行为

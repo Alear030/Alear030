@@ -9,6 +9,7 @@ import io
 import json
 import os
 import sys
+import threading
 import traceback
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -55,6 +56,52 @@ class EmbeddingRuntime:
         self.model_root = Path(LOCAL_MODEL_PATH)
         self.modelscope_id = MODELSCOPE_EMBEDDING_ID
         self._model = None
+        self._phase = 'idle'
+        self._error = None
+        self._boot_thread = None
+        self._boot_lock = threading.Lock()
+        self._state_lock = threading.Lock()
+
+    def _set_phase(self, phase: str, error: str | None = None) -> None:
+        with self._state_lock:
+            self._phase = phase
+            self._error = error
+
+    def status(self) -> dict:
+        with self._state_lock:
+            phase = self._phase
+            error = self._error
+            model_ready = self._model is not None and phase == 'ready'
+        return {
+            'phase': phase,
+            'weights_ready': _weights_ready(self.model_dir),
+            'model_ready': model_ready,
+            'error': error,
+        }
+
+    def start(self) -> dict:
+        # 立刻回 phase；下载/加载丢给 boot 线程，stdin 保持能答 status
+        with self._boot_lock:
+            if self._phase != 'ready':
+                thread = self._boot_thread
+                if thread is None or not thread.is_alive():
+                    if self._phase in ('idle', 'failed'):
+                        self._set_phase('downloading' if not _weights_ready(self.model_dir) else 'loading', error=None)
+                    self._boot_thread = threading.Thread(target=self._boot, name='embedding-boot', daemon=True)
+                    self._boot_thread.start()
+        return {'started': True, 'phase': self._phase}
+
+    def _boot(self) -> None:
+        try:
+            if not _weights_ready(self.model_dir):
+                self._set_phase('downloading')
+                self._download()
+            self._set_phase('loading')
+            self._load_model()
+            self._set_phase('ready', error=None)
+        except Exception as error:
+            self._set_phase('failed', error=f'{type(error).__name__}: {error}')
+            _log(traceback.format_exc())
 
     def _download(self) -> None:
         from modelscope import snapshot_download
@@ -68,12 +115,9 @@ class EmbeddingRuntime:
             )
         _log('embedding weights download done')
 
-    def warmup(self) -> dict:
+    def _load_model(self) -> None:
         if self._model is not None:
-            return {'ready': True}
-
-        if not _weights_ready(self.model_dir):
-            self._download()
+            return
 
         from transformers import logging as transformers_logging
 
@@ -91,12 +135,17 @@ class EmbeddingRuntime:
                 f'加载嵌入模型失败({self.model_dir}): {error}\n{noise}'
             ) from error
 
-        return {'ready': True}
+    def warmup(self) -> dict:
+        # 未 ready 立刻失败，禁止在 stdin 循环里下载/加载
+        if self._phase == 'ready' and self._model is not None:
+            return {'ready': True}
+        raise RuntimeError(f'embedding not ready phase={self._phase}')
 
     def encode(self, texts: list) -> dict:
         if not isinstance(texts, list) or not texts or not all(isinstance(t, str) for t in texts):
             raise ValueError('encode.texts 必须是非空字符串列表')
-        self.warmup()
+        if self._phase != 'ready' or self._model is None:
+            raise RuntimeError(f'embedding not ready phase={self._phase}')
         vectors = self._model.encode(texts)
         # 统一成 list[list[float]]，主进程再还原 ndarray
         return {'vectors': [list(map(float, row)) for row in vectors]}
@@ -114,7 +163,13 @@ def main() -> int:
             req = json.loads(line)
             req_id = req.get('id')
             op = req.get('op')
-            if op == 'warmup':
+            if op == 'start':
+                result = runtime.start()
+                _reply({'id': req_id, 'ok': True, 'result': result})
+            elif op == 'status':
+                result = runtime.status()
+                _reply({'id': req_id, 'ok': True, 'result': result})
+            elif op == 'warmup':
                 result = runtime.warmup()
                 _reply({'id': req_id, 'ok': True, 'result': result})
             elif op == 'encode':

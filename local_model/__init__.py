@@ -3,6 +3,7 @@ from .local_model_core import (
     embedding_to_b64,
     embedding_from_b64,
     embedding_weights_ready,
+    get_embedding_status,
     prewarm_embedding_model,
     shutdown_embedding_worker,
 )
@@ -12,6 +13,7 @@ __all__ = [
     'embedding_to_b64',
     'embedding_from_b64',
     'embedding_weights_ready',
+    'get_embedding_status',
     'prewarm_embedding_model',
     'shutdown_embedding_worker',
 ]
