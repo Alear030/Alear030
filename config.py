@@ -65,6 +65,14 @@ MAX_SESSION_TOKEN = 250000
 MEMORY_STORAGE_PATH = Path(__file__).parent/'memory'/'memory_storage'/'memory_storages'
 
 
+# mcp config
+# MCP server 配置文件:包名与目录都不能叫 mcp——仓库根即 sys.path[0],会遮蔽已安装的 mcp pip 包
+MCP_CONFIG_PATH = Path(__file__).parent/'mcp_client'/'mcp.json'
+# 单条 MCP 工具结果的最大字符数:远端工具的返回不受本项目控制(网页正文、大 JSON 都可能整块回来),
+# 与 SLICE_TOOL_RESULT_MAX_CHARS 同类取舍——超出部分对模型判断的边际价值低,却会实打实顶爆 session token
+MCP_TOOL_RESULT_MAX_CHARS = 4000
+
+
 
 # loacal model
 LOCAL_MODEL_PATH = Path(__file__).parent/'local_model'

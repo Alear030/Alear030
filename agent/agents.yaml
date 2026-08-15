@@ -17,6 +17,7 @@ agents:
       subagent_tool: true
       web_tool: true
       skill_tool: true
+      mcp_tool: true
       interaction_tool: true
     agent_level: medium_level
     agent_priority: 0
@@ -39,6 +40,7 @@ agents:
       subagent_tool: false
       web_tool: false
       skill_tool: false
+      mcp_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -60,6 +62,7 @@ agents:
       subagent_tool: false
       web_tool: false
       skill_tool: false
+      mcp_tool: false
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -81,6 +84,7 @@ agents:
       subagent_tool: true
       web_tool: true
       skill_tool: true
+      mcp_tool: true
     agent_level: medium_level
     agent_priority: 1
     agent_switch: true
@@ -102,6 +106,7 @@ agents:
       subagent_tool: false
       web_tool: false
       skill_tool: false
+      mcp_tool: false
     agent_level: low_level
     agent_priority: 1
     agent_switch: true

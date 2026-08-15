@@ -9,10 +9,10 @@ Alear030 — 从零自研的 Python Agent Harness。核心思想：**Model + Har
 所有命令从仓库根目录执行：
 
 ```bash
-python main.py    # 交互式 REPL；Ctrl+C 触发有序收尾
+python main.py    # TUI 事件循环；Ctrl+C 触发有序收尾
 ```
 
-依赖根目录 `.env` 中的三级模型配置（`max_level` / `medium_level` / `low_level`），由 `config.py` 读取。当前 `pyproject.toml` 尚未声明完整运行依赖，也没有锁文件，不能把 `pip install -e .` 等命令当成可复现的完整安装方案。
+依赖根目录 `.env` 中的三级模型配置（`max_level` / `medium_level` / `low_level`），由 `config.py` 读取。当前没有锁文件，不能把 `pip install -e .` 等命令当成可复现的完整安装方案。
 
 验证改动是否可用时用 `alear030-verify` 技能——这个项目的验证方式有几个反直觉的坑（`python main.py` 有真实副作用、验证脚本必须用 `python -m` 点号路径调用、`unittest discover` 不能带 `-s test`），别凭经验直接套用通用 Python 项目的验证套路。
 
@@ -76,6 +76,7 @@ python main.py    # 交互式 REPL；Ctrl+C 触发有序收尾
 | `session/` | 当前 session 的消息、切片、摘要、压缩和 plan 状态 |
 | `memory/` | 跨 session 的切片分类、去重、用户画像与持久化 |
 | `local_model/` | embedding worker 进程（client/worker/`_EmbeddingProxy` 门面）+ 已跟踪模型元数据 |
+| `mcp_client/` | MCP 客户端：`mcp.json` 配置、asyncio 隔离 supervisor、远端工具接入工具体系（详见"MCP 客户端"） |
 | `skill/` | 项目运行时技能资源 |
 | `tui/` | TUI 界面：channel 路由、widget 注册体系、接收 loop 流式事件（详见"TUI 架构"） |
 
@@ -95,7 +96,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
   → call_from_thread 送回 UI 线程 → channel.append_stream → tuiwidgets.build_widget 渲染
 ```
 
-- `rich_output` 计划整体移除，输出集成到 TUI；当前新主线仍走 `rich_print`（新 TUI 尚未注册 receiver，TUI 模式下仍直写终端），属过渡态；新代码不依赖它当消息总线
+- `rich_output` 计划整体移除，输出集成到 TUI；`rich_print` 入口临时截断中，TUI 也不注册 receiver；新代码不依赖它当消息总线
 - `tui/tui_widget/` 是 widget 注册体系：`@widget_register` 注册类，`tuiwidgets.build_widget(type, content)` 按类型构造；消息类 widget 首段读 `widget_content`，`update_widget` 整段替换（累积在 loop 侧，不全在 widget）
 - Textual 8 自定义 Widget 不写 `height` 默认填满父容器；消息/条目类 widget 的 css 第一条写 `height: auto`（内置 Static/Markdown 的 DEFAULT_CSS 自带 auto）
 - `App.__init__` 的 `css_path` 是关键字参数（第 1 位置参数是 driver_class）；`set_focus` 传 widget 对象，不传 CSS 选择器字符串
@@ -110,6 +111,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
 
 ```text
 启动：prewarm_embedding_model()（spawn embedding worker 进程）
+  → prewarm_mcp_servers(agents)（后台线程逐个连 MCP server，非阻塞）
   → Memory(memory agent, 独立 Loop())
   → Session(slice_agent, summary_agent, main system prompt)
   → 主 Loop(agents, session, hooks)
@@ -129,6 +131,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
 退出（finally）：trigger('after_session')
   → wait_all()
   → shutdown()
+  → shutdown_mcp_servers()
   → shutdown_embedding_worker()
 ```
 
@@ -176,6 +179,8 @@ Tool schema 由 `inspect.signature` 生成，当前排除 `self`、`agents`、`s
 | Prompt | `prompt/__init__.py` 扫描 `prompt/prompts/` 一级目录并加载固定 `prompt.py` | 使用 `prompt/prompts/<name>/prompt.py` + `@register_prompt`，不支持任意深度递归 |
 | Tool | `tool/__init__.py` 只导入 `tool/tools/` 下的一级 package | package 的 `__init__.py` 必须显式 import 具体实现；嵌套 `tool.py` 不会仅因文件存在而注册 |
 
+MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_client/mcp_bridge.py` 在运行时调 `register_tool(...)` 注册、断开时调 `unregister_tool(...)` 摘除，与 import 期自动发现无关。
+
 ### Hook 系统
 
 | Hook | hook point | 模式 | 职责 |
@@ -187,6 +192,17 @@ Tool schema 由 `inspect.signature` 生成，当前排除 `self`、`agents`、`s
 | `session_timeline` | `after_session` | 后台 | 会话结束时把全部 worthy slice 提炼成一条跨会话时间线事件,写 `timeline.json` |
 
 `after_round`/`after_session` 参数由触发方（TUI 的 `_run_round`/`main.py` 的 finally）在 `hooks.trigger(...)` 时显式传入；工具运行时对象则由上表的 `inject_import_args`（`pre_toolUse`）注入，这两条注入路径不要混淆。
+
+### MCP 客户端
+
+`mcp_client/` 让 Alear030 作为 MCP 客户端接入外部 server，stdio 与 Streamable HTTP 两种传输都由 `mcp_client/mcp.json` 驱动。四个非显而易见的约束：
+
+- **目录不能叫 `mcp`**：仓库根即 `sys.path[0]`，顶层 `mcp/` 会遮蔽已安装的 `mcp` pip 包
+- **asyncio 封死在 `mcp_supervisor.py`**：官方 SDK 是纯 asyncio，项目应用层零 asyncio。一个 daemon 线程跑独立事件循环，循环里只有一个常驻 supervisor task 持有 `ClientSessionGroup`。**连接/断开必须排队进那个 task**——`stdio_client` 内部是 anyio task group，cancel scope 必须同 task 进出，用 `run_coroutine_threadsafe` 每次起新 task 会在关闭时炸 `Attempted to exit cancel scope in a different task`。`call_tool` 不涉及 cancel scope，直接派给事件循环，不排队
+- **工具表是运行时可变的**：`agent.tool_list` 原本是构造期快照，MCP 工具连上后经 `Agents.refresh_all_tool_list()` 重取；`loop._chat` 每次现读 `tool_list`，故刷新后下一次模型调用即生效。**但 system prompt 是启动快照不刷新**，MCP 工具只在 function-calling schema 里可见，不进 `tool_prompt` 分块
+- **schema 不走 `inspect.signature`**：MCP 的 `inputSchema` 本身就是 JSON Schema，经 `register_tool(tool_parameters=...)` 直接采用；闭包签名是 `**kwargs`，推导不出任何契约。也因此闭包必须显式剔除 `pre_toolUse` 注入的运行时对象再转发给远端——这是 MCP 工具与内置工具唯一的行为差异
+
+工具名为 `mcp__{server_key}__{tool_name}`，前缀用配置 key 而非 server 自报名，两个 server 自报同名也不会撞。授权统一走新类别 `mcp_tool`（`agents.yaml` 里 main/plan 开、其余关），具体启用哪些 server 由 `mcp.json` 的 `enabled` 控制。凭证在配置里只以 `${VAR}` 占位符出现，真值走 `.env`；占位符解析不到时跳过该 server 并记录原因，不拿空值去连。
 
 ### Session 与 Memory
 

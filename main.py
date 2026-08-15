@@ -5,11 +5,15 @@ from agent import agents
 from loop import Loop
 from memory import Memory
 from local_model import prewarm_embedding_model, shutdown_embedding_worker
+from mcp_client import prewarm_mcp_servers, shutdown_mcp_servers
 from tui import Alear030TUI
 
-# 嵌入在独立 worker 进程加载:此处只 spawn+异步 warmup,不阻塞 TUI 启动;
-# 权重缺失时跳过(不在后台静默下 195MB);缺权重提示改由 TUI Mount 后可见展示
+# 嵌入在独立 worker 进程加载:此处 spawn+后台 boot(缺权重也下载+加载),不阻塞 TUI 启动
 prewarm_embedding_model()
+
+# MCP server 在后台逐个连接:连上一个就把它的工具注册进工具表并刷新各 agent 的 tool_list 快照。
+# 单个 server 失败只记录不影响启动;agents 已在 import 时构造完毕,故此处能直接绑定
+prewarm_mcp_servers(agents=agents)
 
 # 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
 # pipeline_enabled=False：切片摘要照跑，memory 分类/user_info/task 落盘短路（入库总闸收拢在 memory 实例）
@@ -45,5 +49,6 @@ finally:
 
     hooks.wait_all()
     hooks.shutdown()
+    shutdown_mcp_servers()
     shutdown_embedding_worker()
     print('[system_quit] 任务全部完成，Alear030期待与您下次相见')

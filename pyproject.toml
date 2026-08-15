@@ -20,6 +20,8 @@ dependencies = [
     # transformers 在 local_model_core 里显式 import;modelscope 用于权重缺失时自动下载
     "transformers==5.12.1",
     "modelscope==1.37.1",
+    # MCP 客户端:mcp_client/ 顶层 import,主线装配依赖它;包名不能与本地目录 mcp_client 混淆
+    "mcp==1.27.2",
     "ddgs==9.14.4",
     "requests==2.33.0",
     "beautifulsoup4==4.15.0",

@@ -10,6 +10,10 @@ wheels/
 .venv
 .env
 
+# MCP server 配置:描述的是本机接了哪些 server、装在哪个目录,与 .env 同类
+# 项目侧的事实由 mcp_client/mcp.json.example 承载
+mcp_client/mcp.json
+
 # 测试缓存
 .pytest_cache/
 

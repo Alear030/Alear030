@@ -42,6 +42,11 @@ class Agent:
         self.message_list:list = [{'role':'system','content':self.prompt.prompt_content}]
 
 
+    # 重新按授权取一次工具表：tool_list 是构造期快照，运行时注册的工具（MCP server 连上/断开）
+    # 不刷新就永远进不了模型可见的 tools。loop._chat 每次现读 tool_list，故刷新后下一次调用即生效
+    def refresh_tool_list(self):
+        self.tool_list = get_tool(self.tool_autho)
+
     # 得到agent的tool_autho
     def _get_tool_autho(self,agent_tool_autho:dict):
         tool_autho_list =[]
@@ -75,6 +80,11 @@ class Agents:
     # 为后续agent自主创建agent后，更新agents预留
     def _agents_reload(self):
         pass
+
+    # 工具表整体刷新：各 agent 按自身 tool_autho 重取，授权隔离仍然生效
+    def refresh_all_tool_list(self):
+        for agent in self.agents.values():
+            agent.refresh_tool_list()
 
     # 支持 agents["name"] 字典式访问，替代 agents.agents["name"]
     def __getitem__(self, key: str) -> Agent:

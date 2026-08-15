@@ -30,7 +30,9 @@ class _ToolRegister:
         self.tool_list = {}
 
     #技能注册装饰器，后续需增加role，subagent区分
-    def tool_register(self,tool_name:str=None,tool_desc:str='',tool_prompt:str='',tool_enabled:bool=True,tool_autho:str='basic_tool'):
+    # tool_parameters 显式给定时直接采用，不走 inspect.signature 推导：
+    # MCP 等外部来源的工具自带 JSON Schema，函数签名只是 **kwargs 转发壳，推不出参数契约
+    def tool_register(self,tool_name:str=None,tool_desc:str='',tool_prompt:str='',tool_enabled:bool=True,tool_autho:str='basic_tool',tool_parameters:dict=None):
         if not tool_name:
             rich_print(f'tool {tool_name} does not exist......',type='system_error')
         rich_print(f'tool {tool_name} loaded...',type='system_message')
@@ -40,16 +42,26 @@ class _ToolRegister:
                 'name':tool_name,
                 'description':tool_desc,
                 'function':func,
-                'parameters':self._make_parmeters(func),
+                'parameters':tool_parameters if tool_parameters is not None else self._make_parmeters(func),
                 'prompt':tool_prompt,
                 'enabled':tool_enabled,
                 'tool_autho':tool_autho
             }
             return func
-        
+
         return add_tool
-    
-    
+
+
+    # 注册的反向操作：运行时注册的工具（MCP server 断开等）需要能从表里摘掉，
+    # 否则 get_tools 仍会把已失效的工具喂给模型
+    def tool_unregister(self,tool_name:str)->bool:
+        if tool_name not in self.tool_list:
+            return False
+        del self.tool_list[tool_name]
+        rich_print(f'tool {tool_name} unloaded...',type='system_message')
+        return True
+
+
     def _make_parmeters(self,func)->dict:
 
         ## 后续补充全部变量类型映射关系
@@ -255,6 +267,7 @@ def _pre_tool_use_hooks(tool_name:str,tool_args:dict,runtime:dict)->dict:
 _register = _ToolRegister()
 
 register_tool = _register.tool_register
+unregister_tool = _register.tool_unregister
 get_tool = _register.get_tools
 get_tool_brief = _register.get_tool_briefs
 match_tool = _register.match_tool

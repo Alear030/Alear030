@@ -13,9 +13,9 @@ Alear030 不是一个"Python Agent 框架"，它是一个完整的 Agent 基础�
 
 ```
 Alear030/
-├── main.py                     # 入口：创建 Session → 进入 loop → 触发 Hook
+├── main.py                     # 入口：装配 Session/Loop/Memory、MCP 预热后进入 TUI
 ├── config.py                   # 集中配置（MODEL_LEVEL / 路径 / 常量）
-├── rich_output.py              # Rich 终端输出（thinking/content/tool/system）
+├── rich_output.py              # 旧总线，入口临时截断；TUI 主线不经它当消息总线
 ├── __init__.py                 # 导出常量
 ├── pyproject.toml              # 项目元数据
 ├── .env                        # API key & 模型配置（不纳入版本控制）
@@ -59,7 +59,7 @@ Alear030/
 │   └── hooks/                  # 按 hook point 分层，递归发现 **/hook.py
 │       ├── __init__.py
 │       ├── pre_toolUse/
-│       │   └── inject_import_args/  # 无条件注入，给全部工具塞 agents/session/hooks/Loop
+│       │   └── inject_import_args/  # 无条件注入，给全部工具塞 agents/session/hooks/Loop/memory
 │       ├── after_round/
 │       │   ├── memory_pipeline/     # 后台：切片 + 摘要，把 worthy slice 交给 Memory
 │       │   └── session_compress/    # 同步：Token 超限时压缩
@@ -68,7 +68,7 @@ Alear030/
 │           └── session_timeline/      # 后台：把 worthy slice 提炼成跨会话时间线事件
 │
 ├── tool/                       # 工具系统
-│   ├── tool_core.py            # 工具注册 / 匹配 / subagent_loop
+│   ├── tool_core.py            # 工具注册 / 匹配 / match_tool
 │   ├── __init__.py             # 自动发现 tool/tools/*/
 │   └── tools/
 │       ├── __init__.py
@@ -113,6 +113,10 @@ Alear030/
 │   ├── create-skill/
 │   └── memory-recall-systematic-test/
 │
+├── tui/                        # TUI：channel 路由 + widget 注册
+│
+├── mcp_client/                 # MCP 客户端：mcp.json + supervisor + 运行时注册工具
+│
 └── workspace/                  # 工作区（不参与项目代码）
 ```
 
@@ -122,7 +126,7 @@ Alear030/
 
 ### 1. Multi-Agent 集群，而非单 Agent 函数调用
 
-5 个 Agent 各有独立身份与工具授权。模型等级分两档：main/slice/summary/plan 用 medium_level，memory 用 low_level。工具授权分化明显：main 全开（12 类工具，含 config/interaction）、slice 与 summary 全关、plan 开放 basic/file_read/memory/subagent/web/skill、memory 只开 memory_tool。以上 5 个 Agent 定义在 `agents.yaml`（main/slice/summary/plan/memory）。不是 main 的函数——共享记忆空间，独立推理。
+5 个 Agent 各有独立身份与工具授权。模型等级分两档：main/slice/summary/plan 用 medium_level，memory 用 low_level。工具授权分化明显：main 全开（13 类工具，含 config/interaction/mcp_tool）、slice 与 summary 全关、plan 开放 basic/file_read/memory/subagent/web/skill/mcp_tool、memory 只开 memory_tool。以上 5 个 Agent 定义在 `agents.yaml`（main/slice/summary/plan/memory）。不是 main 的函数——共享记忆空间，独立推理。
 
 ### 2. 会话切片 + 嵌入召回，而非 RAG
 
@@ -130,7 +134,7 @@ Alear030/
 
 ### 3. 事件驱动 Hook 系统
 
-Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需在对应 hook point 下新建 `hook.py`。当前注册 5 个：`pre_toolUse` 的 `inject_import_args`（给全部工具统一注入 `agents`/`session`/`hooks`/`Loop`，工具自己决定用不用，无需按工具名逐一注册匹配）；`after_round` 的 `memory_pipeline`（后台切片摘要，当前 enabled=False 临时关闭用于测试其他功能，且同 hook 内调用 `slices_pipeline(enable=False)` 为第二重关闭）与 `session_compress`（同步压缩）；`after_session` 的 `final_memory_pipeline`（尾片处理）与 `session_timeline`（时间线生成）。
+Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需在对应 hook point 下新建 `hook.py`。当前注册 5 个：`pre_toolUse` 的 `inject_import_args`（给全部工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配）；`after_round` 的 `memory_pipeline`（后台切片摘要，hook 当前 enabled=True；入库闸是 `memory.pipeline_enabled`，`main.py` 当前传入 False，切片与摘要也不跑）与 `session_compress`（同步压缩）；`after_session` 的 `final_memory_pipeline`（尾片处理）与 `session_timeline`（时间线生成）。
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
@@ -151,7 +155,7 @@ agent、session、tool、hook… 等模块彼此之间通过 main.py 进行链�
 ```bash
 git clone <repo-url>
 cd Alear030
-pip install -e .
+pip install -e .   # 直接依赖已钉死，无锁文件，传递依赖可能漂移
 
 cp .env.example .env
 # 编辑 .env —— 只填 MAX/MEDIUM/LOW_LEVEL_* 三级模型配置即可（可指向同一服务商，仅 model_name 不同；可选 HTTP_PROXY / HTTPS_PROXY，仅 web_search 走代理时需要）
@@ -163,7 +167,7 @@ python main.py
 
 ## 技术栈
 
-Python ≥3.10 · openai · pyyaml · tiktoken · rich · sentence-transformers · transformers · modelscope · json-repair · requests · beautifulsoup4 · numpy · python-dotenv · ddgs
+Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-transformers · transformers · modelscope · mcp · json-repair · requests · beautifulsoup4 · numpy · python-dotenv · ddgs
 
 ---
 
@@ -173,7 +177,7 @@ MIT，详见 `LICENSE`。
 
 # roadmap
 
-- TUI初版实现
+- TUI 深化（thinking/toolcall 已有 widget，体验仍在推进）
 - todolist初版实现
 - slash命令初版实现
 - eval 评测题集golden set初版建立
