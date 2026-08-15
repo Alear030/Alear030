@@ -2,8 +2,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any,Callable
 
-from rich_output import rich_print
-
 # HookResult —— 钩子的返回值，决定主流程怎么响应
 @dataclass
 class HookResult:
@@ -43,8 +41,6 @@ class HookManager:
             self._hooks[hook_point] = []
 
         def add_hook(func):
-            status = '' if enabled else ' (disabled)'
-            rich_print(f'hook {func.__name__} loaded{status}...',type='system_message')
             hook_def = HookDef(func=func,background=background,match=match,enabled=enabled)
             self._hooks[hook_point].append(hook_def)
             return func

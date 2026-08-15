@@ -1,5 +1,3 @@
-from rich_output import rich_print
-
 class _PromptRegister:
     def __init__(self):
         self.prompt_list = {}
@@ -10,8 +8,6 @@ class _PromptRegister:
     # condition: Callable[[agent], bool]，None=总是启用；否则只有返回True才拼入
     # enabled: 整体开关，False时即使condition为真也跳过（对应tool的tool_enabled玩法）
     def register_prompt(self,prompt_name:str=None,order:int=0,condition=None,enabled:bool=True):
-        rich_print(f'prompt {prompt_name} loaded...',type='system_message')
-
         def add_prompt(func):
             self.prompt_list[prompt_name] = {
                 'name':prompt_name,

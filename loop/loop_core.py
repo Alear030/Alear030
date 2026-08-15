@@ -2,7 +2,6 @@ import json
 
 from openai.types.chat import ChatCompletionMessage
 
-from rich_output import rich_print
 from .orchestrator import PlanRunner
 
 
@@ -149,7 +148,6 @@ class Loop:
             raise
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
-            rich_print(message=f'模型调用失败：{ee}',type='system_error')
             # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败未开流则跳过
             if self.emit and stream_key:
                 self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
@@ -240,8 +238,6 @@ class Loop:
         agent.message_list.append(final_rq)
 
         if self.session:
-            if self.verbose:
-                rich_print(message=self._get_reasoning(final_rq),type='agent_thinking')
             self.session.session_message_insert(role='assistant',content=final_rq)
         return final_rq.content
 
@@ -258,18 +254,12 @@ class Loop:
         tool_call = 0
 
         while tool_call < agent.max_toolcalls:
-            think_type = 'agent_thinking' if agent.agent_name=='main' else 'subagent_thinking'
-
             # 无 tool_calls 即本轮收尾：有内容返回内容，无内容返回空串（不再空转死循环）
             if not agent_rq.tool_calls:
-                if self.verbose:
-                    rich_print(message=self._get_reasoning(agent_rq),type=think_type)
                 self._close_round()
                 return agent_rq.content or ''
 
             tool_call += 1
-            if self.verbose:
-                rich_print(message=self._get_reasoning(agent_rq),type=think_type)
 
             # 执行工具调用 + 通过 diff session.mode 检测模式是否真的切换（不信任提示词自觉性）
             mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
@@ -282,7 +272,8 @@ class Loop:
             agent_rq = self._sent_message_api(agent=agent)
 
         # 达到工具调用上限，强制无 tools 收尾
-        rich_print(message='tool_call over max...', type='system_message')
+        if self.emit:
+            self.emit(event='SystemError',content={'message':'已达到工具调用次数上限'},agent_name=agent.agent_name)
         self._close_round()
         return self._force_final_reply(agent=agent,notice='系统提示：已达到工具调用次数上限，请根据已有信息进行回复',drop_last_toolcalls=True)
 
@@ -309,7 +300,4 @@ class Loop:
         # memory agent 复用全局 loop 也带 session,后台记忆提炼 JSON 被误打印成主回复干扰用户
         # plan/subagent 仅因用无 session 新 Loop 巧合未暴露;修复:条件改为 agent.agent_name=='main'
         # 测试阶段暂不修--需要观察各 subagent 产出,测试结束再收口
-        if self.session:
-            rich_print(message=result,type='agent_content')
-
         return result

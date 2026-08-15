@@ -17,8 +17,6 @@ from concurrent.futures import Future
 
 from mcp.client.session_group import ClientSessionGroup
 
-from rich_output import rich_print
-
 
 LOOP_START_TIMEOUT_SEC = 10
 CONNECT_TIMEOUT_SEC = 30
@@ -203,7 +201,7 @@ class McpSupervisor:
             loop.call_soon_threadsafe(cmds.put_nowait,('shutdown',None,future))
             future.result(timeout=SHUTDOWN_TIMEOUT_SEC)
         except Exception as ee:
-            rich_print(f'MCP supervisor 收尾异常：{ee}',type='system_error')
+            pass
 
         thread.join(timeout=SHUTDOWN_TIMEOUT_SEC)
 

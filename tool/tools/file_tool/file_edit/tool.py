@@ -2,7 +2,6 @@ from pathlib import Path
 from tool.tool_core import register_tool,tool_call_processing
 
 from config import WORK_SPACE,ROOT_DIRECTORY
-from rich_output import rich_print
 
 SKILL_DIRECTORY = ROOT_DIRECTORY/'skill'
 
@@ -27,7 +26,6 @@ def file_edit(file_path:str,old_string:str,new_string:str,replace_all:bool=False
 
     resolved_path = path.resolve()
     if not resolved_path.is_relative_to(WORK_SPACE) and not resolved_path.is_relative_to(SKILL_DIRECTORY):
-        rich_print(message='⚠️ AGENT正在尝试在非工作空间中编辑文件',type='system_error')
         return f'错误，当前编辑路径非工作空间，学习模式下只能在工作空间或技能目录编辑文件，工作空间地址：{WORK_SPACE}，技能目录：{SKILL_DIRECTORY}'
 
     if not path.exists():

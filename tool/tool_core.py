@@ -3,7 +3,6 @@ import inspect
 import typing
 
 from dataclasses import dataclass,field,asdict
-from rich_output import rich_print
 
 @dataclass
 class ToolCallResult:
@@ -33,10 +32,6 @@ class _ToolRegister:
     # tool_parameters 显式给定时直接采用，不走 inspect.signature 推导：
     # MCP 等外部来源的工具自带 JSON Schema，函数签名只是 **kwargs 转发壳，推不出参数契约
     def tool_register(self,tool_name:str=None,tool_desc:str='',tool_prompt:str='',tool_enabled:bool=True,tool_autho:str='basic_tool',tool_parameters:dict=None):
-        if not tool_name:
-            rich_print(f'tool {tool_name} does not exist......',type='system_error')
-        rich_print(f'tool {tool_name} loaded...',type='system_message')
-
         def add_tool(func):
             self.tool_list[tool_name] = {
                 'name':tool_name,
@@ -58,7 +53,6 @@ class _ToolRegister:
         if tool_name not in self.tool_list:
             return False
         del self.tool_list[tool_name]
-        rich_print(f'tool {tool_name} unloaded...',type='system_message')
         return True
 
 
@@ -122,11 +116,7 @@ class _ToolRegister:
 
         # 工具没注册过：不给模型空转的机会，直接回一句"不存在"
         if tool_name not in self.tool_list:
-            rich_print(message=f'{tool_name} doesnt exist...',type='system_error')
             return self._error_result(tcr,'tool_not_found','工具不存在',emit)
-
-        if verbose:
-            rich_print(message=f'{tool_name}...',type='tool_call')
 
         # 参数解析 + 校验：失败不能伪装成空参数继续执行工具
         try:

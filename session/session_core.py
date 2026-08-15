@@ -19,7 +19,6 @@ from config import (
     SLICE_TOOL_RESULT_MAX_CHARS,
 )
 from local_model import _get_embedding_model,embedding_to_b64
-from rich_output import rich_print
 from .session_plan import Plan
 from .attachment_core import Attachment
 
@@ -241,7 +240,6 @@ class Session:
             slice_rqs = _structured_chat(agent=self.slice_agent,message_list=message_list)
         except Exception as error:
             #@agent 后续兼容到LOGGING模块中，统一管理日志打印
-            rich_print(message=f'slice 模型调用失败,跳过本轮 slice: {error}',type='system_error')
             return
 
         try:
@@ -291,13 +289,11 @@ class Session:
                 })
         except (json.JSONDecodeError,IndexError,KeyError,ValueError,TypeError) as error:
             #@agent 后续兼容到LOGGING模块中，统一管理日志打印
-            rich_print(message=f'slice json 存在问题 跳过本轮 slice: {error}',type='system_error')
             return
         except Exception as error:
             # embedding 加载/编码失败等:同样只放弃本轮切片,但必须上报——否则异常冒泡到后台
             # future 里,既看不见,还会连带跳过同一个 hook 里紧随其后的 _session_summary
             #@agent 后续兼容到LOGGING模块中，统一管理日志打印
-            rich_print(message=f'slice embedding 处理失败 跳过本轮 slice: {error}',type='system_error')
             return
 
         def do_slice(data):
@@ -392,10 +388,7 @@ class Session:
                     summarized[slice_key] = thread.result()
                 except Exception as error:
                     #@agent 后续兼容到LOGGING模块中，统一管理日志打印
-                    rich_print(
-                        message=f'slice {slice_key[0]}-{slice_key[1]} summary 失败,留待下轮重试: {error}',
-                        type='system_error'
-                    )
+                    pass
 
         if not summarized:
             return

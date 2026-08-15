@@ -1,6 +1,5 @@
 import json
 
-from rich_output import rich_print
 from tool.tool_core import register_tool,tool_call_processing
 from json import JSONDecodeError
 from openai import OpenAI
@@ -111,7 +110,4 @@ def user_intention(user_content:str,**kwargs)->dict:
     except JSONDecodeError as JE:
         return f'分析输出格式错误，错误原因:{JE}'
 
-    user_intention_result = f'\n--- user intention_tool: 根据关键词{intention_ai_rq["key_word"]}分析，用户的意图是{intention_ai_rq["intent"]},原因是{intention_ai_rq["reason"]}----\n'
-
-    rich_print(message=user_intention_result,type='tool_result')
     return f'根据关键词{intention_ai_rq["key_word"]}分析，用户的意图是{intention_ai_rq["intent"]},原因是{intention_ai_rq["reason"]}'

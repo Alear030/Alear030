@@ -3,9 +3,6 @@ import re
 
 from json_repair import repair_json
 
-from rich_output import rich_print
-
-
 from memory.memory_prompt import memory_prompts
 from memory.memory_config.memory_config_core import memory_config
 from memory.memory_storage import memory_storage
@@ -175,8 +172,6 @@ class Memory:
                 response_format={'type': 'json_object'}
             ).choices[0].message
             agent_think = getattr(response, 'reasoning_content', None) or ''
-            if agent_think and (not self.loop or self.loop.verbose):
-                rich_print(message=agent_think, type='subagent_thinking')
             rq = (response.content or '').strip()
 
             # 不区分成败记录thinking+原始输出，供后续评估分类质量/优化prompt使用

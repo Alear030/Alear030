@@ -15,7 +15,6 @@ Alear030 不是一个"Python Agent 框架"，它是一个完整的 Agent 基础�
 Alear030/
 ├── main.py                     # 入口：装配 Session/Loop/Memory、MCP 预热后进入 TUI
 ├── config.py                   # 集中配置（MODEL_LEVEL / 路径 / 常量）
-├── rich_output.py              # 旧总线，入口临时截断；TUI 主线不经它当消息总线
 ├── __init__.py                 # 导出常量
 ├── pyproject.toml              # 项目元数据
 ├── .env                        # API key & 模型配置（不纳入版本控制）

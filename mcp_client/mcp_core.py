@@ -4,8 +4,6 @@
 """
 import threading
 
-from rich_output import rich_print
-
 from .mcp_config import read_config,build_params,is_enabled,server_type,McpConfigError
 from .mcp_supervisor import get_supervisor,McpSupervisorError
 from .mcp_bridge import register_server_tools,unregister_server_tools,refresh_agent_tools
@@ -42,7 +40,6 @@ class McpManager:
             # 占位符缺失等配置问题：跳过这个 server 并记录原因，不拿空值去连
             with self._lock:
                 self._errors[server_key] = str(ee)
-            rich_print(f'mcp server {server_key} 配置无效：{ee}',type='system_error')
             return {'server':server_key,'ok':False,'error':str(ee)}
 
         try:
@@ -51,7 +48,6 @@ class McpManager:
             message = f'{type(ee).__name__}: {ee}'
             with self._lock:
                 self._errors[server_key] = message
-            rich_print(f'mcp server {server_key} 连接失败：{message}',type='system_error')
             return {'server':server_key,'ok':False,'error':message}
 
         tool_names = register_server_tools(server_key,tools)
@@ -59,8 +55,6 @@ class McpManager:
             self._server_tools[server_key] = tool_names
             self._errors.pop(server_key,None)
         refresh_agent_tools(self._agents)
-
-        rich_print(f'mcp server {server_key} connected, {len(tool_names)} tools loaded...',type='system_message')
         return {'server':server_key,'ok':True,'tools':tool_names}
 
     def disconnect_server(self,server_key:str)->dict:
@@ -71,7 +65,7 @@ class McpManager:
             get_supervisor().disconnect(server_key)
         except McpSupervisorError as ee:
             # 会话已经不在了也要把工具摘干净，否则模型仍能看到失效工具
-            rich_print(f'mcp server {server_key} 断开异常：{ee}',type='system_error')
+            pass
 
         removed = unregister_server_tools(server_key,tool_names or [])
         refresh_agent_tools(self._agents)
@@ -95,7 +89,6 @@ class McpManager:
         try:
             servers = read_config()
         except Exception as ee:
-            rich_print(f'mcp.json 读取失败：{ee}',type='system_error')
             return
 
         for server_key,entry in servers.items():
