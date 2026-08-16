@@ -1,4 +1,5 @@
 import signal
+import threading
 
 from pathlib import Path
 
@@ -50,39 +51,6 @@ class Alear030TUI(App,inherit_bindings=False):
 
         # channel下的状态占位栏、用户输入栏、提示栏
         self.bottom_bar = tuiwidgets.build_widget(widget_type="BottomBar",widget_id="BOTTOM_BAR",widget_content={"state":"default"})
-
-    # BINDINGS 入口：有选区复制，无选区 App.exit
-    def action_ctrl_c_event(self):
-        if self._exit:
-            return
-        
-        selected = ""
-        focused = self.focused
-        if focused is not None:
-            selected = getattr(focused,"selected_text",None) or ""
-        if not selected:
-            selected = self.screen.get_selected_text() or ""
-        if selected:
-            self.copy_to_clipboard(selected)
-            return
-        
-        self.exit()
-    
-    # 主线程SIGINT：call_later丢回消息循环，不用call_from_thread
-    def _dispatch_ctrl_c(self,signum,frame):
-        if not self.call_later(self.action_ctrl_c_event):
-            self.exit()
-    
-    # TUI 存活期：SIGINT 转到 ctrl+c 同一套复制/退出
-    def run(self,*args,**kwargs):
-        signal.signal(signal.SIGINT,self._dispatch_ctrl_c)
-        try:
-            return super().run(*args,**kwargs)
-        except KeyboardInterrupt:
-            return
-        finally:
-            # 收尾期：忽略SIGINT，别还默认handler打断main收尾
-            signal.signal(signal.SIGINT,signal.SIG_IGN)
 
     # 登记常驻 channel
     def _channel_init(self):
@@ -162,6 +130,16 @@ class Alear030TUI(App,inherit_bindings=False):
 
     # loop 外发入口：未知 agent 兜底；底栏 event 先截；其余丢给对应 channel
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
+        # 底栏认领的 event 先截走，不进 channel；UI 线程直接调，别 call_from_thread
+        method_name = self.bottom_bar.event_methods.get(event,None)
+        if method_name is not None:
+            method = getattr(self.bottom_bar,method_name)
+            if self._thread_id == threading.get_ident():
+                method(content=content)
+            else:
+                self.call_from_thread(method,content=content)
+            return
+
         if agent_name not in self.channels.keys():
             # done(@claude): 未知 agent 挂 SystemError 到 now_channel，不再静默 return
             self.call_from_thread(
@@ -170,13 +148,44 @@ class Alear030TUI(App,inherit_bindings=False):
                 content={"message":f"未知 agent_name: {agent_name}"},
             )
             return
-        
-        # 底栏认领的 event 先截走，不进 channel
-        method_name = self.bottom_bar.event_methods.get(event,None)
-        if method_name is not None:
-            self.call_from_thread(getattr(self.bottom_bar,method_name),content=content)
-            return
 
         # 其余按 agent_name 丢给对应 channel
         target_channel = self.channels[agent_name]
         self.call_from_thread(target_channel.handle_loop_emit,event=event,content=content,agent_name=agent_name,stream_id=stream_id)
+
+
+    # BINDINGS 入口：有选区复制，无选区 App.exit
+    def action_ctrl_c_event(self):
+        # 如果程序已经退出，则直接返回
+        if self._exit:
+            return
+        
+        # Input 选区走 selected_text；消息区鼠标拖选用 screen.get_selected_text
+        selected = getattr(self.focused,"selected_text",None) or self.screen.get_selected_text() or ""
+        if selected:
+            self.copy_to_clipboard(selected)
+            return
+        
+        # 如果没有选取内容，进入确认退出流程
+        if not self.bottom_bar.exit_confirm_status:
+            self.receive_loop_emit(event="ExitConfirm",content={})
+            return
+
+        # 如果没有触发上述的事件，则退出程序
+        self.exit()
+    
+    # 主线程SIGINT：call_later丢回消息循环，不用call_from_thread
+    def _dispatch_ctrl_c(self,signum,frame):
+        if not self.call_later(self.action_ctrl_c_event):
+            self.exit()
+    
+    # TUI 存活期：SIGINT 转到 ctrl+c 同一套复制/退出
+    def run(self,*args,**kwargs):
+        signal.signal(signal.SIGINT,self._dispatch_ctrl_c)
+        try:
+            return super().run(*args,**kwargs)
+        except KeyboardInterrupt:
+            return
+        finally:
+            # 收尾期：忽略SIGINT，别还默认handler打断main收尾
+            signal.signal(signal.SIGINT,signal.SIG_IGN)

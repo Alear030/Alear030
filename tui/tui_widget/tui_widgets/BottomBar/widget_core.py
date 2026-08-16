@@ -38,6 +38,11 @@ class BottomBar(Widget):
         self.askuserquestion = None
 
         self.event_methods = event_methods
+
+        # 退出确认状态，从tui_core中传入，同时读取进行判断
+        self.exit_confirm_status = False
+        # 2s 未再按 ctrl+c 就还原，句柄用来停旧 timer
+        self._exit_confirm_timer = None
         
 
     def compose(self):
@@ -86,6 +91,20 @@ class BottomBar(Widget):
         self.bottom_bar_vertical.mount(self.askuserquestion)
         self.askuserquestion.focus()
 
+    # 退出确认事件方法
+    @event_register(event="ExitConfirm")
+    def exit_confirm_event_method(self,content:dict=None,**args):
+        self.exit_confirm_status = True
+        self.state_bar.exit_confirm_event_method()
+        # 2s 没再按 ctrl+c 就还原；重复进入先停旧的
+        if self._exit_confirm_timer is not None:
+            self._exit_confirm_timer.stop()
+        self._exit_confirm_timer = self.set_timer(2, self._restore_exit_confirm)
+
+    def _restore_exit_confirm(self):
+        self.exit_confirm_status = False
+        self._exit_confirm_timer = None
+        self.state_bar.default_event_method()
     
     def event_stop(self,event_type:str,event_widget:Widget):
         event_widget.remove()
