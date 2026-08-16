@@ -1,3 +1,5 @@
+import signal
+
 from pathlib import Path
 
 from .tui_channel import TuiChannel
@@ -6,6 +8,7 @@ from .tui_widget import tuiwidgets
 from textual import on,work
 from textual.app import App
 from textual.events import Click, Mount
+from textual.binding import Binding
 
 # 全局变量
 _UserInput = tuiwidgets.widget_list["UserInput"]["widget_cls"]
@@ -16,10 +19,17 @@ css_file_paths = widget_css_files + [global_css_file]
 
 
 
-# 入口 App：channel 路由 + 输入框 + 渲染
-class Alear030TUI(App):
+# 入口 App：channel 路由 + 输入框 + 渲染；inherit_bindings=False 丢掉 App 自带 ctrl+q
+class Alear030TUI(App,inherit_bindings=False):
 
     TITLE = "ALEAR"
+
+    # 关掉命令面板，避免 ctrl+p 另开退出入口
+    ENABLE_COMMAND_PALETTE = False
+    BINDINGS = [
+        # 抢 ctrl+c：有选区复制，无选区退出
+        Binding("ctrl+c", "ctrl_c_event",show=False,priority=True)
+    ]
 
     def __init__(self,css_path=css_file_paths,loop=None,session=None,hooks=None,agents=None,memory=None):
         super().__init__(watch_css=True,css_path=css_path,ansi_color=True)
@@ -41,6 +51,39 @@ class Alear030TUI(App):
         # channel下的状态占位栏、用户输入栏、提示栏
         self.bottom_bar = tuiwidgets.build_widget(widget_type="BottomBar",widget_id="BOTTOM_BAR",widget_content={"state":"default"})
 
+    # BINDINGS 入口：有选区复制，无选区 App.exit
+    def action_ctrl_c_event(self):
+        if self._exit:
+            return
+        
+        selected = ""
+        focused = self.focused
+        if focused is not None:
+            selected = getattr(focused,"selected_text",None) or ""
+        if not selected:
+            selected = self.screen.get_selected_text() or ""
+        if selected:
+            self.copy_to_clipboard(selected)
+            return
+        
+        self.exit()
+    
+    # 主线程SIGINT：call_later丢回消息循环，不用call_from_thread
+    def _dispatch_ctrl_c(self,signum,frame):
+        if not self.call_later(self.action_ctrl_c_event):
+            self.exit()
+    
+    # TUI 存活期：SIGINT 转到 ctrl+c 同一套复制/退出
+    def run(self,*args,**kwargs):
+        signal.signal(signal.SIGINT,self._dispatch_ctrl_c)
+        try:
+            return super().run(*args,**kwargs)
+        except KeyboardInterrupt:
+            return
+        finally:
+            # 收尾期：忽略SIGINT，别还默认handler打断main收尾
+            signal.signal(signal.SIGINT,signal.SIG_IGN)
+
     # 登记常驻 channel
     def _channel_init(self):
         main_channel = TuiChannel(channel_id=1,agent_name='main',channel_type='main_agent',channel_loop=self.loop)
@@ -52,9 +95,6 @@ class Alear030TUI(App):
     def compose(self):
         yield self.channels["main"].body
         yield self.bottom_bar
-
-    # @claude 一次性渲染不再需要独立 emit_once 方法：loop 侧 emit 泛化后，新增一次性事件（如 system_message）经事件分发路由 channel.append_once 即可
-
 
     # Mount 后聚焦 USER_INPUT
     @on(message_type=Mount)

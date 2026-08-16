@@ -1,3 +1,5 @@
+import signal
+
 from session import Session
 from hook.hook_core import hooks
 
@@ -37,11 +39,9 @@ hooks.trigger(hook_point='before_session',session=session,agents=agents,memory=m
 try:
     AlearTui.run()
 
-except KeyboardInterrupt:
-    # 检测到退出动作，进行收尾
-    print('\n[system_quit] 接收到退出动作，正在处理后台运行任务请稍等...')
-
 finally:
+    # 收尾期间忽略SIGINT，须在print/join之前装上：join不被第二下Ctrl+C打断
+    signal.signal(signal.SIGINT,signal.SIG_IGN)
     # 在退出之前进行保险环节操作
     print('[system_quit] 等待后台任务完成...')
     # after_session hooks engage
