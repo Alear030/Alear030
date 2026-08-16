@@ -90,7 +90,6 @@ class Alear030TUI(App):
         try:
             self._run_round(user_input=user_input)
         except Exception as ee:
-            # done(@claude): do_work except 挂 SystemError，不再空 pass
             self.call_from_thread(
                 self.now_channel.append_once,
                 content_type="SystemError",
@@ -121,6 +120,7 @@ class Alear030TUI(App):
         self.call_from_thread(self.now_channel.body.stick_bottom)
 
 
+    # loop 外发入口：未知 agent 兜底；底栏 event 先截；其余丢给对应 channel
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):
         if agent_name not in self.channels.keys():
             # done(@claude): 未知 agent 挂 SystemError 到 now_channel，不再静默 return
@@ -131,10 +131,12 @@ class Alear030TUI(App):
             )
             return
         
+        # 底栏认领的 event 先截走，不进 channel
         method_name = self.bottom_bar.event_methods.get(event,None)
         if method_name is not None:
             self.call_from_thread(getattr(self.bottom_bar,method_name),content=content)
             return
 
+        # 其余按 agent_name 丢给对应 channel
         target_channel = self.channels[agent_name]
         self.call_from_thread(target_channel.handle_loop_emit,event=event,content=content,agent_name=agent_name,stream_id=stream_id)

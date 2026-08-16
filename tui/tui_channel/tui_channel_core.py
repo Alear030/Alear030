@@ -13,6 +13,20 @@ class ChannelBody(VerticalScroll):
     def __init__(self,channel,body_id:str):
         super().__init__(id=body_id)
         self.channel = channel
+        # 尾部置底槽，后续赋值
+        self.bottom_widget = None
+
+    # 有置底件才 yield，钉在滚动区最后
+    def compose(self):
+        if self.bottom_widget is not None:
+            yield self.bottom_widget
+
+    # 消息挂滚动区：有置底件就插到它前面
+    def mount_content(self,widget):
+        if self.bottom_widget is not None:
+            self.mount(widget,before=self.bottom_widget)
+            return
+        self.mount(widget)
 
     # Textual原生贴底：锚定时内容增高跟底；用户上滚会release
     def stick_bottom(self):
@@ -46,14 +60,14 @@ class TuiChannel:
     # 一次性的信息，无需流式处理
     def append_once(self,content_type:str=None,content:dict=None,widget_id:str=None):
         new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=widget_id)
-        self.body.mount(new_widget)
+        self.body.mount_content(new_widget)
         self.once_widgets[widget_id] = new_widget
 
     # 流式信息，需要流式处理，widget_id需要传入的时候就直接拼接
     def append_stream(self,content_type:str=None,content:dict=None,widget_id:str=None):
         if widget_id not in self.stream_widgets.keys():
             new_widget = tuiwidgets.build_widget(widget_type=content_type,widget_content=content,widget_id=widget_id)
-            self.body.mount(new_widget)
+            self.body.mount_content(new_widget)
             self.stream_widgets[widget_id] = new_widget
             return
         # 每个widget内都需要有一个update_widget方法
@@ -107,3 +121,19 @@ class TuiChannel:
         for k in finished:
             self.stream_widgets[k].finalize()
             del self.stream_widgets[k]
+
+    @event_register(event="LoopStart")
+    def start_loop(self,**args):
+        if self.body.bottom_widget is not None:
+            return
+        self.body.bottom_widget = tuiwidgets.build_widget(widget_type="BottomThinkTip",widget_content={},widget_id="BottomThinkTip")
+        self.body.mount(self.body.bottom_widget)
+
+    
+    @event_register(event="LoopEnd")
+    def end_loop(self,**args):
+        if self.body.bottom_widget is None:
+            return
+        self.body.bottom_widget.finalize()
+        self.body.bottom_widget = None
+        

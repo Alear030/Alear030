@@ -283,12 +283,14 @@ class Loop:
     def loop_run(self,agent = None,agent_name:str=None,message:str=None):
         agent = agent if not agent_name else self._get_agent(agent_name=agent_name)
         try:
+            if self.emit:
+                self.emit(event='LoopStart',agent_name=agent.agent_name)
             result = self.run_turn(agent=agent,message=message)
-
             # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_round 之前完成以保原切片时机
             plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
             if plan_result is not None:
                 result = plan_result
+        
         except LoopAPIError as ee:
             result = f'[系统错误] 模型调用失败，本轮未完成：{ee}'
             if self.session:
@@ -296,8 +298,9 @@ class Loop:
             if self.emit:
                 self.emit(event='SystemError',content={'message':result},agent_name=agent.agent_name)
 
-        # @claude bug:loop_run 用 if self.session 当打印 agent_content 的条件不精确
-        # memory agent 复用全局 loop 也带 session,后台记忆提炼 JSON 被误打印成主回复干扰用户
-        # plan/subagent 仅因用无 session 新 Loop 巧合未暴露;修复:条件改为 agent.agent_name=='main'
-        # 测试阶段暂不修--需要观察各 subagent 产出,测试结束再收口
+        # 收尾：发 LoopEnd 事件
+        finally:
+            if self.emit:
+                self.emit(event='LoopEnd',content={},agent_name=agent.agent_name)
+                
         return result

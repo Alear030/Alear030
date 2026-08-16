@@ -20,7 +20,7 @@ class AssistantThinking(Widget):
         self.widget_id = widget_id
 
         # 计时：mount起跑，stream_end停
-        self.strt_time = monotonic()
+        self.start_time = monotonic()
         self.elapsed_time = 0
         self._timer = None
         self.brief_bar_display = True
@@ -29,6 +29,7 @@ class AssistantThinking(Widget):
         self.thinking_content = ""
         self._frag_buf:list[str] = []
         self.thinking_content_pending:list[str] = []
+        # 泵是否已挂
         self._stream_worker = False
 
         # 防stream_end / finalize重复收尾
@@ -60,7 +61,7 @@ class AssistantThinking(Widget):
         )
         self.assistant_thinking_details_bar.display = not self.brief_bar_display
 
-        # thinking pointer 呼吸效果
+        # 呼吸开关；默认打在brief那颗●
         self.pointer_blinking = False
         self.pointer_blinking_target = self.assistant_thinking_brief_pointer
 
@@ -93,6 +94,7 @@ class AssistantThinking(Widget):
             self.assistant_thinking_brief_bar.display = self.brief_bar_display
             self.assistant_thinking_details_bar.display = not self.brief_bar_display
 
+            # 切条：两颗透明度拉回，呼吸改打可见那颗
             self.assistant_thinking_brief_pointer.styles.opacity = 1.0
             self.assistant_thinking_details_pointer.styles.opacity = 1.0
             self.pointer_blinking_target = (
@@ -103,7 +105,7 @@ class AssistantThinking(Widget):
 
     # 刷brief计时文案
     def _refresh_timer(self):
-        self.elapsed_time = monotonic() - self.strt_time
+        self.elapsed_time = monotonic() - self.start_time
         self.assistant_thinking_brief_timer.update(f'Alear030 Thinking in {self.elapsed_time:.1f}s')
 
     # mount前pending并入frag缓冲
@@ -161,11 +163,12 @@ class AssistantThinking(Widget):
         self.has_been_finalized = True
         self._pointer_blinking_stop()
 
-        self.elapsed_time = monotonic() - self.strt_time
+        self.elapsed_time = monotonic() - self.start_time
         if self._timer:
             self._timer.stop()
             self._timer = None
 
+        # 未mount：只停计时，Done文案/定稿等_on_mount
         if not self.is_mounted:
             return
 
@@ -181,13 +184,14 @@ class AssistantThinking(Widget):
         self._pointer_blinking_stop()
         self.thinking_stream_end()
 
-    # 效果方法
+    # 开呼吸：已在闪就跳过
     def _start_pointer_blinking(self):
         if self.pointer_blinking:
             return
         self.pointer_blinking = True
         self._pointer_fade_out()
 
+    # 淡出；animate回调可能晚到，已停则拉回1.0
     def _pointer_fade_out(self):
         if not self.pointer_blinking:
             self.pointer_blinking_target.styles.opacity = 1.0
@@ -198,6 +202,7 @@ class AssistantThinking(Widget):
             on_complete=self._pointer_fade_in,
         )
 
+    # 淡入；同上，停了就拉回1.0
     def _pointer_fade_in(self):
         if not self.pointer_blinking:
             self.pointer_blinking_target.styles.opacity = 1.0
@@ -208,6 +213,7 @@ class AssistantThinking(Widget):
             on_complete=self._pointer_fade_out,
         )
 
+    # 停呼吸：两颗pointer都拉回不透明
     def _pointer_blinking_stop(self):
         if not self.pointer_blinking:
             return

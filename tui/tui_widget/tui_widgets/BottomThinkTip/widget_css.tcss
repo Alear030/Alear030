@@ -1,0 +1,47 @@
+/* 置底思考条：高度随两行撑开 */
+.BottomThinkTip{
+    height:auto;
+    width:100%;
+    padding:0 1;
+    margin:1 2 1 0;
+}
+
+/* 主行：⬡ + 文案计时 */
+.BottomThinkTip_thinking_bar{
+    height:auto;
+    width:100%;
+}
+
+/* 主行 ⬡：天蓝 */
+.BottomThinkTip_thinking_bar_pointer{
+    height:auto;
+    width:2;
+    color:rgb(163, 201, 232);
+}
+
+/* 主行文案：Digging... / thinking + Ns */
+.BottomThinkTip_thinking_bar_message{
+    height:auto;
+    width:1fr;
+    color:rgb(163, 201, 232);
+}
+
+/* 次行：⎿ + tip，默认藏、有文案再开 */
+.BottomThinkTip_thinking_bar_tip{
+    height:auto;
+    width:100%;
+}
+
+/* 次行 ⎿：桃色，略淡 */
+.BottomThinkTip_thinking_bar_tip_pointer{
+    height:auto;
+    width:2;
+    color:rgba(252, 255, 229, 0.75);
+}
+
+/* 次行 tip 文案：同桃色略淡 */
+.BottomThinkTip_thinking_bar_tip_message{
+    height:auto;
+    width:1fr;
+    color:rgba(252, 255, 229, 0.75);
+}
