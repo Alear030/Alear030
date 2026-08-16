@@ -90,6 +90,14 @@ class BottomBar(Widget):
         self.default_vertical.display = False
         self.bottom_bar_vertical.mount(self.askuserquestion)
         self.askuserquestion.focus()
+    
+    # 事件停止方法
+    def event_stop(self,event_type:str,event_widget:Widget):
+        event_widget.remove()
+        if event_type == "AskUserQuestion":
+            self.askuserquestion = None
+        self.default_vertical.display = True
+        self.UserInput_set_focus()
 
     # 退出确认事件方法
     @event_register(event="ExitConfirm")
@@ -105,10 +113,3 @@ class BottomBar(Widget):
         self.exit_confirm_status = False
         self._exit_confirm_timer = None
         self.state_bar.default_event_method()
-    
-    def event_stop(self,event_type:str,event_widget:Widget):
-        event_widget.remove()
-        if event_type == "AskUserQuestion":
-            self.askuserquestion = None
-        self.default_vertical.display = True
-        self.UserInput_set_focus()

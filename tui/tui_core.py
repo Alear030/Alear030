@@ -166,6 +166,8 @@ class Alear030TUI(App,inherit_bindings=False):
             self.copy_to_clipboard(selected)
             return
         
+        #@claude 后续需要对bottom_bar是否存在比如askuserquestion这种进行中事件的判断，不然会将二次确认的state_bar隐藏在事件之下
+
         # 如果没有选取内容，进入确认退出流程
         if not self.bottom_bar.exit_confirm_status:
             self.receive_loop_emit(event="ExitConfirm",content={})

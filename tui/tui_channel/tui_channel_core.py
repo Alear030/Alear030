@@ -52,10 +52,11 @@ class TuiChannel:
         self.channel_type = channel_type
 
         self.body = ChannelBody(channel=self,body_id=f"{agent_name}_CHANNEL_BODY")
-
         self.once_widgets:dict = {}
         self.stream_widgets:dict = {}
         self.tool_widgets:dict = {}# toolcall and toolresult use tool_id to group store
+
+        self.loop_running = False
 
     # 一次性的信息，无需流式处理
     def append_once(self,content_type:str=None,content:dict=None,widget_id:str=None):
@@ -126,6 +127,7 @@ class TuiChannel:
     def start_loop(self,**args):
         if self.body.bottom_widget is not None:
             return
+        self.loop_running = True
         self.body.bottom_widget = tuiwidgets.build_widget(widget_type="BottomThinkTip",widget_content={},widget_id="BottomThinkTip")
         self.body.mount(self.body.bottom_widget)
 
@@ -136,4 +138,4 @@ class TuiChannel:
             return
         self.body.bottom_widget.finalize()
         self.body.bottom_widget = None
-        
+        self.loop_running = False
