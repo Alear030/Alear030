@@ -9,7 +9,7 @@ Alear030 — 从零自研的 Python Agent Harness。核心思想：**Model + Har
 所有命令从仓库根目录执行：
 
 ```bash
-python main.py    # TUI 事件循环；Ctrl+C 触发有序收尾
+python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.py finally 做进程收尾且收尾期间忽略 SIGINT
 ```
 
 依赖根目录 `.env` 中的三级模型配置（`max_level` / `medium_level` / `low_level`），由 `config.py` 读取。当前没有锁文件，不能把 `pip install -e .` 等命令当成可复现的完整安装方案。
@@ -96,7 +96,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
   → call_from_thread 送回 UI 线程 → channel.append_stream → tuiwidgets.build_widget 渲染
 ```
 
-- `rich_output` 计划整体移除，输出集成到 TUI；`rich_print` 入口临时截断中，TUI 也不注册 receiver；新代码不依赖它当消息总线
+- 用户可见 harness 错误走 `Loop.emit(event='SystemError', content={'message':...})`；工具错误走 `_error_result` / `tcr` extra_info，不另开通知总线
 - `tui/tui_widget/` 是 widget 注册体系：`@widget_register` 注册类，`tuiwidgets.build_widget(type, content)` 按类型构造；消息类 widget 首段读 `widget_content`，`update_widget` 整段替换（累积在 loop 侧，不全在 widget）
 - Textual 8 自定义 Widget 不写 `height` 默认填满父容器；消息/条目类 widget 的 css 第一条写 `height: auto`（内置 Static/Markdown 的 DEFAULT_CSS 自带 auto）
 - `App.__init__` 的 `css_path` 是关键字参数（第 1 位置参数是 driver_class）；`set_focus` 传 widget 对象，不传 CSS 选择器字符串

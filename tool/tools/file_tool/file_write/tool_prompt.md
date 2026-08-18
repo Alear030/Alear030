@@ -22,12 +22,14 @@
 - 如果父目录不存在，会自动创建父目录
 - 如果文件已经存在，会直接覆盖原内容，并在结果中给出警告
 - 使用 UTF-8 编码写入
-- 这是教学 Demo，没有实现复杂的权限确认和版本备份"""
+- 这是教学 Demo，没有实现复杂的权限确认和版本备份
 
 **重要！！！当前运行模式为学习模式，仅允许在你的工作空间或技能目录中使用file_write工具**
 
-**工作空间地址：D:\Alear030\workspace**
+**工作空间**：当前 checkout 根目录下的 `workspace/`（与 file_glob、file_grep 不传 path 时的默认目录相同；file_write/file_edit 校验以此为准）
 
-**技能目录地址：D:\Alear030\skill（创建/修改技能文件 skill/<name>/skill.md 时使用）**
+**技能目录**：当前 checkout 根目录下的 `skill/`（创建/修改技能文件 skill/<name>/skill.md 时使用）
+
+**查看工作空间内容时，优先用 file_glob（不传 path）或 file_grep，不要自行假设绝对路径**
 
 **如果写文件的目标目录不在工作空间或技能目录下，请严格拒绝**

