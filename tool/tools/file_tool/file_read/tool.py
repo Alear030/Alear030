@@ -2,6 +2,7 @@ from tool.tool_core import register_tool,tool_call_processing
 from pathlib import Path
 
 MAX_LINES = 2000
+MAX_LINE_CHARS = 2000
 
 tool_desc = '用于读取本地文件，支持行号、offset和limit'
 
@@ -59,10 +60,13 @@ def file_read(file_path:str,offset:int=0,limit:int=2000,**kwargs)->str:
     lines_contents = []
     for i,line in enumerate(lines_selected):
         line_num = offset+i+1
+        # 单行超长(压缩JSON/无换行日志)时MAX_LINES挡不住,这里单独卡字符数兜底
+        if len(line) > MAX_LINE_CHARS:
+            line = line[:MAX_LINE_CHARS] + f'...[该行已截断，原长{len(line)}字符]'
         lines_contents.append(f'{line_num:6}\t{line}')
 
     line_end = offset + selected_line
-    file_header = f'[file_reader]文件：{file_path}\n总行数:{lines_total},显示:{offset+1} - {line_end}'
+    file_header = f'[file_read]文件：{file_path}\n总行数:{lines_total},显示:{offset+1} - {line_end}'
 
     # 追加而非覆盖:覆盖会丢掉文件路径/总行数/当前范围,agent 就不知道该用哪个 offset 接着读
     if limit == MAX_LINES and selected_line == MAX_LINES:
