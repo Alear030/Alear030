@@ -96,7 +96,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
 
     if not safe:
         return (
-            f"[command_runner] ❌ 安全验证未通过\n"
+            f"[command] ❌ 安全验证未通过\n"
             f"命令: {command}\n"
             f"类别: {category}\n"
             f"原因: {reason}\n"
@@ -106,7 +106,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
 
     if is_destructive_category(category):
         return (
-            f"[command_runner] ❌ 拒绝执行破坏性操作\n"
+            f"[command] ❌ 拒绝执行破坏性操作\n"
             f"命令: {command}\n"
             f"类别: {category}\n"
             f"原因: {reason}\n"
@@ -114,7 +114,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
         )
 
     if timeout <= 0:
-        return f"[command_runner] 错误: timeout 必须大于 0，收到: {timeout}"
+        return f"[command] 错误: timeout 必须大于 0，收到: {timeout}"
     # 钳制不再静默：否则模型会以为自己设的值生效了
     timeout_notice = ''
     if timeout > MAX_TIMEOUT:
@@ -126,7 +126,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
         cwd_path = Path(cwd)
         if not cwd_path.is_dir():
             return (
-                f"[command_runner] 错误: cwd 不是一个存在的目录\n"
+                f"[command] 错误: cwd 不是一个存在的目录\n"
                 f"cwd: {cwd}"
             )
         cwd = str(cwd_path)
@@ -142,7 +142,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
         )
     except Exception as e:
         return (
-            f"[command_runner] ❌ 命令执行异常\n"
+            f"[command] ❌ 命令执行异常\n"
             f"命令: {command}\n"
             f"错误: {type(e).__name__}: {e}"
         )
@@ -152,14 +152,14 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
     except subprocess.TimeoutExpired:
         _kill_tree(proc)
         return (
-            f"[command_runner] ⏰ 命令超时\n"
+            f"[command] ⏰ 命令超时\n"
             f"命令: {command}\n"
             f"超时时间: {timeout} 秒（子进程树已清理）{timeout_notice}"
         )
     except Exception as e:
         _kill_tree(proc)
         return (
-            f"[command_runner] ❌ 命令执行异常\n"
+            f"[command] ❌ 命令执行异常\n"
             f"命令: {command}\n"
             f"错误: {type(e).__name__}: {e}"
         )
@@ -177,7 +177,7 @@ def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
         warning_line = f"\n⚠️ 警告: {destructive_warning}"
 
     output = (
-        f"[command_runner] 命令执行完成 [{category_label}]{warning_line}{timeout_notice}\n"
+        f"[command] 命令执行完成 [{category_label}]{warning_line}{timeout_notice}\n"
         f"命令: {command}\n"
         f"{cwd_line}"
         f"退出码: {exit_code}\n"

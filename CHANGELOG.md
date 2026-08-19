@@ -131,7 +131,7 @@
 - [迭代] `pyproject.toml` 补全 `description` 及此前一直缺失的 10 个运行时依赖声明（openai/pyyaml/tiktoken/rich/sentence-transformers/ddgs/requests/beautifulsoup4/numpy/python-dotenv）
 - [清理] README 修正与代码漂移的多处描述：agents.yaml 4→5 个 agent（补 memory）、prompt 分块 6→9 块（补 memory_prompt/timeline_prompt/attachment_prompt）、hook 目录树按 hook point 重排、tool 列表补 skill_finish/interaction 并删已废弃的 user_intention 引用、memory 模块描述从「开发中空白骨架」更正为「分类/去重/画像/时间线主线已跑通」；运行章节补 `git clone`→`pip install`→`cp .env.example .env` 完整上手流程
 - [重构] `user_intention` 工具：删调试 print、修拼写错误变量名（masseges→messages、rounter→router），配置读取从 `.env` 里并不存在的 `main_BASE_URL` 等废弃键改为对齐项目统一的 `config.MODEL_LEVEL` 模式（工具本身仍保持 disabled）
-- [清理] 移除两处死代码（memory_pipeline hook 里注释掉的测试短路 `return`、session_core 里被 print 替代后遗留的 rich_print 死注释）及 `memory_core.py` 一处写死的本机绝对路径注释；`security.py` 移除对 Claude Code 源码文件路径/行数的具体归属描述，只保留通用设计模型说明；`.gitignore`/CLAUDE.md 补充 `.cc_file/` 目录约定
+- [清理] 移除两处死代码（memory_pipeline hook 里注释掉的测试短路 `return`、session_core 里被 print 替代后遗留的 rich_print 死注释）及 `memory_core.py` 一处写死的本机绝对路径注释；`security.py` 清理内部研究注释，只保留通用设计模型说明；`.gitignore`/CLAUDE.md 补充 `.cc_file/` 目录约定
 
 对应提交：`3749de5`(开源前收尾)
 

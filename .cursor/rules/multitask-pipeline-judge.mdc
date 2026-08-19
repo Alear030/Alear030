@@ -1,0 +1,11 @@
+---
+description: 较大改动自行判断启用 Multitask 满配或轻量；细节见 skill
+alwaysApply: true
+---
+
+# Multitask 流水线（自行判断）
+
+- 较大/跨模块/机制路径改动：优先 `$alear030-multitask-pipeline`（plan→拍板→executor→style∥review）
+- 小改（错字、入口 return、单点注释）：轻量 executor+轻 review，不上满配
+- 主对话协调者自行判断；用户也可显式要求
+- 细节以 skill 为准，勿复述全文

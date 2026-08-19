@@ -1,4 +1,4 @@
-## command_runner 工具
+## command 工具
 
 用途: 在本地 shell 中执行命令，并返回退出码、标准输出 stdout 和标准错误 stderr。
 

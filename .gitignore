@@ -39,10 +39,13 @@ memory/memory_log/memory_logs/
 # memory config 备份(运行时快照,不进版本控制)
 memory/memory_config/backup/
 
-# Claude Code 本地配置与协作契约(.claude/ 含技能本体与本地配置,不上传;CLAUDE.md 已纳入版本控制)
-.claude/
+# 本地 IDE 与协作配置。CLAUDE.md、.cursor/rules/ 与 .claude/skills/ 已纳入版本控制
+# ——它们记录这个项目实际是怎么被开发的,不含本机信息。默认忽略 .claude/ 下其余内容,
+# 只显式放行 skills/:settings.local.json 含本机绝对路径,worktrees/ 是完整 checkout。
+.claude/*
+!.claude/skills/
+!.claude/settings.local.json.example
 .agents/
-.cursor/
 .vscode/
 
 # 准用于claudecode产出代码的文件夹

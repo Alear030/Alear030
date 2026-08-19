@@ -48,7 +48,7 @@ def file_write(file_path:str,content:str,**kwargs)->str:
 
     tool_result = f'[file_write] {status}文件:{file_path}\n写入字符数:{char_count}'
     if path_exist:
-        tool_result = f"[file_writer] 警告: 文件已存在，已覆盖原内容\n路径: {file_path}\n写入字符数: {char_count}"
+        tool_result = f"[file_write] 警告: 文件已存在，已覆盖原内容\n路径: {file_path}\n写入字符数: {char_count}"
 
     return tool_result
 

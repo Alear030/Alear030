@@ -7,6 +7,7 @@ from agent import agents
 from loop import Loop
 from memory import Memory
 from local_model import prewarm_embedding_model, shutdown_embedding_worker
+from config import MEMORY_PIPELINE_ENABLED
 from mcp_client import prewarm_mcp_servers, shutdown_mcp_servers
 from tui import Alear030TUI
 
@@ -18,8 +19,9 @@ prewarm_embedding_model()
 prewarm_mcp_servers(agents=agents)
 
 # 创建新的memory：独立 Loop 静音 thinking 打印，避免后台 pipeline 干扰终端输出
-# pipeline_enabled=False：切片摘要照跑，memory 分类/user_info/task 落盘短路（入库总闸收拢在 memory 实例）
-memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False),pipeline_enabled=False)
+# 管线总闸收拢在 memory 实例,开关值由 config.MEMORY_PIPELINE_ENABLED 提供。
+# 注意判空在 _session_slice() 之前:关闭时切片摘要也一并短路,不只是不落盘
+memory = Memory(memory_agent=agents.agents['memory'],loop=Loop(verbose=False),pipeline_enabled=MEMORY_PIPELINE_ENABLED)
 
 # 创建新的session
 session = Session(

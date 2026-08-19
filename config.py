@@ -62,6 +62,12 @@ MAX_SESSION_TOKEN = 250000
 
 
 # memory config
+# 跨会话记忆管线的总闸。默认关闭——注意它关掉的不只是"入库":
+# memory_pipeline hook 的判空在 session._session_slice() 之前,所以关闭时
+# 切片、摘要、slice 分类、user_info 画像、task 节点、timeline 全都不会发生。
+# 想体验完整的记忆能力就改成 True(会对每轮对话额外产生若干次模型调用)。
+MEMORY_PIPELINE_ENABLED = False
+
 MEMORY_STORAGE_PATH = Path(__file__).parent/'memory'/'memory_storage'/'memory_storages'
 
 

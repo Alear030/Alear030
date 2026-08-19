@@ -1,0 +1,28 @@
+---
+description: Temporary disable must preserve implementation; never delete body for a gate
+alwaysApply: true
+---
+
+# 临时截断 ≠ 删除实现
+
+当用户要求「最小化截断 / 临时禁用 / 先关掉 / 入口 return」时：
+
+- **只允许**在入口加 `return`、early-return guard、`if disabled: return`，或等价开关。
+- **禁止**删除、清空、或重写成空函数体来达到“不执行”的效果。
+- **禁止**以“反正以后要删整个模块”为借口，先砍掉现有实现。
+- 原逻辑、分支、注释必须原样保留在 guard 之后（即使暂时不可达）。
+- 若计划说“入口 return”，落盘 diff 必须能一眼看出：**新增的只有 guard 行**，不是整段删除。
+
+```python
+# ❌ BAD — 用删实现代替截断
+def rich_print(message: str, type: str = None):
+    return
+
+# ✅ GOOD — 只加入口，保留原实现
+def rich_print(message: str, type: str = None):
+    return  # temporary cutoff
+    message = message if message else ''
+    # ... 原有全部逻辑保持不动 ...
+```
+
+自检：写完后问自己「用户若去掉这一行 return，原功能能否原样恢复？」不能则改错了。

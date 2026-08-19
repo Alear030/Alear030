@@ -27,6 +27,8 @@
 import re
 import os
 from dataclasses import dataclass, field
+import threading
+
 from typing import Optional, Callable
 
 # ============================================================
@@ -833,11 +835,30 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
     "ln": CommandConfig(name="ln", category="write", safe_flags={"-s": "none", "-f": "none", "-n": "none", "-v": "none", "--help": "none"}),
 
     # ═══════════════════════════════════════════════════════
-    #  故意不在白名单的危险命令（永远拒绝）:
-    #  rm, del, format, shutdown, reboot, poweroff,
-    #  diskpart, bcdedit, reg, icacls, takeown,
-    #  dd, mkfs, chown, sudo, su, passwd,
-    #  kill, killall, pkill, bash, sh, zsh
+    #  删除 / 进程 / 系统状态
+    # ═══════════════════════════════════════════════════════
+    # 这几条此前既不在白名单也不在硬拒表，闸门翻转后一路走 unknown 分支放行。
+    # 登记进来不是为了卡 flag（未登记 flag 本来就不拒），而是为了让类别如实反映
+    # 它们在写：category=write 才会真正参与 _check_dangerous_paths 的路径校验。
+    # 递归删除仍由 BLOCKING_PATTERNS 的 rm -r / rm -f / del /s 拦在更前面。
+    "rm": CommandConfig(name="rm", category="write", safe_flags={"-v": "none", "-i": "none", "-I": "none", "-d": "none", "--help": "none"}),
+    "del": CommandConfig(name="del", category="write", safe_flags={"/P": "none", "/A": "string", "/F": "none"}),
+    "erase": CommandConfig(name="erase", category="write", safe_flags={"/P": "none", "/A": "string", "/F": "none"}),
+    # 杀进程可逆、且是排障常用操作，硬拒会重演 netstat -ano 那类误伤，按 write 放行
+    "kill": CommandConfig(name="kill", category="write", safe_flags={"-9": "none", "-15": "none", "-l": "none", "-s": "string", "--help": "none"}),
+    "killall": CommandConfig(name="killall", category="write", safe_flags={"-9": "none", "-i": "none", "-v": "none", "-s": "string", "--help": "none"}),
+    "pkill": CommandConfig(name="pkill", category="write", safe_flags={"-9": "none", "-f": "none", "-u": "string", "--help": "none"}),
+    "taskkill": CommandConfig(name="taskkill", category="write", safe_flags={"/PID": "number", "/IM": "string", "/F": "none", "/T": "none"}),
+
+    # reg 与 icacls 不整条拒：reg query 是常用诊断，icacls <path> 只是查看 ACL。
+    # 按动词/开关判定，只拦真正写注册表或改权限的形式（与 wmic 同一套做法）。
+    "reg": CommandConfig(name="reg", category="read", additional_check=lambda cmd, args: _check_reg_safe(cmd, args)),
+    "icacls": CommandConfig(name="icacls", category="read", additional_check=lambda cmd, args: _check_icacls_safe(cmd, args)),
+
+    # ═══════════════════════════════════════════════════════
+    #  不在这张表里的命令会被标 unknown 并照常放行——本表是分类表，不是准入名单。
+    #  真正的拦截在 DESTRUCTIVE_COMMANDS 与 BLOCKING_PATTERNS；
+    #  解释器的 -c/-e 载荷由 _check_interpreter_payload 递归过闸。
     # ═══════════════════════════════════════════════════════
 }
 
@@ -921,6 +942,9 @@ DESTRUCTIVE_COMMANDS = {
     "shutdown", "reboot", "halt", "poweroff",
     # 提权
     "sudo", "su", "runas",
+    # 改账户与属主：Windows 下基本用不到，POSIX 下需要特权，
+    # 误伤面极小而后果不可逆，直接硬拒
+    "chown", "chgrp", "passwd",
 }
 
 BLOCKING_PATTERNS = [
@@ -1368,6 +1392,104 @@ def _check_destructive(command: str) -> Optional[str]:
 _SEVERITY = {"read": 0, "neutral": 1, "unknown": 2, "write": 3, "destructive": 4}
 
 
+# ============================================================
+#  解释器载荷：命令的命令
+# ============================================================
+# bash -c "rm -rf x" 与 rm -rf x 是同一个操作，但前者此前完全不过检——
+# bash 既不在分类表也不在硬拒表，走 unknown 放行，而 -c 后面整条命令
+# 只是这个未知命令的一个参数 token，没有任何一层会去看它。
+# BLOCKING_PATTERNS 只拦了管道形式 | bash，没拦直接调用形式。
+# 威胁模型是"防模型手滑"，而模型在"清理一下 build 目录"这种任务里
+# 就会自然写出 bash -c "rm -rf build"，闸门对直接形式拦、对包装形式放，
+# 恰好背离了自己的目的。故把载荷取出来当普通命令再过一遍完整闸门。
+INTERPRETER_PAYLOAD_FLAGS: dict[str, tuple[str, ...]] = {
+    "bash": ("-c",), "sh": ("-c",), "zsh": ("-c",), "ksh": ("-c",), "dash": ("-c",),
+    "python": ("-c",), "python3": ("-c",), "py": ("-c",),
+    "node": ("-e", "--eval", "-p", "--print"),
+    "perl": ("-e",), "ruby": ("-e",),
+    "powershell": ("-command", "-c", "-encodedcommand", "-e", "-ec"),
+    "pwsh": ("-command", "-c", "-encodedcommand", "-e", "-ec"),
+}
+
+# base64 载荷没法静态校验,只能整条拒——正常用途也不会用它
+_OPAQUE_PAYLOAD_FLAGS = {"-encodedcommand", "-ec"}
+
+# 内层再套一层解释器直接拒。正常用途不会有两层,而放开递归深度
+# 等于给"多包几层就能绕过"留了口子
+_MAX_NEST_DEPTH = 1
+_nest_state = threading.local()
+
+
+def _check_nested_command(inner: str, flag: str) -> Optional[str]:
+    """把 -c/-e 的取值当成一条普通命令重新过闸,内层被拒则整条拒。"""
+    inner = _strip_quotes(inner).strip()
+    if not inner:
+        return None
+
+    depth = getattr(_nest_state, "depth", 0)
+    if depth >= _MAX_NEST_DEPTH:
+        return f"{flag} 的内层命令又嵌套了一层解释器调用,不予放行"
+
+    _nest_state.depth = depth + 1
+    try:
+        ok, err, _category, _warning = validate_command(inner)
+    finally:
+        _nest_state.depth = depth
+
+    if not ok:
+        return f"{flag} 的内层命令未通过校验: {err}"
+    return None
+
+
+def _check_interpreter_payload(base_cmd: str, args: list[str]) -> Optional[str]:
+    """解释器的 -c/-e 载荷递归过闸。不是解释器则直接放过。"""
+    flags = INTERPRETER_PAYLOAD_FLAGS.get(base_cmd)
+    if not flags:
+        return None
+
+    for index, arg in enumerate(args):
+        low = _strip_quotes(arg).lower()
+        # 取值可能跟在同一个 token 里（-c="..."）,也可能是下一个 token
+        name, sep, inline = low.partition("=")
+        if name not in flags:
+            continue
+        if name in _OPAQUE_PAYLOAD_FLAGS:
+            return f"{name} 的载荷是 base64 编码,无法校验其内容,不予放行"
+        if sep:
+            return _check_nested_command(arg.partition("=")[2], name)
+        if index + 1 < len(args):
+            return _check_nested_command(args[index + 1], name)
+        return None
+    return None
+
+
+def _check_reg_safe(cmd: str, args: list[str]) -> Optional[str]:
+    """reg 按动词判定:query/export 是读,其余会写注册表。"""
+    READ_VERBS = {"query", "export", "compare"}
+    for arg in args:
+        low = _strip_quotes(arg).lower()
+        if low.startswith("/") or low.startswith("-"):
+            continue
+        if low in READ_VERBS:
+            return None
+        return f"reg 动词 '{low}' 会修改注册表,只允许 query / export / compare"
+    return "reg 必须带 query / export / compare 动词,否则无法确认它只是在读取"
+
+
+def _check_icacls_safe(cmd: str, args: list[str]) -> Optional[str]:
+    """icacls 不带开关时只是查看 ACL;带下列开关才是改权限。"""
+    DENY_SWITCHES = {
+        "/grant", "/deny", "/remove", "/setowner", "/setintegritylevel",
+        "/reset", "/inheritance", "/substitute", "/restore",
+    }
+    for arg in args:
+        low = _strip_quotes(arg).lower()
+        head = low.split(":", 1)[0]
+        if head in DENY_SWITCHES:
+            return f"icacls {head} 会修改文件访问权限或属主,不予放行"
+    return None
+
+
 def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
     """对单条子命令跑完整校验，返回 (是否安全, 错误信息, 类别)"""
     tokens, redirect_targets = _extract_redirects(tokens)
@@ -1387,6 +1509,12 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
     # 第1层: 不可逆命令硬拒
     if base_cmd in DESTRUCTIVE_COMMANDS:
         return (False, f"命令 '{base_cmd}' 属于不可逆的破坏性操作", "destructive")
+
+    # 第1.5层: 解释器载荷。必须在分类之前——bash/sh 根本不在分类表里,
+    # 放到 config 查表之后就永远轮不到它们
+    nested_err = _check_interpreter_payload(base_cmd, args)
+    if nested_err:
+        return (False, nested_err, "destructive")
 
     # 第2层: 分类。命中白名单沿用其类别；未命中标 unknown 但照常放行——
     # 闸门已翻转，白名单从"准入条件"降级为"分类表"

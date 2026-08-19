@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Alear030 — 从零自研的 Python Agent Harness。核心思想：**Model + Harness = Agent**。处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
+Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型之外的编排、状态与记忆全部自己实现**。处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
 
 ## 运行与验证
 
@@ -42,7 +42,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 - 同一问题纠正超过两次 → 停下重开，换根本思路或把已知信息重写成更清楚的需求，不继续叠补丁
 - 模糊提问是合法且鼓励的；开放问题用于共创，不要求用户每次先给出成型需求
 
-**机制改动的文档对账**：对机制、触发点、数据流或 `config.py` 常量做改动时，进 CHANGELOG 前顺带核对 CLAUDE.md 的「稳定模块地图」「核心运行数据流」「架构核心」相关段，漂移则同次修正；CLAUDE.md 的架构事实以代码为准。
+**机制改动的文档对账**：对机制、触发点、数据流或 `config.py` 常量做改动时，进 CHANGELOG 前顺带核对两处，漂移则同次修正——CLAUDE.md 的「稳定模块地图」「核心运行数据流」「架构核心」相关段，以及 `docs/` 下的三份对外文档（`ARCHITECTURE.md` / `CONFIGURATION.md` / `EXTENDING.md`）。`docs/` 是对外架构事实的权威源，CLAUDE.md 只承载协作时必须立刻知道的约束，两者受众不同、不互为副本；最终架构事实一律以代码为准。
 
 **代码里的 `@claude` 任务标记**：
 
@@ -91,7 +91,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 **事件流**：loop 边跑边发流式事件 → TUI 按 agent_name 找 channel → `append_stream` → `build_widget` 渲染。
 
 ```text
-loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 时传入 loop)
+loop.emit (Alear030TUI.__init__ 里 self.loop.emit = self.receive_loop_emit；main.py 构造 TUI 时传入 loop)
   → tui 按 agent_name 找 TuiChannel（subagent 已写入 agents 供按名路由铺路；本版 channel 仅登记 main）
   → call_from_thread 送回 UI 线程 → channel.append_stream → tuiwidgets.build_widget 渲染
 ```
@@ -115,7 +115,7 @@ loop.emit_stream (Alear030TUI.__init__ 挂 tui.emit_stream；main.py 构造 TUI 
   → Memory(memory agent, 独立 Loop())
   → Session(slice_agent, summary_agent, main system prompt)
   → 主 Loop(agents, session, hooks)
-  → Alear030TUI 装配（loop.emit_stream 挂 tui）
+  → Alear030TUI 装配（TUI 把 receive_loop_emit 挂到 loop.emit）
   → trigger('before_session')
   -> 进入 TUI 事件循环（Textual）
 

@@ -1,123 +1,139 @@
-# Alear030 — 从零自研的 Agent Harness
+<div align="center">
 
-**Model + Harness = Agent**
+<img src="assets/logo.png" alt="Alear030" width="170" />
 
-> 个人自研的实验性项目，单人维护，API 可能变动。中文优先：system prompt、agent 身份、memory prompt 均为中文，嵌入模型为中文 GTE。仅在 Windows 上实测过。
+# Alear030
 
-Alear030 不是一个"Python Agent 框架"，它是一个完整的 Agent 基础设施（Harness）——处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
+工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
+[![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
+
+[架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/MEMORY.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [CHANGELOG](CHANGELOG.md)
+
+**中文** · [English](README.en.md)
+
+</div>
 
 ---
 
-## 架构概览
+## 定位
 
+Alear030 不是一个「Python Agent 框架」，是一套完整的 Agent 基础设施（Harness）。模型负责推理，工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回全部由我在这个仓库里从零写出来，不包装任何现成框架。
+
+> **我自己在做的实验性项目，单人维护，API 可能变动。**
+> 中文优先：system prompt、agent 身份、memory prompt 均为中文，嵌入模型为中文 GTE。
+> 仅在 Windows 上开发与实测；Linux / macOS 未验证，没有已知的硬性阻断，但不作保证。
+
+---
+
+## 演示
+
+<div align="center">
+<img src="assets/screenshot.png" alt="Alear030 TUI" width="860" />
+</div>
+
+---
+
+## 特性
+
+- **纯 ReAct 引擎** —— `Loop` 对 plan 编排零感知，main 与运行时临时 subagent 共用同一份实现
+- **Multi-Agent 集群** —— 5 个常驻 Agent，身份、模型等级与工具授权由 YAML 驱动；可在运行时按任务临时构造 subagent
+- **会话切片 + 本地嵌入召回** —— LLM 切话题边界，本地中文 GTE 算向量，不依赖任何外部向量库
+- **跨会话记忆** —— 后台管线做切片分类、去重、用户画像提炼与跨会话时间线
+- **事件驱动 Hook** —— 4 个事件点，同步/后台两种模式，新增 Hook 只需在对应目录建一个 `hook.py`
+- **工具零样板注册** —— `@register_tool` + `inspect.signature` 自动生成 function-calling schema
+- **MCP 客户端** —— stdio 与 Streamable HTTP 双传输，远端工具在 server 连上后运行时注册进工具表
+- **Textual TUI** —— 流式渲染 thinking / tool call / 回复，按 agent 分 channel
+
+---
+
+## 快速开始
+
+```bash
+git clone https://github.com/Alear030/Alear030.git
+cd Alear030
+
+pip install -e .   # 直接依赖已钉死，但无锁文件，传递依赖可能漂移
+
+cp .env.example .env
+# 编辑 .env —— 只需填 MAX / MEDIUM / LOW_LEVEL 三级模型配置
+# 三级可以指向同一服务商，仅 model_name 不同
+# 模型必须支持 function calling（tools），否则 main 与 plan 跑不起来
+
+python main.py
 ```
-Alear030/
-├── main.py                     # 入口：装配 Session/Loop/Memory、MCP 预热后进入 TUI
-├── config.py                   # 集中配置（MODEL_LEVEL / 路径 / 常量）
-├── __init__.py                 # 导出常量
-├── pyproject.toml              # 项目元数据
-├── .env                        # API key & 模型配置（不纳入版本控制）
-│
-├── loop/                       # ReAct 推理循环
-│   ├── loop_core.py            # Loop 类 — 纯 ReAct 引擎（main/subagent 共用，对 plan 编排零感知）
-│   ├── orchestrator.py         # PlanRunner — plan 分步编排器，独立于 Loop（无进展熔断）
-│   └── __init__.py
-│
-├── agent/                      # Agent 集群
-│   ├── agent_core.py           # Agent 类 + Agents 容器（YAML 驱动）
-│   ├── agents.yaml             # 5 个 Agent 定义：main/slice/summary/plan/memory
-│   └── __init__.py
-│
-├── prompt/                     # Prompt 分层组合（装饰器 + 目录自动发现注册，对齐 tool/hook 惯例）
-│   ├── prompt_core.py          # Prompt 类：薄封装，调用 build_prompt(agent)
-│   ├── prompt_register.py      # @register_prompt 装饰器 + build_prompt（order 排序/condition 过滤/enabled 开关）
-│   ├── __init__.py             # 自动发现并 import prompt/prompts/*/prompt.py
-│   └── prompts/                # 各分块独立注册
-│       ├── system_prompt/      # 认知架构（仅 main agent 注入）
-│       ├── agent_prompt/       # {agent_name}_agent.md 身份（main/slice/summary/plan；memory 走 memory_prompts 不走此路）
-│       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（动态记忆，仅 main）
-│       ├── memory_prompt/      # 用户画像注入（读 user.json，动态记忆，仅 main）
-│       ├── timeline_prompt/    # 跨会话时间线（读 timeline.json，近/远分层渲染，仅 main）
-│       ├── attachment_prompt/  # 运行时通知/中断处理协议声明（仅 main）
-│       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name+简短描述
-│       ├── skill_prompt/       # 技能使用原则 + 已注册技能列表（仅 skill_tool 权限）
-│       └── basic_prompt/       # 当前时间戳
-│
-├── session/                    # 会话生命周期
-│   ├── session_core.py         # Session 类（持久化 / 切片 / 压缩 / message_list 重建 / plan 初始化）
-│   ├── attachment_core.py      # 运行时通知/中断的纯内存态实现（attachment_prompt 的对应实体）
-│   ├── session_plan.py         # Plan / Plan_step 类（读取/刷新 plan 状态）
-│   ├── __init__.py
-│   ├── session_detail/         # 每个会话的完整 JSON（切片 + 消息流，不纳入版本控制）
-│   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
-│
-├── hook/                       # 事件驱动 Hook 系统
-│   ├── hook_core.py            # HookManager：注册 / 触发 / 匹配 / 异步
-│   ├── __init__.py             # 自动发现 hook/hooks/*/
-│   └── hooks/                  # 按 hook point 分层，递归发现 **/hook.py
-│       ├── __init__.py
-│       ├── pre_toolUse/
-│       │   └── inject_import_args/  # 无条件注入，给全部工具塞 agents/session/hooks/Loop/memory
-│       ├── after_round/
-│       │   ├── memory_pipeline/     # 后台：切片 + 摘要，把 worthy slice 交给 Memory
-│       │   └── session_compress/    # 同步：Token 超限时压缩
-│       └── after_session/
-│           ├── final_memory_pipeline/ # 后台：会话退出时处理最终定型尾片
-│           └── session_timeline/      # 后台：把 worthy slice 提炼成跨会话时间线事件
-│
-├── tool/                       # 工具系统
-│   ├── tool_core.py            # 工具注册 / 匹配 / match_tool
-│   ├── __init__.py             # 自动发现 tool/tools/*/
-│   └── tools/
-│       ├── __init__.py
-│       ├── command/            # 命令行执行（8 层安全检查白名单 + security.py）
-│       ├── file_tool/          # 文件读写工具集群
-│       │   ├── file_read/      # 文件读取（带行号）
-│       │   ├── file_write/     # 文件写入/新建（workspace 隔离，整体覆盖）
-│       │   ├── file_edit/      # 文件局部编辑（唯一字符串替换，不覆盖全文件）
-│       │   ├── file_glob/      # 按文件名 glob 模式查找文件
-│       │   └── file_grep/      # 按正则表达式搜索文件内容
-│       ├── web_search/         # DuckDuckGo 搜索
-│       ├── web_fetch/          # 网页内容抓取
-│       ├── memory_recall/      # 语义搜索历史会话切片
-│       ├── session_slice/      # 读取特定会话原文
-│       ├── plan_tool/          # plan 工具集群（调用 Loop 跑 plan_agent）
-│       │   ├── plan_design/    # 创建/修改分步计划
-│       │   ├── plan_update/    # 更新指定 step 的状态和结果
-│       │   ├── plan_mode_on/   # 激活 plan 执行模式
-│       │   └── plan_mode_off/  # 结束 plan 执行模式
-│       ├── subagent_tool/      # 并行子 agent 集群（仅只读工具权限）
-│       │   └── subagent_create/# 并行创建并运行多个 subagent
-│       ├── skill_tool/         # 技能工具集群
-│       │   ├── skill_list/     # 扫描磁盘技能列表（当前禁用）
-│       │   ├── skill_load/     # 按目录名加载 skill.md 正文
-│       │   └── skill_finish/   # 技能创建收尾：确认后回写 skill_info
-│       ├── user_intention/     # 用户意图识别（当前禁用）
-│       └── interaction/        # 用户交互：反向提问 / 澄清
-│           └── askUserQuestion/   # ask_user_question 工具实现
-│
-├── local_model/                # 本地中文嵌入模型（GTE）：权重不纳入版本控制，首次运行自动从 ModelScope 下载（约 195MB）
-│
-├── memory/                     # 跨会话记忆系统：slice 分类 / 去重 / user_info 画像提炼 / 时间线生成
-│   ├── memory_core.py          # 主线：分类、按 (session_id,start,end) 去重、slice_node 入库、画像更新
-│   ├── memory_storage/         # 派生记忆存储（嵌套 memory_storages/：slice_node / user / timeline / advanced_task_node，运行时更新）
-│   ├── memory_config/          # 画像维度模板等运行时配置
-│   ├── memory_prompt/          # memory agent 的 system prompt 来源（prompts/ 下按 type 分文件）
-│   └── memory_log/             # 失败诊断与评估日志（agent 输出默认不落盘，见 LOG_AGENT_RESPONSE）
-│
-├── skill/                      # 技能系统
-│   ├── coding-conduct/
-│   ├── competitive-analysis/   # 竞品分析技能
-│   ├── create-skill/
-│   └── memory-recall-systematic-test/
-│
-├── tui/                        # TUI：channel 路由 + widget 注册
-│
-├── mcp_client/                 # MCP 客户端：mcp.json + supervisor + 运行时注册工具
-│
-└── workspace/                  # 工作区（不参与项目代码）
+
+首次运行时，本地嵌入模型权重（约 195MB）会自动从 ModelScope 下载到 `local_model/`。需要联网，仅首次需要，之后离线可用。这一步与 `MEMORY_PIPELINE_ENABLED` 无关——预热在总闸判断之前执行，记忆管线关着也照样下载。
+
+需要接 MCP server、调整运行常量或了解全部配置项，见 **[配置说明](docs/CONFIGURATION.md)**。
+
+---
+
+## 架构
+
+一次用户输入的完整流转：
+
+```mermaid
+flowchart TB
+    U([用户输入]) --> TUI[TUI channel]
+    TUI --> LOOP{{ReAct Loop}}
+    LOOP <--> AG[Agent 集群<br/>main · plan · slice · summary · memory]
+    LOOP --> PR[PlanRunner<br/>plan 模式分步编排]
+    LOOP --> TL[工具编排]
+    TL -. pre_toolUse .-> INJ[注入运行时对象]
+    TL --> MCP[MCP 远端工具]
+    LOOP --> SE[(Session<br/>消息 · 切片 · 摘要)]
+    SE -. after_round .-> H1[memory_pipeline<br/>session_compress]
+    SE -. after_session .-> H2[final_memory_pipeline<br/>session_timeline]
+    H1 --> MEM[Memory 管线<br/>分类 · 去重 · 画像]
+    H2 --> MEM
+    MEM --> ST[(slice_node · user.json<br/>timeline.json)]
+    ST -. 启动快照 .-> AG
+    LOOP -->|流式事件| TUI
 ```
+
+完整目录树、启动与退出流程、各模块职责见 **[架构文档](docs/ARCHITECTURE.md)**。
+
+---
+
+## 记忆系统
+
+这是我投入最重的一块，也是 Alear030 和「ReAct + 工具调用」类项目的主要区别。整条链路我自己实现，**不依赖任何外部向量数据库**。
+
+它检索的不是资料，是**它自己经历过的对话片段**——由 LLM 判断话题边界切出来的「一件事」，带主题、关键词、摘要和向量。所以最小单元不是「一段文本」，而是「一段有起止轮次坐标的经历」。
+
+```mermaid
+flowchart LR
+    M[对话消息] --> S[切片<br/>LLM 判话题边界]
+    S --> SM[摘要<br/>并发生成]
+    SM --> EM[本地 GTE<br/>算向量]
+    EM --> SL[(session_slice<br/>事实源)]
+    SL --> CL[分类 · 坐标去重]
+    CL --> ND[(slice_node)]
+    ND --> UI[画像提炼]
+    ND --> TK[task 归并<br/>skill 候选]
+    SL --> TL[会话结束<br/>提炼时间线]
+    UI --> UJ[(user.json)]
+    TL --> TJ[(timeline.json)]
+    UJ -. 启动注入 .-> P[main 的 system prompt]
+    TJ -. 启动注入 .-> P
+    SL -. 语义召回 .-> R[memory_recall 工具]
+```
+
+几个不显然的地方：
+
+- **尾片是「未封口的临时尾巴」** —— 切片指针取最后一片的起始轮次，每轮把那之后的消息整体重喂，让新轮次有机会并进同一片，而不是每来一轮就封一片
+- **不信任模型回显的轮次号** —— 模型常把重喂窗口当成从 1 开始的新对话重新编号，用「窗口真实起点 − 模型首片起点」的偏移整体平移回去，而不是校验不符就丢弃
+- **三段式锁** —— 锁内读快照、锁外跑 LLM 与 embedding、锁内短写，慢计算不占锁，否则用户下一句输入要等整轮切片跑完才能落盘
+- **两层去重** —— 锁外乐观去重省掉分类的模型调用，锁内二次去重保证并发正确性；去重键是 `(session_id, start_round, end_round)` 坐标而非内容哈希
+
+> ⚠️ **默认是关闭的。** `config.py` 的 `MEMORY_PIPELINE_ENABLED` 默认 `False`，而且它关掉的不只是入库——判空在切片之前，所以切片摘要也一并不跑。改成 `True` 才能体验上述能力。
+
+完整数据流、各产物的定义与消费者、以及**如实列出的已知限制**，见 **[记忆系统文档](docs/MEMORY.md)**。
+
+我**为什么把它做成这样**，写在 **[记忆的想法&构思](docs/MEMORY-DESIGN.md)**。
 
 ---
 
@@ -125,44 +141,41 @@ Alear030/
 
 ### 1. Multi-Agent 集群，而非单 Agent 函数调用
 
-5 个 Agent 各有独立身份与工具授权。模型等级分两档：main/slice/summary/plan 用 medium_level，memory 用 low_level。工具授权分化明显：main 全开（13 类工具，含 config/interaction/mcp_tool）、slice 与 summary 全关、plan 开放 basic/file_read/memory/subagent/web/skill/mcp_tool、memory 只开 memory_tool。以上 5 个 Agent 定义在 `agents.yaml`（main/slice/summary/plan/memory）。不是 main 的函数——共享记忆空间，独立推理。
+5 个常驻 Agent 各有独立身份与工具授权，定义在 `agent/agents.yaml`。它们不是 main 的函数——共享记忆空间，独立推理。main 全开，plan 拿到 basic/file_read/memory/subagent/web/skill/mcp，memory 只开 memory_tool，slice 与 summary 全关。
 
 ### 2. 会话切片 + 嵌入召回，而非 RAG
 
-每轮对话 LLM 切话题边界 → 本地 GTE 模型算嵌入 → 余弦相似度搜索。不是"搜文档"，是"唤起经历"。定型切片再经后台 Memory 管线分类、去重、提炼用户画像与跨会话时间线。
+每轮对话由 LLM 切话题边界 → 本地 GTE 算嵌入 → 余弦相似度搜索。不是「搜文档」，是「唤起经历」。定型切片再经后台管线分类、去重、提炼画像与时间线。
 
 ### 3. 事件驱动 Hook 系统
 
-Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需在对应 hook point 下新建 `hook.py`。当前注册 5 个：`pre_toolUse` 的 `inject_import_args`（给全部工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配）；`after_round` 的 `memory_pipeline`（后台切片摘要，hook 当前 enabled=True；入库闸是 `memory.pipeline_enabled`，`main.py` 当前传入 False，切片与摘要也不跑）与 `session_compress`（同步压缩）；`after_session` 的 `final_memory_pipeline`（尾片处理）与 `session_timeline`（时间线生成）。
+自动发现 → 注册 → 多事件点触发 → 同步或后台执行 → match 条件过滤。当前注册 5 个 Hook，覆盖工具入参注入、切片摘要、session 压缩、尾片处理与时间线生成。扩展只需在对应 hook point 下新建 `hook.py`。
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
-装饰器 `@register_tool` + `inspect.signature` → 自动生成 function-calling 参数 schema。新增工具零样板代码。
+`@register_tool` + `inspect.signature` 自动生成 function-calling 参数 schema，新增工具零样板代码。函数签名是模型可见参数契约的唯一真相源，不为单个工具另维护平行 schema。
 
 ### 5. Prompt 分层组合
 
-`prompt/prompts/` 下每个分块用 `@register_prompt(order, condition, enabled)` 独立注册，`build_prompt(agent)` 按 order 排序、按 condition/enabled 过滤后拼接：`system_prompt`（认知架构，仅 main）+ `tool_prompt`（工具原则 + 已持有工具的 name+简短描述）+ `skill_prompt`（技能原则 + 已注册技能列表，仅 skill_tool 权限）+ `session_recent`（最近 3 个 session 的 slice 摘要，仅 main，当前 enabled=False）+ `memory_prompt`（读 `user.json` 注入用户画像，仅 main）+ `timeline_prompt`（读 `timeline.json` 做近/远分层的跨会话时间线，仅 main；注册名 timeline，enabled 由 timeline.json 是否存在在 import 时决定，全新 clone 上为 disabled）+ `attachment_prompt`（运行时通知/中断处理协议，仅 main）+ `agent_prompt`（`{agent_name}_agent.md` 身份，覆盖 main/slice/summary/plan；memory agent 不走此路，其 system prompt 由 memory_core 用 memory_prompts.get_memory_type_prompt() 直接替换 message_list[0]）+ `basic_prompt`（当前时间戳）= 最终 system prompt。`session_recent`/`memory_prompt`/`timeline_prompt` 在 Agent 初始化时读盘，是**启动快照**，同进程后续写入不会自动刷新。新增分块只需在 `prompts/` 下建目录写 `prompt.py`，自动发现注册，不改其他分块。
+9 个分块各自用 `@register_prompt(order, condition, enabled)` 独立注册，`build_prompt(agent)` 排序过滤后拼成最终 system prompt。新增分块建个目录写 `prompt.py` 即可，不改其他分块。注意 `session_recent` / `memory_prompt` / `timeline_prompt` 是**启动快照**，同进程后续写入不会自动刷新。
 
 ### 6. 模块解耦
 
-agent、session、tool、hook… 等模块彼此之间通过 main.py 进行链接，通过 hook 在 loop 中的注入进行交互，而非彼此之间相互引用，避免后续框架扩展、功能扩展的场景造成不必要的循环引用的麻烦，避免在各种子文件下懒引用的不优雅。
+agent、session、tool、hook 等模块彼此不直接引用，而是通过 `main.py` 装配链接、通过 hook 在 loop 中的注入交互。我这么做是为了避免后续扩展时产生循环引用，也避免在子文件里写懒引用那种不优雅的绕法。
+
+> 每条的完整版本、以及 command 工具安全闸门那次方向性反转的来龙去脉，见 **[架构文档](docs/ARCHITECTURE.md#核心设计决策)**。
 
 ---
 
-## 运行
+## Roadmap
 
-```bash
-git clone <repo-url>
-cd Alear030
-pip install -e .   # 直接依赖已钉死，无锁文件，传递依赖可能漂移
+- [ ] TUI 深化（thinking / toolcall 已有 widget，体验仍在推进）
+- [ ] todolist 初版实现
+- [ ] slash 命令初版实现
+- [ ] eval 评测题集 golden set 初版建立
+- [ ] toolcall trace 机制建立
 
-cp .env.example .env
-# 编辑 .env —— 只填 MAX/MEDIUM/LOW_LEVEL_* 三级模型配置即可（可指向同一服务商，仅 model_name 不同；可选 HTTP_PROXY / HTTPS_PROXY，仅 web_search 走代理时需要）
-
-python main.py
-```
-
-首次运行 `python main.py` 时，本地嵌入模型权重（约 195MB）会自动从 ModelScope 下载到 `local_model/` 目录，需联网，仅首次需要，之后离线可用。
+---
 
 ## 技术栈
 
@@ -170,14 +183,20 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ---
 
+## 安全边界
+
+它会在你的机器上执行命令、读写文件、访问网络。`command` 工具那层闸门的威胁模型是「防模型手滑」，不是沙箱；`file_tool` 的读写是不对称的（写受限于 `workspace/`，读可达任意绝对路径）。跑之前值得看一眼 **[安全说明](SECURITY.md)**。
+
+---
+
+## 参与
+
+单人维护，现阶段不接受 PR，但欢迎开 issue——bug、疑问、设计讨论都可以。见 **[参与方式](CONTRIBUTING.md)**。
+
+仓库里也放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
+
+---
+
 ## License
 
-MIT，详见 `LICENSE`。
-
-# roadmap
-
-- TUI 深化（thinking/toolcall 已有 widget，体验仍在推进）
-- todolist初版实现
-- slash命令初版实现
-- eval 评测题集golden set初版建立
-- toolcall trace 机制建立
+[MIT](LICENSE)

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm ls *)",
+      "WebSearch",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(sed -E 's/^\\\\s*\\(import|from\\)\\\\s+//')",
+      "Bash(awk '{print $1}')",
+      "Bash(python -m test.memory_pipeline.test_memory_log)",
+      "WebFetch(domain:github.com)"
+    ]
+  },
+  "outputStyle": "default"
+}
