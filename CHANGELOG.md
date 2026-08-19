@@ -6,7 +6,80 @@
 
 **变更类型标签**：`[新增]` 新功能/新模块 · `[迭代]` 既有功能改进 · `[修复]` bug 修复 · `[重构]` 结构性重构 · `[收口]` 机制收敛/职责归一 · `[清理]` 版本控制治理/文档同步 · `[删除]` 移除功能。重大改动写「契机」（动机/根因）和「验证」（过程声明），小修省略。每块末尾「对应提交」列出 commit hash + 一句话，保证可回溯。
 
-> **⚠ v0.6.2 及更早版本块的 commit hash 已全部失效**：2026-07-26 对仓库执行过一次 `git filter-repo` 历史重写（清理泄漏语料），全部 49 个 commit 的 hash 随之改变，写入时正确的旧 hash 现已无法解析。待开源前历史彻底定稿后统一回填——2026-07-05 之后的 commit 可按 message 的 `YYYYMMDD_HHMMSS` 前缀经 `git log --grep` 定位（该前缀写在 message 正文里，不随历史重写变化），更早的 14 个 commit 无稳定前缀，需按日期与描述人工比对。
+> 早期若干版本块的「对应提交」只列改动描述、不列 commit hash：那几批提交早于当前的 `YYYYMMDD_HHMMSS` message 前缀约定，无稳定锚点可回溯。之后的版本块都带 hash。
+
+## 2026-08-18 ~ 2026-08-19 · v0.8.0 — command 安全闸门方向性反转 + 面向使用者的文档
+
+契机：`command` 工具的白名单准入模型两头不讨好——真实会话 49 次调用误伤 12 次（`git -C`、`npm --prefix`、`netstat -ano` 全被拒），而 `&` 之后的命令从不经过校验，白名单本身可被绕过。同期项目准备公开，缺一套面向使用者而非维护者的文档。
+
+变更：
+- [重构] `security.py` 闸门由白名单准入翻转为破坏性拦截：`COMMAND_WHITELIST` 降级为分类表，未登记命令标 `unknown` 照常放行，真正拦截交给 `DESTRUCTIVE_COMMANDS` 与 `BLOCKING_PATTERNS`；三份重复的引号/转义扫描收口为单一 `scan_command`，并按 `&&`/`||`/`&`/`;`/`|` 分段逐条校验
+- [修复] 解释器载荷绕过：`rm -rf /tmp/x` 被拒而 `bash -c "rm -rf /tmp/x"` 放行——`bash`/`sh`/`zsh` 既不在分类表也不在硬拒表，`-c` 后整条命令只是一个参数 token 从不递归校验。新增 `_check_interpreter_payload` 作第 1.5 层（必须排在分类之前），把载荷取出重过完整闸门，`threading.local` 记深度上限一层，`powershell -EncodedCommand` 因无法静态校验整条拒
+- [修复] `DANGEROUS_PATHS` 三条 Windows 正则原写法要求路径含两个字面反斜杠故从未命中；`wmic` 的 `/format` 由整条拒绝收窄为按取值判定；重定向由一刀切硬拒改为放行算子、按写操作校验目标路径
+- [新增] `file_read` 补 `MAX_TOTAL_CHARS` 总量闸与 `MAX_LINE_CHARS` 单行上限；`command` 补 `MAX_OUTPUT_CHARS` 首尾保留式截断、`cwd` 参数、超时后按进程树清理孙进程
+- [收口] memory 管线总闸由 `main.py` 硬编码外露为 `config.MEMORY_PIPELINE_ENABLED`——此前旗舰功能默认关闭且只能改源码
+- [新增] 面向使用者的文档：双语 README、`docs/ARCHITECTURE.md`、`docs/CONFIGURATION.md`、`docs/EXTENDING.md`、`docs/MEMORY.md`（机制）与 `docs/MEMORY-DESIGN.md`（设计取舍），以及 `SECURITY.md`、`CONTRIBUTING.md`
+- [清理] 工具旧名统一为注册名：`[command_runner]`→`[command]`、`[file_writer]`→`[file_write]`，两份 `tool_prompt.md` 标题同步；项目协作规约与 agent 技能纳入版本控制
+
+验证：command 安全层单测 31→44 条全绿，核心断言是包壳与不包壳结论必须一致；AST 149 文件；工具注册探针确认三个注册名在册且旧名零出现；文档技术断言逐条对着源码复核。
+
+对应提交：`66c7b62`(command 工具全面重构) · `7e24f9d`(file_read 单行上限) · `f47d6cb`(文档与协作规约)
+
+后续计划：prompt 层死代码清理与 `docs/PROMPT.md`。
+
+## 2026-08-16 ~ 2026-08-17 · v0.7.7 — TUI 退出手势收口与底部提示
+
+变更：
+- [收口] 退出手势统一：`inherit_bindings=False` 关掉 App 默认 `ctrl+q` 与命令面板；`Ctrl+C` 有选区复制、无选区改为双击确认退出（首次发 `ExitConfirm` 切 StateBar 并 2s 超时还原）；SIGINT 经 `call_later` 走同一动作，避免主线程 `call_from_thread` 报错
+- [修复] 消息区鼠标选区补 `screen.get_selected_text`，此前只读 `Input.selected_text` 导致拖选仍进确认
+- [新增] `BottomThinkTip`：`loop_run` 以 `LoopStart`/`LoopEnd`（finally 保证成对）驱动底部提示
+- [收口] 底栏 `event_stop` 上移到 `ExitConfirm` 前，`AskUserQuestion` 复用同一摘除/回焦路径
+
+对应提交：`466d943`(退出手势) · `4ad299e`(双击确认) · `02dc6c8`(底栏 event 收口) · `7d6630a`(BottomThinkTip)
+
+后续计划：中途退出时 `do_work` 仍在跑与 `wait_all` 无超时另切片。
+
+## 2026-08-15 · v0.7.6 — MCP 客户端接入，旧总线 rich_output 退场
+
+契机：需要接入外部工具生态，但官方 SDK 是纯 asyncio 而项目应用层零 asyncio。
+
+变更：
+- [新增] `mcp_client/` 集成官方 `mcp` SDK：asyncio 封死在单个 daemon 线程的事件循环里，循环内只有一个常驻 supervisor task 持有 `ClientSessionGroup`；连接/断开必须排队进该 task（`stdio_client` 内部是 anyio task group，cancel scope 必须同 task 进出），`call_tool` 不涉及 cancel scope 故直派不排队
+- [新增] `mcp.json` 驱动 stdio 与 Streamable HTTP 两种传输；凭证只以 `${VAR}` 占位符引用、真值走 `.env`，解析不到即跳过该 server；工具名 `mcp__{server_key}__{tool}` 用配置 key 而非 server 自报名
+- [迭代] `tool_core` 加 `tool_parameters`（MCP 的 `inputSchema` 本身即 JSON Schema，不走 `inspect.signature`）与 `tool_unregister`；`agent_core` 加 `refresh_tool_list`——`tool_list` 是构造期快照，不刷新则运行时注册的工具进不了模型可见 tools
+- [删除] 收口旧总线：删除 `rich_output.py` 及全部 `rich_print` 调用
+
+验证：GitHub 远程 HTTP 拉到 13 个只读工具并实调返回真实数据；本地 stdio server 连接/调用/断开摘除全通且无 cancel scope 报错。
+
+对应提交：`6f30b51`(MCP 客户端体系) · `97e4619`(收口 rich_output)
+
+后续计划：模型自管 server 的工具组与 `tools/list_changed` 热刷新。
+
+## 2026-08-13 ~ 2026-08-14 · v0.7.5 — TUI 底部栏协议、交互工具收口与错误通道
+
+变更：
+- [新增] `BottomBar` 承接底部槽（UserInput + StateBar），`AskUserQuestion` 多题 tab 可辨当前题与已答题，作答后在工具卡片展示逐题问答摘要
+- [收口] 分散的 `skill_list`/`skill_load`/`skill_finish` 收拢为 `skill_tool` 集群
+- [新增] `SystemError` 错误通道：整轮异常、未知路由与模型调用失败统一走这条，不另开通知总线
+- [迭代] embedding 预热改为启动即后台 boot，缺权重时在 worker 内下载，不阻塞 TUI 启动
+- [修复] TUI 运行时原文 `Static` 关 Rich markup，避免正文里的方括号被当标记解析
+
+对应提交：`fc0eb94`(底部栏协议) · `3a78053`(AskUserQuestion 交互) · `5d39992`(skill_tool 收拢) · `c9e38ab`(SystemError) · `2079a77`(embedding 后台 boot) · `b26928d`(关 Rich markup)
+
+后续计划：继续 TUI 主线与 channel 轮次记账。
+
+## 2026-08-05 ~ 2026-08-10 · v0.7.4 — 工具调用消费端闭环与 emit 三态协议
+
+变更：
+- [新增] `ToolCallResult` 融入工具执行环节：`match_tool` 重写为工具自驱 `error`/`processing`/`success` 三态，`tool_call_processing` helper 给无特化 emit 的工具兜底
+- [新增] `tool_widget` 的 `extra_info` 挂载 widget 协议整体落地（框架级），`web_search`/`web_fetch` 按新协议特化渲染
+- [收口] `AssistantThinking` 骨架事件后移进首个 `reasoning_content` chunk，消除空骨架倒计时；`AssistantContent` 改 pending/holder/timer 攒字刷新
+- [修复] `web_search` 注入参数收口：`tool_call_content` 混进工具 schema 致首次调用 `TypeError`，schema 排除名单补齐
+- [清理] 新建 `.gitattributes` 断根仓库级行尾符约定（`* text=auto`），`loop_core.py` 混合换行归一化；删除旧版 TUI 备份文件
+
+对应提交：`a89eb03`(ToolCallResult 融入执行) · `32ca43b`(extra_info 挂载协议) · `13fae95`(thinking 流式收口) · `3328aa3`(web_fetch emit 特化) · `5057327`(web_search 注入收口) · `86b3af0`(.gitattributes)
+
+后续计划：channel 轮次记账重构与 toolcall trace。
 
 ## 2026-08-03 · v0.7.3 — memory 入库开关收口 + thinking 与正文分离落盘
 
@@ -17,7 +90,7 @@
 
 验证：AST + 探针（落盘对象/字符串/None 四路径形状）+ guard 测试 9 用例全绿。
 
-对应提交：`09b3625`(pipeline_enabled 收拢为 Memory 属性) · `1416b1e`(thinking 与正文分离落盘) · `926cc3c`(gitignore 忽略 changelog-site)
+对应提交：`b28abe0`(pipeline_enabled 收拢为 Memory 属性) · `fb5be18`(thinking 与正文分离落盘) · `8f269bc`(gitignore 忽略 changelog-site)
 
 后续计划：推进 TUI 主线——thinking/toolcall 挂载、channel 轮次记账重构、embedding 缺权重启动下载。
 
@@ -34,7 +107,7 @@
 - [修复] `rich_print` 恢复 receiver 接收器分发：有接收器则全量转接收器、无接收器才直写终端，修复 TUI 占终端时直写撞崩 Windows 控制台，并预留 `_stream_buffers`
 - [清理] hook 导出 `HookManager`；`tool_core` 为 `match_tool` 补流程注释
 
-对应提交：`ef0ccd5`(TUI channel+widget 重构/流式 _chat/embedding worker/subagent 命名) · `cd8c3a0`(rich_print receiver 分发代码补齐)
+对应提交：`f5491b7`(TUI channel+widget 重构/流式 _chat/embedding worker/subagent 命名) · `88ff2fd`(rich_print receiver 分发代码补齐)
 
 后续计划：推进 TUI 主线——清理 rich_output 等过时类 TUI 文件、丰富 tui_widget 生态、TUI 接入 thinking（已累积未接，留 @claude 位）与 toolcall/toolresult 展示、优化整体 TUI 体验。
 
@@ -51,7 +124,7 @@
 
 验证：单测覆盖锁外计算、写回合并、tool_result 截断与失败上报；live probe 确认并发 `session_message_insert` 等待降至毫秒级。
 
-对应提交：`65ebafc`(slice/summary 移出锁 + 写回合并 + embedding 预热)
+对应提交：`fda2f03`(slice/summary 移出锁 + 写回合并 + embedding 预热)
 
 后续计划：修 compress/reform 按开口尾 `end_round` 砍上下文导致丢最新轮；memory 结构化直调收同一 API 边界；slice 失败上报改静默日志。
 
@@ -67,27 +140,27 @@
 - [迭代] `memory_pipeline` hook 重新启用，经 `main` 显式传 `pipeline_enabled=False` 控制入库静默、切片摘要仍跑
 - [清理] TUI 构造去掉未使用的 session/loop 占位入参；gitignore 清过时条目并忽略 `.agents/` 与 `AGENTS.md`；README Known Limitations 改为 roadmap
 
-对应提交：`589c3b7`(TUI 首版闭环) · `75da9a2`(清理 TUI 构造参数) · `e925e56`(ContextTokens + user_info 校验 + pipeline_enabled)
+对应提交：`db30054`(TUI 首版闭环) · `aaf61e7`(清理 TUI 构造参数) · `d4cc774`(ContextTokens + user_info 校验 + pipeline_enabled)
 
 后续计划：深化 TUI toolcall/toolresult 与 plan 展示；为 eval 的 toollog 做准备。
 
-## 2026-07-26 ~ 2026-07-29 · v0.6.7 — 开源推送就绪：隐私开关、全新 clone 可跑、权重出库
+## 2026-07-26 ~ 2026-07-29 · v0.6.7 — 日志开关、全新 clone 可跑、权重改运行时下载
 
-契机：v0.6.4 开源收尾之后仍挡推送——`pip install -e .` 在 flat layout 下炸、全新 clone 首次写 session 因 gitignore 目录不存在而崩、195MB 权重触 GitHub 单文件硬限制；协作契约（技能、`@claude` 标记）也不应随公开仓库悬空引用。
+契机：v0.6.4 之后仍有三处挡住首次推送——`pip install -e .` 在 flat layout 下炸、全新 clone 首次写 session 因 gitignore 目录不存在而崩、195MB 权重触 GitHub 单文件硬限制；协作契约（技能、`@claude` 标记）也不应随公开仓库悬空引用。
 
 变更：
 - [迭代] `memory_log` 加 `LOG_AGENT_RESPONSE` 默认 False：不删模块，关掉后仍可定位「哪一片在哪个阶段失败」，本地评 prompt 时再打开
 - [修复] `pyproject` 补 `[build-system]` 与 `packages=[]`，修 `pip install -e .`；补 `transformers`/`modelscope` 显式依赖
 - [修复] `session_core._json_write` 与 `memory_storage_core` 写前 `mkdir`，全新 clone 首次落盘不再 `FileNotFoundError`
 - [新增] 本地 embedding 权重改运行时 ModelScope 下载（以权重文件而非目录判据）；gitignore 忽略 `pytorch_model.bin`/`model.safetensors`
-- [清理] 从 git 历史移除已跟踪的 195MB `pytorch_model.bin`；`CLAUDE.md` 取消跟踪并 ignore（流程知识收到技能）；README 大规模事实漂移修正；`session_plan/` 补尾斜杠
+- [清理] 195MB 的 `pytorch_model.bin` 不再进版本控制（超 GitHub 单文件限制），改由首次加载时下载；`CLAUDE.md` 暂时取消跟踪（它引用的技能本体当时不上传）；README 大规模事实漂移修正；`session_plan/` 补尾斜杠
 - [迭代] `memory_pipeline` 临时 `enabled=False` + `slices_pipeline(enable=…)`（后续 v0.7.0 改为 hook 开、入库静默）
 
 验证：mkdir 与下载逻辑探针、memory_log 开关双向、全量 unittest；真实数据 MD5 前后一致。
 
-对应提交：`cb969c3`(pipeline 临时关 + CLAUDE.md 收技能) · `3e4ba16`(LOG_AGENT_RESPONSE + pyproject) · `fcf7c8d`(README/mkdir/自动下载权重) · `1f62c7a`(历史移除 pytorch_model.bin)
+对应提交：`fcfb8a0`(pipeline 临时关 + CLAUDE.md 收技能) · `90ce450`(LOG_AGENT_RESPONSE + pyproject) · `71f50bb`(README/mkdir/自动下载权重) · `e56524c`(pytorch_model.bin 改运行时下载)
 
-后续计划：开源前历史定稿后回填 CHANGELOG 失效 hash；继续 TUI toolcall/toolresult。
+后续计划：继续 TUI toolcall/toolresult。
 
 ## 2026-07-26 · v0.6.6 — 真实 coding 任务暴露的工具层六处修复
 
@@ -101,7 +174,7 @@
 
 验证：临时脚本 18 项断言（含 UTF-8/GBK 双向）+ 全量 unittest；session/memory MD5 比对确认测试未写入，脚本已删。
 
-对应提交：`a52f112`(工具层六处修复)
+对应提交：工具层六处修复
 
 后续计划：元认知问题（工具在手想不到用、错误诊断不回溯等）根因是陈述性 prompt 扛程序性职责，待定是否先做轮次预算软提示与待办工具。
 
@@ -117,11 +190,11 @@
 
 验证：临时脚本 4 项断言（默认状态未变、禁用不触发且返回空列表、禁用与 `match` 条件正交、后台禁用不进 `_pending`）+ 全量 `unittest` 10 项通过，脚本验证后删除。
 
-对应提交：`b2acec9`(hook enabled 开关)
+对应提交：`58e2a09`(hook 补齐 enabled 开关)
 
 后续计划：暂不加 `hooks.disable()`/`enable()` 运行时方法（当前无调用方，属投机性控制面），需要在进程运行中切换钩子时再评估。
 
-## 2026-07-26 · v0.6.4 — 开源前收尾：文档对齐代码、依赖声明补全与路径校验修复
+## 2026-07-26 · v0.6.4 — 文档对齐代码、依赖声明补全与路径校验修复
 
 契机：README 多处描述已与代码实际漂移（agent 数量、prompt 分块数、tool 列表、memory 模块状态），`pyproject.toml` 缺 10 个运行时依赖声明，新用户按文档走不通完整上手流程；同轮排查中发现三处路径校验因 API 误用而形同虚设。
 
@@ -133,9 +206,9 @@
 - [重构] `user_intention` 工具：删调试 print、修拼写错误变量名（masseges→messages、rounter→router），配置读取从 `.env` 里并不存在的 `main_BASE_URL` 等废弃键改为对齐项目统一的 `config.MODEL_LEVEL` 模式（工具本身仍保持 disabled）
 - [清理] 移除两处死代码（memory_pipeline hook 里注释掉的测试短路 `return`、session_core 里被 print 替代后遗留的 rich_print 死注释）及 `memory_core.py` 一处写死的本机绝对路径注释；`security.py` 清理内部研究注释，只保留通用设计模型说明；`.gitignore`/CLAUDE.md 补充 `.cc_file/` 目录约定
 
-对应提交：`3749de5`(开源前收尾)
+对应提交：`3a1dd38`(一轮收尾)
 
-后续计划：核实 `skill_finish`/`skill_list` 的 `skill_name` 参数是否需要防路径穿越校验（rglob 实测证明当前不可利用，可标注为已验证无需修改）；推进 README「安全边界」说明段落；决定是否为 memory_storage/memory_config 提供脱敏 demo 数据。
+后续计划：核实 `skill_finish`/`skill_list` 的 `skill_name` 参数是否需要防路径穿越校验（rglob 实测证明当前不可利用，可标注为已验证无需修改）；推进 README「安全边界」说明段落；决定是否提供 demo 数据。
 
 ## 2026-07-22 · v0.6.3 — 模型 API 失败的统一错误边界
 
@@ -148,7 +221,7 @@
 
 验证：`unittest.mock` 临时探针验证异常翻译、消息回滚、`loop_run` 不崩、round 正确自增共 4 项，验证后删除。
 
-对应提交：`a658907`(统一错误边界)
+对应提交：`290456f`(统一错误边界)
 
 后续计划：`_tool_calls_api` 的 tool_calls 参数解析（`json.loads`）和 `match_tool` 的工具内部异常两块仍未纳入此边界，留在原方案里，后续需要时再确认范围。
 
@@ -157,7 +230,7 @@
 变更：
 - [清理] CLAUDE.md 补两条验证经验：`unittest discover` 出失败时先 `git stash` 回退改动前重跑，区分历史遗留断言漂移与本次改动引入的新问题；Windows 上 `Path.read_text`/`write_text` 读写中文文本必须显式传 `encoding='utf-8'`，否则走系统默认 GBK 码页崩溃
 
-对应提交：`fb5a337`(CLAUDE.md 验证经验)
+对应提交：`d56cd77`(CLAUDE.md 验证经验)
 
 后续计划：继续观察是否还有其他遗漏 encoding 的读写点。
 
@@ -169,7 +242,7 @@
 - [删除] `session_recent` prompt 分块经 `enabled=False` 禁用（职责已被 timeline system prompt 分块覆盖）
 - [修复] `main.py` 退出收尾注释 typo（推出->退出）
 
-对应提交：`61da56d`(中文输出约束+attachment措辞+session_recent禁用+typo)
+对应提交：`f8305de`(中文输出约束+attachment措辞+session_recent禁用+typo)
 
 后续计划：观察中文输出约束落地后 embedding 召回准确率变化。
 
@@ -185,7 +258,7 @@
 
 验证：AST 全量解析（302 文件）+ import 链路确认 timeline 分块注册、旧 hook 不再加载；`session_compress` 签名探针确认去 memory 依赖；36 项单测全绿；无关历史失败经 git stash 交叉验证排除。
 
-对应提交：`95591e8`(timeline system prompt 化 + 旧 attachment 路径收口)
+对应提交：`dd116d4`(timeline system prompt 化 + 旧 attachment 路径收口)
 
 后续计划：观察 timeline system prompt 分块在真实会话中的召回效果，评估是否需要运行时刷新机制替代启动快照。
 
@@ -202,11 +275,11 @@
 - [重构] session compress：计数改为 main agent 全量 `message_list`（修旧计数只算尾片致几乎不触发）；超阈值 `250000` 后保留 system+最后切片原始消息，attachment 注入更早切片摘要并恢复跨会话 timeline
 - [收口] timeline 渲染与注入统一收口到 `memory.inject_timeline_attachment`，`session_timeline_inject` hook 与 `session_compress` 共用同一入口，消除分层双源漂移
 - [修复] `file_edit`/`file_write` 的 `path.absolute()` 误用改为 `is_absolute()`（原写法恒真致路径校验失效）
-- [清理] `test/`、真实 session/memory 语料及 `bench_secret.py` 纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目宪法）；取消跟踪已泄漏 session_detail；随后已于 2026-07-26 执行 filter-repo 重写历史（见文件头失效声明）
+- [清理] `test/` 与运行时 session/memory 数据纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目约定）
 
 验证：三轮真实 REPL 确认压缩后可由摘要恢复首轮唯一标记；AST + `_emit`/`_update` 分叉探针确认 skill candidate 产出逻辑。
 
-对应提交：`103b444`(四大模块落地) · `645c6ee`(skill更新闭环) · `e3e749c`(compress落地) · `af29115`(timeline fallback) · `05dc5c5`(阈值250000) · `57511e5`(合并+端到端验证) · `6785b16`(CLAUDE.md纳入跟踪) · `1d30e8c`(test纳入gitignore) · `bc236e8`(bench_secret)
+对应提交：四大模块落地 · skill更新闭环 · compress落地 · `a70b002`(timeline fallback) · `90ab861`(阈值250000) · `9a12cd5`(合并+端到端验证) · CLAUDE.md纳入跟踪 · test纳入gitignore · `4dec39b`(bench_secret)
 
 后续计划：跑通 LongMemEval benchmark basic 四格；观察真实会话 compress 触发频率、压缩后衔接质量与 timeline fallback 召回效果。
 
@@ -223,7 +296,7 @@
 
 验证：重构前召回基线快照已留存（`20260714_112246_recall_benchmark_before.json`），供收口后对比。
 
-对应提交：`4744c61`(slice重复修复) · `aa57b35`(memory管线主体+benchmark+ask_user_question)
+对应提交：slice重复修复 · memory管线主体+benchmark+ask_user_question
 
 后续计划：收口 timeline、task memory 与 skill 生命周期，并用 benchmark 验证记忆链路的召回质量。
 
@@ -235,7 +308,7 @@
 - [修复] Windows 风格 `/` flag 白名单大小写匹配：`/flag` 统一转大写比对；command prompt 从白名单唯一来源动态生成可用命令清单
 - [迭代] `_build_step_prompt` 注意事项格式：分行编号避免拼接成一整段
 
-对应提交：`5571fb6`(slice agent重写+去壳) · `ba39d40`(命令白名单大小写+动态清单) · `63ec4c8`(step prompt格式)
+对应提交：`e06fff9`(slice agent重写+去壳) · 命令白名单大小写+动态清单 · `9d0ee73`(step prompt格式)
 
 后续计划：推进 memory 消费端（slice 分类/task 提炼）链路。
 
@@ -248,7 +321,7 @@
 - [迭代] 适配两处读取存储态 slice 的下游：`memory_recall` 工具返回结果字段读取、`session_recent` prompt 分块渲染（对外字段形状不变，只改内部读取路径）
 - [清理] 一次性脚本迁移历史 34 个 `session_detail/*.json`（33 个含 slice，共 200 条）：旧扁平结构转 `slice_anchor` 嵌套结构，补齐旧数据缺失的 `session_id` 字段
 
-对应提交：`19c20f6`(slice_anchor收敛+历史数据迁移)
+对应提交：slice_anchor收敛+历史数据迁移
 
 后续计划：架构巩固到此告一段落，正式进入 memory（自涌现记忆）框架开发阶段。
 
@@ -259,7 +332,7 @@
 - [清理] `hook/hook_core.py` 补充 `trigger`/`_match` 等核心方法的设计意图注释（纯注释，无逻辑变化）
 - [清理] `README.md` 同步 `prompt/prompts/` 装饰器自动发现机制的目录结构描述（跟进 v0.0.15 的实现）
 
-对应提交：`a60a892`(属性名bug+hook_core注释+README同步)
+对应提交：属性名bug+hook_core注释+README同步
 
 后续计划：继续优化整体架构代码，推进 memory 系统主线。
 
@@ -274,7 +347,7 @@
 - [迭代] 17 个工具函数签名统一加 `**kwargs` 兜底，吞掉无条件注入带来的多余参数，避免 `TypeError`
 - [清理] `README.md` 同步 hook 解耦后的目录结构（`plan_hook` 替换为 `pre_toolUse/inject_import_args`）及设计决策描述
 
-对应提交：`2cc0e3b`(hook解耦+漏传参修复+kwargs兜底) · `50bf72e`(README同步hook解耦)
+对应提交：hook解耦+漏传参修复+kwargs兜底 · `e0ca032`(README同步hook解耦)
 
 后续计划：继续优化整体架构代码，推进 memory 系统主线。
 
@@ -287,7 +360,7 @@
 - [新增] `systeminfo`、`nvidia-smi`（标准逐 flag 白名单）
 - [新增] `wmic`（非 flag 式语法，改用动词/开关黑名单--只放行 `get`/`list` 查询，堵死 `call`/`set`/`delete`/`create` 和 `/format`（XSL 注入面）/`output`/`append`）
 
-对应提交：`a9885d1`(flag校验漏洞修复+systeminfo/wmic)
+对应提交：`62e7a91`(flag校验漏洞修复+systeminfo/wmic)
 
 后续计划：管道场景下 `_validate_flags` 拿整条命令行对**管道第一个命令**的白名单校验，各段命令各自的 flag 未被正确归属校验（如 `systeminfo | findstr /B ...` 中 `/B` 会被拿去对 `systeminfo` 校验）。已记录，本次不修。
 
@@ -296,7 +369,7 @@
 变更：
 - [修复] `_force_final_reply`（v0.1.0 合并出的方法）里的系统提示此前只进了 `message_list`、没写入 session--这是原代码就有的疏漏，不是 v0.1.0 引入的。已对齐 `_sent_message_api` 的写入方式
 
-对应提交：`03ffc93`(notice系统提示写入session)
+对应提交：notice系统提示写入session
 
 后续计划：继续优化整体架构代码。
 
@@ -311,7 +384,7 @@
 - [修复] `json.loads` 裸奔：工具参数解析失败给空 args 兜底
 - [迭代] `Plan` 新增 `advance()` 公开 API，收回 Loop 对私有方法/内部属性的直接扒取；合并 3 处重复 LLM 调用 + 2 处雷同收尾逻辑
 
-对应提交：`eeeaaf2`(loop_core重构+PlanRunner剥离)
+对应提交：loop_core重构+PlanRunner剥离
 
 后续计划：在 PlanRunner 之上加 goal 模式编排（goal 包 plan 包 step + 不合格重新 plan 回边），预留扩展点，未实现。
 
@@ -320,7 +393,7 @@
 变更：
 - [重构] `Session` 构造时直接写入 round 0 的 system_prompt，round 计数从 1 开始，不再与 system_prompt 插入时机耦合
 
-对应提交：`221b824`(system_prompt插入时机解耦)
+对应提交：system_prompt插入时机解耦
 
 后续计划：继续优化整体架构代码。
 
@@ -329,7 +402,7 @@
 变更：
 - [重构] `prompt_core.py` 瘦身，新增 `prompt_register.py`（`@register_prompt` 装饰器），各分块迁移为 `prompt/prompts/{name}/prompt.py` 目录结构，与 tool/hook 的自动发现机制对齐
 
-对应提交：`87daf7b`(prompt装饰器自动发现)
+对应提交：`c33ffdb`(prompt装饰器自动发现)
 
 后续计划：继续优化整体架构代码。
 
@@ -338,7 +411,7 @@
 变更：
 - [清理] `README.md` 目录结构和分层组合说明同步改为 `prompt/` 包描述
 
-对应提交：`9151cb8`(README同步prompt_structor)
+对应提交：`70c7104`(README同步prompt_structor)
 
 后续计划：继续优化整体架构代码。
 
@@ -347,7 +420,7 @@
 变更：
 - [重构] `agent/prompt_structor.py`（单文件硬拼接）拆分为独立的 `prompt/` 包：`prompt_core.py` 负责组装，`agent_prompt/agents/` 收纳各 agent 身份定义，新增 `skill_prompt`/`tool_prompt` 两个分块目录
 
-对应提交：`8ee3112`(prompt_structor拆分为prompt包)
+对应提交：prompt_structor拆分为prompt包
 
 后续计划：继续优化整体架构代码。
 
@@ -356,7 +429,7 @@
 变更：
 - [清理] `file_glob`/`file_grep`/`file_write` 的 tool_prompt 去除/调整学习模式相关提示语
 
-对应提交：`1dedf5e`(tool_prompt文案清理)
+对应提交：tool_prompt文案清理
 
 后续计划：重构 `prompt_structor`，将 system_prompt 拆成按语义分块的可组装结构（如 subagent 使用触发规则等），替代当前紧凑单文件硬拼接。
 
@@ -365,7 +438,7 @@
 变更：
 - [迭代] `memory_recall` 的 tool_prompt 补充一条何时使用场景的说明
 
-对应提交：`a3c09e4`(memory_recall tool_prompt补充)
+对应提交：`a724e8d`(memory_recall tool_prompt补充)
 
 后续计划：继续优化整体架构代码。
 
@@ -376,7 +449,7 @@
 - [修复] web_fetch 失败信息里 `error` 始终为 None 的 bug；去掉 web_fetch 中多余的 print 调试输出
 - [清理] 补充两个工具的 tool_prompt 说明文档
 
-对应提交：`54bfc6c`(web批量并行+error修复)
+对应提交：web批量并行+error修复
 
 后续计划：继续优化整体架构代码。
 
@@ -389,7 +462,7 @@
 - [新增] `skill/coding-conduct/skill.md` 技能
 - [清理] 误跟踪的 `memory.db` 二进制文件被移除；`loop/loop_core.py` 大改
 
-对应提交：`ec95e4c`(file_tool拆分+plan_tool细化+subagent+coding-conduct)
+对应提交：`db9d675`(file_tool拆分+plan_tool细化+subagent+coding-conduct)
 
 后续计划：继续优化整体架构代码。
 
@@ -398,7 +471,7 @@
 变更：
 - [迭代] `plan_agent.md` 补充说明、`agents.yaml` 调整、`loop_core.py` 补充逻辑、`plan_create` 工具与其 tool_prompt 微调
 
-对应提交：`5a55b7d`(loop重构跟进+plan工具微调)
+对应提交：loop重构跟进+plan工具微调
 
 后续计划：即将进入 plan_loop 阶段。
 
@@ -408,7 +481,7 @@
 - [重构] `core/loop.py` 移出 core，迁移为独立的 `loop/loop_core.py` 模块；`rich_output.py` 从 `core/` 提升到项目根
 - [清理] README 大幅扩写记录新架构
 
-对应提交：`bd4722b`(loop模块迁移+README扩写)
+对应提交：loop模块迁移+README扩写
 
 后续计划：进入 plan_mode 开发阶段。
 
@@ -420,7 +493,7 @@
 - [新增] `agent/agents.yaml` 首次引入（YAML 驱动 agent 定义），新增 `plan_agent.md`
 - [重构] 历史 `tools/` 目录整体迁移合并进 `tool/tools/`（两套目录统一）；`session_core.py` 大幅重构（约 323 行改动）
 
-对应提交：`3cab3e8`(hook模块+plan_tool+session重构)
+对应提交：`896e186`(hook模块+plan_tool+session重构)
 
 后续计划：继续优化整体架构代码。
 
@@ -432,7 +505,7 @@
 - [新增] `core/loop.py`、`core/local_model.py`（GTE embedding 本地模型接入）；引入本地中文 embedding 模型权重（`local_model/nlp_gte_sentence-embedding_chinese-base/`）
 - [新增] `tools/session_recall`（记忆召回）、`tools/session_compress`、`tools/session_slice`
 
-对应提交：`436d40e`(session重构+本地embedding)
+对应提交：`e097db7`(session重构+本地embedding)
 
 后续计划：继续优化整体架构代码。
 
@@ -443,7 +516,7 @@
 - [重构] `tool/tool_register.py` 迁移改名为 `tools/_tool_register.py` 并扩展为自动发现机制
 - [新增] `core/prompt_structor.py`/`core/runtime.py`；`memory/system.md` 承接 06-13 的 system prompt
 
-对应提交：`6ade27c`(基础tools集群+自动发现)
+对应提交：基础tools集群+自动发现
 
 后续计划：进入 memory 框架搭建阶段。
 
@@ -453,7 +526,7 @@
 - [新增] `prompt/agents_prompt/system_agent_prompt.md` 作为 system prompt 早期版本
 - [清理] 提交中意外带入两份问答语料 md 文件（06-20 提交中被移除）
 
-对应提交：`17994ae`(system_agent_prompt)
+对应提交：`07b543e`(system_agent_prompt)
 
 后续计划：继续完善基础架构。
 
@@ -463,7 +536,7 @@
 - [新增] `core/`（`agent.py`/`rich_output.py`）、`memory/`（`USER.py` 占位）、`tool/`（`tool_register.py`）三大目录雏形
 - [新增] `AGENTS.py`/`SOUL.md`/`SYSTEM.py` 作为早期身份定义的占位文件
 
-对应提交：`282bd2d`(基础三大目录雏形)
+对应提交：基础三大目录雏形
 
 后续计划：继续完善基础架构。
 
@@ -472,6 +545,6 @@
 变更：
 - [新增] 搭建最基础的项目骨架：`.gitignore`、`.python-version`、`main.py`、`pyproject.toml`、`README.md`
 
-对应提交：`c9ed61e`(项目初始化) · `c7e0064`(项目初始文件夹目录)
+对应提交：`f3251ba`(项目初始化) · `057eb45`(项目初始文件夹目录)
 
 后续计划：继续完善基础架构。
