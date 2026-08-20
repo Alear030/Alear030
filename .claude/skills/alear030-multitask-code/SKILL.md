@@ -70,7 +70,7 @@ Plan/Execute **必须对照**；Review **必须检查**有无违反。要点 che
 - [ ] 同文件 `_helper` 优先；禁止拆新文件、微 helper 堆
 - [ ] 最小 diff；临时截断只入口 guard（`minimal-disable-preserve-body.mdc`）
 - [ ] 注释走 `$alear030-style-notes`：禁空标签，说清意图
-- [ ] **数据安全**：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`local_model`
+- [ ] **数据安全**：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`memory_log`、`local_model`
 - [ ] 用户在自己写时：**先教后改**；明确「接进去 / 同步 / 改」才落盘
 
 ---

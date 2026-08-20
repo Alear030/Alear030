@@ -14,12 +14,12 @@ description: "Alear030 项目里验证代码改动是否可用时使用。这个
 判据看配置,不看路径名:
 
 ```bash
-grep -n "pipeline_enabled" main.py
+grep -n "MEMORY_PIPELINE_ENABLED" config.py
 ls memory/memory_storage/memory_storages/
 ```
 
-- `Memory(...)` 传的是 `pipeline_enabled=False`,且 `memory_storages/` 为空 → **开发 worktree**,走宽松档
-- `pipeline_enabled=True`,或 `memory_storages/` 里有真实数据 → **主仓库**,走严格档
+- `MEMORY_PIPELINE_ENABLED = False`,且 `memory_storages/` 为空 → **开发 worktree**,走宽松档
+- `MEMORY_PIPELINE_ENABLED = True`,或 `memory_storages/` 里有真实数据 → **主仓库**,走严格档
 
 **不要用「路径里有没有 `worktrees`」来判。** 未来完全可能出现开着 pipeline 的 worktree,路径名会骗人,配置不会。
 
@@ -120,7 +120,7 @@ agents.agents['main'].agent_ai.chat.completions.create(
 
 **先按判断 0 确认自己在主仓库。** 开发 worktree 里这一节整体不适用,只保留「不批量删 `session_detail`」那条共同底线。
 
-如果验证过程需要读写 `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`local_model/` 这几个目录:
+如果验证过程需要读写 `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/`、`local_model/` 这几个目录:
 
 - 这些目录存的是真实运行数据,不是可随意重建的临时文件
 - 需要干净环境验证时用临时目录或临时 session id,不得清场式测试真实数据

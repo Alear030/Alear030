@@ -23,7 +23,7 @@ description: >-
 **硬约束（两路径共用）**
 
 - 先预览后落盘：拟议 diff 轮廓经用户确认再写盘（用户明确「直接改」除外）
-- 数据安全：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`local_model`
+- 数据安全：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`memory_log`、`local_model`
 - 验证用 `$alear030-verify`；**不跑有副作用的 `python main.py`，除非用户批准**
 - 不 commit，除非用户明确要求
 - `.claude/` 是本地协作资产，不强制进 git
@@ -105,7 +105,7 @@ description: >-
 ### 执行步骤
 1. 按拟议 diff 落盘（外科手术式）
 2. 低副作用自测（见 $alear030-verify：AST / python -m test...）
-3. 按下方模板汇报；不要改 AGENTS.md/.claude 除非任务写明
+3. 按下方模板汇报；不要改 AGENTS.md（本地文件,不在仓库里）/.claude 除非任务写明
 ```
 
 ### 汇报模板

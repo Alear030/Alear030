@@ -27,6 +27,6 @@ git worktree 对未修改文件可能硬链接主仓库。Edit 改 worktree 的�
 
 ## 示例
 Edit 改 `memory/memory_core.py`(worktree):
-1. Read `D:\Alear030\.claude\worktrees\<name>\memory\memory_core.py` 确认改动
+1. Read `<repo-root>\.claude\worktrees\<name>\memory\memory_core.py` 确认改动
 2. 若没改 → Bash python 直接改 worktree 路径
 3. 再 Read 确认改动落地

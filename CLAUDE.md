@@ -20,7 +20,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 
 **当前阶段：架构稳定期**。后续改动默认跨模块、机制级，一律走**探索 → 规划 → 执行 → 验收**；「可直接做」仅限无行为影响的纯文本改动。
 
-本项目不走“用户给需求 → Claude 闷头执行”的单向模式。默认节奏是**探索 → 规划 → 执行 → 验收**；仅**无行为影响的纯文本改动**（改错字、加日志、重命名、注释）可直接做——触碰行为、机制、参数、调用链的改动，即便一句话说得清，也先过规划闸门并说明权威路径与影响面。
+本项目不走“用户给需求 → Claude 闷头执行”的单向模式。默认节奏是**探索 → 规划 → 执行 → 验收**；仅**无行为影响的纯文本改动**（改错字、加日志、用户明确指定的重命名、注释）可直接做——触碰行为、机制、参数、调用链的改动，即便一句话说得清，也先过规划闸门并说明权威路径与影响面。
 
 1. **探索** — 先读相关代码/资料搞清现状，不改任何东西；产出“现状是 X”
 2. **规划** — 提方案并主动点出取舍与风险；较大特性可用 `AskUserQuestion` 反向采访；产出用户能修改、能拍板的计划
@@ -30,7 +30,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 **规模增长协作约定**（2026-08-08 起）：项目体量增大后，在「探索→规划→执行→验收」之上叠加四条节奏约定：
 
 - **切片化工作单元**：跨模块/大特性按「可独立提交、可运行」的切片规划，一次会话一个闭环，不留带已知缺陷的 WIP 半程提交；计划按切片呈现，用户拍板切片边界后开工
-- **验证优先**：机制级改动先明确「怎么快速验」；测试/探针尽可能固化进 `test/` 而非随用随删；交付以验证输出为准（验证底座 A 正在推进，见后续）
+- **验证优先**：机制级改动先明确「怎么快速验」；测试/探针尽可能固化进 `test/` 而非随用随删；交付以验证输出为准
 - **知识交接**：会话收尾更新「当前主线 + 未完成项」交接物；协作经验与用户偏好落 memory；`@claude` 标记经 scan-claude-markers 定期扫描
 - **并行编排**：跨模块改动默认走 workflow 并行探索（Explore 子代理）与并行审查；闸门三级——纯文本直接做 / 单模块机制自验 / 跨模块完整流程
 
@@ -46,7 +46,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 
 **代码里的 `@claude` 任务标记**：
 
-- SessionStart hook（`.claude/settings.json`）每次会话开始扫描仓库并注入待办标记
+- SessionStart hook 每次会话开始扫描仓库并注入待办标记（配置在本机 `.claude/settings.local.json`,不进版本控制,新 clone 不自带该行为）
 - 完成标记后将原行改写成 `# done(@claude): <做了什么>`，保留痕迹且避免下次重复扫描
 - `# @claude(ignore) ...` 是用户自己的备注，不是 Claude 任务，不要修改
 
@@ -155,7 +155,7 @@ loop.emit (Alear030TUI.__init__ 里 self.loop.emit = self.receive_loop_emit；ma
 
 - **强制收尾靠物理断供而非提示词**：`_force_final_reply` 不传 tools，让模型只能输出文本
 - **mode 切换靠 diff 而非信任模型自觉**：工具批次执行前后比较 `session.mode`，一旦切换便停止同批剩余工具并补齐 tool results
-- **模型 API 失败靠统一错误边界而非层层 try/except**：`loop._chat`（含流式中途异常与建连失败）把裸异常翻译成 `LoopAPIError`，`loop_run` 顶层统一兜底返回错误字符串，不炸穿 `main.py`；`_tool_calls_api` 的参数解析、`match_tool` 的工具内部异常及工具内直调（如 `user_intention`）仍未纳入此边界（20260702 方案 `polished-wondering-cook.md` 的另外两部分，暂缓）
+- **模型 API 失败靠统一错误边界而非层层 try/except**：`loop._chat`（含流式中途异常与建连失败）把裸异常翻译成 `LoopAPIError`，`loop_run` 顶层统一兜底返回错误字符串，不炸穿 `main.py`；`_tool_calls_api` 的参数解析、`match_tool` 的工具内部异常及工具内直调（如 `user_intention`）仍未纳入此边界（20260702 那版方案的另外两部分，暂缓）
 - **thinking 与 tools 强绑定**：`_chat` 里 `with_tools=True` 时 `extra_body` 固定带 `thinking:enabled`，两者没有拆开的独立开关；想单独关某次调用的 thinking（如高频调用的性能优化）又要保留 tools，需要先解耦这个方法，会影响 main agent 真实运行时行为——不带 tools 的独立直调可各自直接传 `extra_body` 关闭、不受此绑定影响：`session_core.py::_session_slice` 已传 `disabled`，`memory_core.py::slice_type_define` 当前仍传 `enabled`（待收进结构化直调边界）
 - **流式累积替代整块返回**：`_chat` 以 `stream=True` 逐 chunk 累积 `content`/`thinking`/`tool_calls`（tool_calls 按 `index` 占位拼回完整 JSON），再拼回非流式同构消息；thinking 已累积但 TUI 尚未消费（loop_core.py 留 `@claude` 位）
 

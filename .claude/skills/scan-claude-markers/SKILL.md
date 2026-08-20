@@ -22,7 +22,7 @@ description: "扫描 Alear030 仓库里用户留在代码注释中的 @claude / 
 在仓库根目录跑这条（Git Bash）。它匹配 `@claude`/`@claudecode`，再用第二层 grep 滤掉 `done(@claude)` 和 `@claude(ignore)`：
 
 ```bash
-cd "D:/Alear030" && grep -rniE "@claude(code)?\b" \
+cd "$(git rev-parse --show-toplevel)" && grep -rniE "@claude(code)?\b" \
   --include="*.py" --include="*.md" --include="*.yaml" --include="*.yml" --include="*.txt" \
   --exclude="CLAUDE.md" \
   --exclude-dir=".git" --exclude-dir=".claude" --exclude-dir="session_detail" --exclude-dir="session_plan" \

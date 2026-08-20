@@ -23,7 +23,7 @@ Multitask Mode 下 Task 子代理改生产代码时**强制**本流程；主对�
  - 对照 `coding-conventions.mdc` + 用户当场命名
 2. **架构归位**：语义相同走既有扩展点（tool/hook/prompt/widget）；见 `architecture-first-extension.mdc`
 3. **明确不改什么**：边界、不顺手重构、不删实现（临时截断只加入口 guard，见 `minimal-disable-preserve-body.mdc`）
-4. **非 trivial 逻辑**：拟议 diff 轮廓经用户确认后再进入 Phase 2（对齐 AGENTS.md「先预览后落盘」）
+4. **非 trivial 逻辑**：拟议 diff 轮廓经用户确认后再进入 Phase 2（「先预览后落盘」）
 
 ### 轻量路径
 
@@ -37,7 +37,7 @@ Multitask Mode 下 Task 子代理改生产代码时**强制**本流程；主对�
  - 保留用户标识符；禁止擅自重命名、跨文件搬家、过度抽一行微 helper
  - 最小 diff：不重排方法、不顺手清理死代码
  - 注释中文、动作导向；4 空格、紧凑风跟邻近文件
-4. 数据安全：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`local_model`
+4. 数据安全：不删/不清/不批量覆盖 `session_detail`、`session_plan`、`memory_storage`、`memory_config`、`memory_log`、`local_model`
 
 ## Phase 3 — Review + Test
 

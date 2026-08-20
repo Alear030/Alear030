@@ -5,12 +5,12 @@ description: "把 Alear030 审查/复盘发现的待优化问题记录成 GitHub
 
 # Alear030 技术债 issue 上传
 
-把审查/复盘/日常发现的「当前看可能有问题，后续需要修改优化」的技术债记录到 GitHub 仓库 `Alear030/Alear030-remote`。固定规范：`tech-debt` 专属标签 + 严重度标题前缀 + 三段式正文，与仓库已建的 issue 模板保持风格统一。
+把审查/复盘/日常发现的「当前看可能有问题，后续需要修改优化」的技术债记录到 GitHub 仓库 `Alear030/Alear030`。固定规范：`tech-debt` 专属标签 + 严重度标题前缀 + 三段式正文，与仓库已建的 issue 模板保持风格统一。
 
 ## 生成前先做的事
 
 1. 确认 gh 已登录：`gh auth status`（需有 `repo` scope，否则不能建 issue）。
-2. 确认远程仓库：`git remote -v`，仓库应为 `Alear030/Alear030-remote`。
+2. 确认远程仓库：`git remote -v`，仓库应为 `Alear030/Alear030`。
 3. 收集/整理待记录的问题清单，每条包含：问题描述、证据（`文件:行号`）、建议方向。如果是审查报告的产物，先按严重度分级（高/中/低）。
 
 ## 标签与严重度规范
@@ -45,14 +45,14 @@ description: "把 Alear030 审查/复盘发现的待优化问题记录成 GitHub
 
 ```powershell
 # 单条创建
-gh issue create --repo Alear030/Alear030-remote --title "[高] <一句话描述>" --body-file <临时文件> --label tech-debt
+gh issue create --repo Alear030/Alear030 --title "[高] <一句话描述>" --body-file <临时文件> --label tech-debt
 
 # 批量时逐条执行，单条失败单独重试，不中断其余
 ```
 
 - 标题：严重度前缀 + 一句话（能看出改什么）。
 - 证据必须给到 `文件:行号` 级别，方便定位。
-- 完成后跑 `gh issue list --repo Alear030/Alear030-remote --label tech-debt` 确认全部落地为 OPEN。
+- 完成后跑 `gh issue list --repo Alear030/Alear030 --label tech-debt` 确认全部落地为 OPEN。
 
 ## 真实例子（照着这个语感写）
 

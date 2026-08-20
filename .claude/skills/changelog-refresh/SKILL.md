@@ -75,7 +75,7 @@ description: "刷新 Alear030 项目的 CHANGELOG.md：把近期一批 git 提�
 - [重构] session compress：计数改为 main agent 全量 `message_list`（修旧计数只算尾片致几乎不触发）；超阈值 `250000` 后保留 system+最后切片原始消息，attachment 注入更早切片摘要并恢复跨会话 timeline
 - [收口] timeline 渲染与注入统一收口到 `memory.inject_timeline_attachment`，`session_timeline_inject` hook 与 `session_compress` 共用同一入口，消除分层双源漂移
 - [修复] `file_edit`/`file_write` 的 `path.absolute()` 误用改为 `is_absolute()`（原写法恒真致路径校验失效）
-- [清理] `test/`、真实 session/memory 语料及 `bench_secret.py` 纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目宪法）；取消跟踪已泄漏 session_detail；开源前仍需 filter-repo 重写历史
+- [清理] `test/` 与运行时 session/memory 数据纳入 .gitignore；CLAUDE.md 正式纳入版本跟踪（供并行 worktree 共享项目约定）
 
 验证：三轮真实 REPL 确认压缩后可由摘要恢复首轮唯一标记；AST + `_emit`/`_update` 分叉探针确认 skill candidate 产出逻辑。
 
