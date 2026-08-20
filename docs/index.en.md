@@ -12,7 +12,7 @@ Documents under `docs/` are organized into three tiers by content type; new docu
 
 - **Overview docs** (`docs/` root): cross-module explanations, for someone reading the project for the first time
 - **Module mechanism docs** (`docs/modules/<module>.md`): what a single module looks like right now, named after the module in [CLAUDE.md](../CLAUDE.md)'s stable module map
-- **Design narrative docs** (`docs/design/<topic>.md`): why a single mechanism ended up shaped this way, decoupled from the mechanism doc, not required to have an English version
+- **Design narrative docs** (`docs/design/<topic>.md`): why a single mechanism ended up shaped this way, decoupled from the mechanism doc
 
 Only documents with actual content are listed below; modules that don't have a write-up yet don't get a placeholder link.
 
@@ -28,4 +28,4 @@ Only documents with actual content are listed below; modules that don't have a w
 
 ## Design narratives
 
-- [Memory ideas & design](design/memory.md) *(Chinese)* — why the memory system ended up shaped this way
+- [Memory ideas & design](design/memory.en.md) — why the memory system ended up shaped this way

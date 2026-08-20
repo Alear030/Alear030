@@ -1,5 +1,7 @@
 # 记忆的想法&构思
 
+**中文** · [English](memory.en.md)
+
 ← [返回 README](../../README.md) · [机制文档](../modules/memory.md) · [文档目录](../index.md)
 
 [机制文档](../modules/memory.md) 讲的是「现在是什么样」。这一篇讲「我为什么把它做成这个样子」——里面有几个选择单看很奇怪，得知道它们在解决什么问题才讲得通。

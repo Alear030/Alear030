@@ -6,7 +6,7 @@
 
 This is the part of Alear030 that received the most investment, and the main difference from typical "ReAct + tool calling" projects. The full chain — topic-boundary slicing, embeddings, classification, deduplication, profile extraction, cross-session timeline generation, semantic recall — is implemented entirely in this repository, **with no external vector database**.
 
-This document covers the mechanism. **Why it looks this way** is in [Memory ideas & design](../design/memory.md) *(Chinese)*; architecture overview in [Architecture](../ARCHITECTURE.en.md); configuration in [Configuration](../CONFIGURATION.en.md).
+This document covers the mechanism. **Why it looks this way** is in [Memory ideas & design](../design/memory.en.md); architecture overview in [Architecture](../ARCHITECTURE.en.md); configuration in [Configuration](../CONFIGURATION.en.md).
 
 > **Every technical claim in this document has been checked against the code.** Unverified speculation is omitted; known rough edges are listed honestly in the final section.
 
@@ -286,7 +286,7 @@ Injection into the system prompt is not a full dump (many sessions would blow th
 
 ## Self-Emergence: What This Pipeline Grows
 
-Earlier sections were about "remembering". But **remembering was never the goal** — the goal is an agent that can grow on its own; memory is only the necessary base (the origin of this line is in [Memory ideas & design](../design/memory.md) *(Chinese)*).
+Earlier sections were about "remembering". But **remembering was never the goal** — the goal is an agent that can grow on its own; memory is only the necessary base (the origin of this line is in [Memory ideas & design](../design/memory.en.md)).
 
 This section is that goal at the mechanism layer: **several tables in this pipeline are not fixed schemas; they grow with use.**
 
@@ -342,12 +342,12 @@ That closes a loop:
 flowchart LR
     A[Do work] --> B[Slice ingested]
     B --> C[Classified as task]
-    C --> D{同类反复出现<br/>攒够阈值?}
-    D -- 是 --> E[提议固化为技能]
-    E --> F[skill.md 落盘]
-    F --> G[进 system prompt<br/>成为可调用能力]
+    C --> D{Same kind repeats<br/>enough times?}
+    D -- yes --> E[Propose solidify as skill]
+    E --> F[skill.md on disk]
+    F --> G[Enter system prompt<br/>as callable capability]
     G --> A
-    D -- 否 --> B
+    D -- no --> B
 ```
 
 **Memory here is not only read — it generates capability.** Most agent memory systems stop at recall — store in, look up. This pipeline takes one more step: it watches what it has done repeatedly, then proposes growing a new skill. After solidification the skill enters the system prompt as something the next round can call; new slices flow back into the same pipeline.
@@ -362,7 +362,7 @@ But the current boundary is clear:
 - Thresholds (2 / 3) are hard-coded constants with no use-driven tuning
 - The three self-emergence layers do not feed each other — e.g. a new profile dimension does not change task matching strategy
 - The whole chain is off by default; see [the opening section](#prerequisites-off-by-default)
-- **Most fundamental: the type set itself is still hard-coded.** Feature words, dimensions, and skills grow, but "which memory kinds exist" is still my choice — `slices_pipeline` only has hard-coded `user_info` and `task` branches. Unlocking that is true self-emergence, and the next stretch of the main line; see [the ideas & design piece](../design/memory.md#什么是自涌现现在是什么程度潜力或者我对他未来的期望是什么) *(Chinese)*
+- **Most fundamental: the type set itself is still hard-coded.** Feature words, dimensions, and skills grow, but "which memory kinds exist" is still my choice — `slices_pipeline` only has hard-coded `user_info` and `task` branches. Unlocking that is true self-emergence, and the next stretch of the main line; see [the ideas & design piece](../design/memory.en.md#what-is-self-emergence-where-does-it-stand-now-whats-its-potential-or-what-do-i-expect-from-it)
 
 ---
 
@@ -448,7 +448,7 @@ It also re-runs `_session_summary()` before compress, closing the timing gap whe
 
 ## How This Mechanism Grew
 
-Above is "what it is now". **Why it looks this way** — including the graph structure discussed longest but deliberately not shipped, how the Hook system grew out of a slice stall, and a counter-intuitive finding from my own tests — is written separately in **[Memory ideas & design](../design/memory.md)** *(Chinese)*.
+Above is "what it is now". **Why it looks this way** — including the graph structure discussed longest but deliberately not shipped, how the Hook system grew out of a slice stall, and a counter-intuitive finding from my own tests — is written separately in **[Memory ideas & design](../design/memory.en.md)**.
 
 That piece also clarifies something this document does not: **the system's goal is not memory itself**.
 

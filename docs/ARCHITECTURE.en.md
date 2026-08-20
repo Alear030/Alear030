@@ -84,118 +84,118 @@ finally:
 
 ```text
 Alear030/
-├── main.py                     # 入口：装配 Session/Loop/Memory、预热后进入 TUI、退出收尾
-├── config.py                   # 集中配置（MODEL_LEVEL / 路径 / 运行常量）
-├── pyproject.toml              # 项目元数据与钉死的直接依赖
-├── .env                        # API key & 三级模型配置（不纳入版本控制）
+├── main.py                     # entry: assemble Session/Loop/Memory, prewarm, enter TUI, exit teardown
+├── config.py                   # central config (MODEL_LEVEL / paths / runtime constants)
+├── pyproject.toml              # project metadata and pinned direct dependencies
+├── .env                        # API key & three-tier model config (not version-controlled)
 │
-├── loop/                       # ReAct 推理循环
-│   ├── loop_core.py            # Loop 类 —— 纯 ReAct 引擎（main/subagent 共用，对 plan 编排零感知）
-│   └── orchestrator.py         # PlanRunner —— plan 分步编排器，独立于 Loop（含无进展熔断）
+├── loop/                       # ReAct reasoning loop
+│   ├── loop_core.py            # Loop class — pure ReAct engine (shared by main/subagent; zero awareness of plan orchestration)
+│   └── orchestrator.py         # PlanRunner — stepwise plan orchestrator, independent of Loop (includes stall circuit-breaker)
 │
-├── agent/                      # Agent 集群
-│   ├── agent_core.py           # Agent 类 + Agents 容器（YAML 驱动）
-│   └── agents.yaml             # 5 个常驻 Agent：main/slice/summary/plan/memory
+├── agent/                      # Agent cluster
+│   ├── agent_core.py           # Agent class + Agents container (YAML-driven)
+│   └── agents.yaml             # 5 resident Agents: main/slice/summary/plan/memory
 │
-├── prompt/                     # Prompt 分层组合（装饰器 + 目录自动发现注册）
-│   ├── prompt_core.py          # Prompt 类：薄封装，调用 build_prompt(agent)
-│   ├── prompt_register.py      # @register_prompt + build_prompt（order 排序 / condition 过滤 / enabled 开关）
-│   ├── __init__.py             # 自动发现并 import prompt/prompts/*/prompt.py
-│   └── prompts/                # 各分块独立注册，按 order 拼接
-│       ├── system_prompt/      # 认知架构（order 0，仅 main）
-│       ├── attachment_prompt/  # 运行时通知/中断处理协议（order 5，仅 main）
-│       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name 与简短描述（order 10）
-│       ├── skill_prompt/       # 技能原则 + 已注册技能列表（order 20，仅 skill_tool 权限）
-│       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（order 30，仅 main，当前 enabled=False）
-│       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（order 30，仅 main）
-│       ├── memory_prompt/      # 用户画像注入，读 user.json（order 35，仅 main）
-│       ├── agent_prompt/       # {agent_name}_agent.md 身份（order 40，覆盖 main/slice/summary/plan）
-│       └── basic_prompt/       # 当前时间戳（order 50）
+├── prompt/                     # layered Prompt composition (decorator + directory auto-discovery registration)
+│   ├── prompt_core.py          # Prompt class: thin wrapper calling build_prompt(agent)
+│   ├── prompt_register.py      # @register_prompt + build_prompt (order sort / condition filter / enabled switch)
+│   ├── __init__.py             # auto-discover and import prompt/prompts/*/prompt.py
+│   └── prompts/                # each block registers independently; concatenated by order
+│       ├── system_prompt/      # cognitive architecture (order 0, main only)
+│       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (order 5, main only)
+│       ├── tool_prompt/        # tool-use principles + name and short desc of held tools (order 10)
+│       ├── skill_prompt/       # skill principles + registered skill list (order 20, skill_tool auth only)
+│       ├── session_recent/     # slice summaries of last 3 sessions (order 30, main only, currently enabled=False)
+│       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (order 30, main only)
+│       ├── memory_prompt/      # user-profile injection; reads user.json (order 35, main only)
+│       ├── agent_prompt/       # {agent_name}_agent.md identity (order 40, covers main/slice/summary/plan)
+│       └── basic_prompt/       # current timestamp (order 50)
 │
-├── session/                    # 会话生命周期
-│   ├── session_core.py         # Session 类（持久化 / 切片 / 摘要 / 压缩 / message_list 重建）
-│   ├── attachment_core.py      # 运行时通知/中断的纯内存态实现
-│   ├── session_plan.py         # Plan / Plan_step 类（读取与推进 plan 状态）
-│   ├── session_detail/         # 每个会话的完整 JSON：切片 + 消息流（不纳入版本控制）
-│   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
+├── session/                    # session lifecycle
+│   ├── session_core.py         # Session class (persist / slice / summary / compress / rebuild message_list)
+│   ├── attachment_core.py      # pure in-memory runtime notice/interrupt implementation
+│   ├── session_plan.py         # Plan / Plan_step classes (read and advance plan state)
+│   ├── session_detail/         # full JSON per session: slices + message stream (not version-controlled)
+│   └── session_plan/           # plan files written by plan_design (not version-controlled)
 │
-├── hook/                       # 事件驱动 Hook 系统
-│   ├── hook_core.py            # HookManager：注册 / 触发 / match 过滤 / 后台线程池
-│   ├── __init__.py             # 递归发现 hook/hooks/**/hook.py
-│   └── hooks/                  # 按 hook point 分层
+├── hook/                       # event-driven Hook system
+│   ├── hook_core.py            # HookManager: register / trigger / match filter / background thread pool
+│   ├── __init__.py             # recursively discover hook/hooks/**/hook.py
+│   └── hooks/                  # layered by hook point
 │       ├── pre_toolUse/
-│       │   └── inject_import_args/    # 同步：给全部工具注入 agents/session/hooks/Loop/memory
+│       │   └── inject_import_args/    # sync: inject agents/session/hooks/Loop/memory into all tools
 │       ├── after_round/
-│       │   ├── memory_pipeline/       # 后台：切片 + 摘要，把 worthy slice 交给 Memory
-│       │   └── session_compress/      # 同步：Token 超限时压缩 session
+│       │   ├── memory_pipeline/       # background: slice + summary; hand worthy slices to Memory
+│       │   └── session_compress/      # sync: compress session when tokens exceed limit
 │       └── after_session/
-│           ├── final_memory_pipeline/ # 后台：会话退出时处理最终定型尾片
-│           └── session_timeline/      # 后台：把 worthy slice 提炼成跨会话时间线事件
+│           ├── final_memory_pipeline/ # background: handle final settled trailing slice on session exit
+│           └── session_timeline/      # background: distill worthy slices into a cross-session timeline event
 │
-├── tool/                       # 工具系统
-│   ├── tool_core.py            # 工具注册 / schema 推导 / match_tool / pre_toolUse 触发
-│   ├── __init__.py             # 只导入 tool/tools/ 下的一级 package
+├── tool/                       # tool system
+│   ├── tool_core.py            # tool registration / schema derivation / match_tool / pre_toolUse trigger
+│   ├── __init__.py             # import only first-level packages under tool/tools/
 │   └── tools/
-│       ├── command/            # 命令行执行 + security.py 安全闸门（见设计决策末尾）
-│       ├── file_tool/          # 文件工具集群
-│       │   ├── file_read/      # 读取（带行号，三重输出上限）
-│       │   ├── file_write/     # 写入/新建（整体覆盖）
-│       │   ├── file_edit/      # 局部编辑（唯一字符串替换）
-│       │   ├── file_glob/      # 按文件名 glob 查找
-│       │   └── file_grep/      # 按正则搜索内容
-│       ├── web_search/         # DuckDuckGo 搜索
-│       ├── web_fetch/          # 网页抓取（线程池并行多 URL）
-│       ├── memory_recall/      # 语义搜索历史会话切片
-│       ├── session_slice/      # 读取特定会话原文
-│       ├── plan_tool/          # plan 集群（内部调用 Loop 跑 plan_agent）
-│       │   ├── plan_design/    # 创建/修改分步计划
-│       │   ├── plan_update/    # 更新指定 step 的状态与结果
-│       │   ├── plan_mode_on/   # 激活 plan 执行模式
-│       │   └── plan_mode_off/  # 结束 plan 执行模式
+│       ├── command/            # command execution + security.py gate (see end of design decisions)
+│       ├── file_tool/          # file-tool cluster
+│       │   ├── file_read/      # read (with line numbers; triple output caps)
+│       │   ├── file_write/     # write/create (full overwrite)
+│       │   ├── file_edit/      # local edit (unique string replace)
+│       │   ├── file_glob/      # glob by filename
+│       │   └── file_grep/      # search content by regex
+│       ├── web_search/         # DuckDuckGo search
+│       ├── web_fetch/          # web fetch (thread-pool parallel multi-URL)
+│       ├── memory_recall/      # semantic search over historical session slices
+│       ├── session_slice/      # read a specific session raw text
+│       ├── plan_tool/          # plan cluster (internally calls Loop to run plan_agent)
+│       │   ├── plan_design/    # create/modify stepwise plan
+│       │   ├── plan_update/    # update status and result of a given step
+│       │   ├── plan_mode_on/   # activate plan execution mode
+│       │   └── plan_mode_off/  # end plan execution mode
 │       ├── subagent_tool/
-│       │   └── subagent_create/# 并行创建并运行多个临时 subagent（默认只读授权，可用 tool_autho 覆盖）
-│       ├── skill_tool/         # 技能集群
-│       │   ├── skill_list/     # 扫描磁盘技能列表（当前禁用）
-│       │   ├── skill_load/     # 按目录名加载 skill.md 正文
-│       │   └── skill_finish/   # 技能创建收尾：确认后回写 skill_info
-│       ├── user_intention/     # 用户意图识别（当前禁用）
+│       │   └── subagent_create/# create and run multiple temporary subagents in parallel (default read-only auth; overridable via tool_autho)
+│       ├── skill_tool/         # skill cluster
+│       │   ├── skill_list/     # scan on-disk skill list (currently disabled)
+│       │   ├── skill_load/     # load skill.md body by directory name
+│       │   └── skill_finish/   # skill-creation finish: write back skill_info after confirmation
+│       ├── user_intention/     # user-intention recognition (currently disabled)
 │       └── interaction/
-│           └── askUserQuestion/# 反向提问 / 澄清
+│           └── askUserQuestion/# ask back / clarify
 │
-├── mcp_client/                 # MCP 客户端（目录不能叫 mcp，会遮蔽同名 pip 包）
-│   ├── mcp_core.py             # 对外门面：prewarm_mcp_servers / shutdown_mcp_servers
-│   ├── mcp_config.py           # 读 mcp.json、展开 ${VAR} 占位符、按 enabled 过滤
-│   ├── mcp_supervisor.py       # asyncio 隔离：daemon 线程 + 单个常驻 supervisor task
-│   ├── mcp_bridge.py           # 远端工具运行时 register_tool / unregister_tool
-│   ├── mcp.json.example        # 配置模板
-│   └── mcp.json                # 本机实际配置（不纳入版本控制）
+├── mcp_client/                 # MCP client (directory must not be named mcp — would shadow the pip package)
+│   ├── mcp_core.py             # public facade: prewarm_mcp_servers / shutdown_mcp_servers
+│   ├── mcp_config.py           # read mcp.json, expand ${VAR} placeholders, filter by enabled
+│   ├── mcp_supervisor.py       # asyncio isolation: daemon thread + single resident supervisor task
+│   ├── mcp_bridge.py           # runtime register_tool / unregister_tool for remote tools
+│   ├── mcp.json.example        # config template
+│   └── mcp.json                # local actual config (not version-controlled)
 │
-├── memory/                     # 跨会话记忆
-│   ├── memory_core.py          # 主线：slice 分类、去重、slice_node 入库、user_info 画像提炼
-│   ├── memory_storage/         # 派生存储（slice_node / user / timeline / advanced_task_node）
-│   ├── memory_config/          # 画像维度模板等运行时配置
-│   ├── memory_prompt/          # memory agent 的 system prompt 来源，按 type 分文件
-│   └── memory_log/             # 失败诊断与评估日志
+├── memory/                     # cross-session memory
+│   ├── memory_core.py          # main line: slice classify, dedupe, slice_node ingest, user_info profile extraction
+│   ├── memory_storage/         # derived storage (slice_node / user / timeline / advanced_task_node)
+│   ├── memory_config/          # runtime config such as profile-dimension templates
+│   ├── memory_prompt/          # source of memory agent system prompt, one file per type
+│   └── memory_log/             # failure diagnostics and evaluation logs
 │
-├── local_model/                # 本地中文嵌入模型（GTE）
-│                               # 权重不纳入版本控制，首次运行自动从 ModelScope 下载（约 195MB）
+├── local_model/                # local Chinese embedding model (GTE)
+│                               # weights not version-controlled; first run auto-downloads from ModelScope (~195MB)
 │
 ├── tui/                        # Textual TUI
-│   ├── tui_core.py             # 入口：App 装配、do_work 工作线程、_run_round
-│   ├── tui_style.tcss          # 全局样式
+│   ├── tui_core.py             # entry: App assembly, do_work worker thread, _run_round
+│   ├── tui_style.tcss          # global styles
 │   ├── tui_channel/
-│   │   └── tui_channel_core.py # 按 agent_name 路由的 channel：append_stream / build_widget
+│   │   └── tui_channel_core.py # channel routed by agent_name: append_stream / build_widget
 │   └── tui_widget/
-│       ├── tui_widgets_core.py # @widget_register 注册 + build_widget 按类型构造
-│       └── tui_widgets/        # 每个 widget 一个目录（widget_core.py + widget_css.tcss）
+│       ├── tui_widgets_core.py # @widget_register registration + build_widget construct by type
+│       └── tui_widgets/        # one directory per widget (widget_core.py + widget_css.tcss)
 │           ├── UserInput/ UserContent/
 │           ├── AssistantContent/ AssistantThinking/ AssistantToolCall/
 │           ├── AskUserQuestion/ SystemError/
 │           └── BottomBar/ BottomThinkTip/ StateBar/
 │
-├── skill/                      # 技能系统：每个技能一个目录，内含 skill.md（YAML frontmatter + 正文）
+├── skill/                      # skill system: one directory per skill containing skill.md (YAML frontmatter + body)
 │
-└── workspace/                  # 工作区（不参与项目代码）
+└── workspace/                  # workspace (not part of project code)
 ```
 
 ---

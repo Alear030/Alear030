@@ -133,7 +133,7 @@ A few non-obvious parts:
 
 Full data flow, every artifact and its consumers, and an honest list of **known limitations**, are in **[the memory documentation](docs/modules/memory.en.md)**.
 
-Why I shaped it this way is in **[the design journey](docs/design/memory.md)** *(Chinese)*.
+Why I shaped it this way is in **[the design journey](docs/design/memory.en.md)**.
 
 ---
 
