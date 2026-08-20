@@ -10,6 +10,12 @@ What follows is my own thinking at the time, plus the conversations I had with A
 
 "Alear030" as quoted below refers to the very system being developed at the time — those conversations are what's left over from writing it while discussing, with it, how to write it.
 
+A few thoughts on memory in general: designing and building an agent's memory framework always ends up circling the same handful of questions — when to store, how to store, what to store, when to recall, how to recall, what to recall. That's the baseline. After that comes something a bit more involved — non-linear memory structures and self-emergence (or, put another way: giving the system/agent a base scaffold and letting it grow, maintain, and evolve on its own). This is actually the whole reason I insisted on writing my own thinking up as a separate design doc — I wanted to share it.
+
+The total code for memory isn't actually that much — the core file is only about 900-some lines, and even that's partly because I never split it up or refactored it cleaner. But the lived experience of building it felt completely different from that line count: the more I researched, thought about, and pushed this forward, the more it felt like the design-and-thinking effort alone rivaled everything else in the project combined. Every other module basically wraps up once it's written — unless something else touches it, it's done, a phase that closes. Memory never closed. How to design it, how to build it, has been running continuously in the back of my head the whole time. That's a strange, interesting feeling.
+
+What follows is partly a question I've been chewing on since around mid-June, and partly my own thinking on the aspects above.
+
 ---
 
 ## Table of Contents
@@ -26,17 +32,19 @@ What follows is my own thinking at the time, plus the conversations I had with A
 
 ## The Original Goal Was Never a Memory System
 
-What I wanted was **an agent that could grow on its own**. Self-emergence is the main line; memory is only the necessary foundation for it, not the destination.
+What I wanted was **an agent that could grow on its own** — or maybe more like its own kind of existence. Self-emergence is necessary; memory is only the necessary foundation for it, not the destination.
 
 That distinction sounds abstract, but every strange-looking choice further down traces back to it: why the graph structure — the thing discussed longest — was deliberately never shipped, why recall is still brute-force full-scan to this day, why almost every classification scheme in the system refuses to be hard-coded.
 
 This sentence isn't something I summarized in hindsight. It comes from [the chapter on the graph](#exploring-the-storage-structure--the-graph-the-direction-i-deliberated-longest-and-never-shipped) — at the low point of the discussion on 2026-06-26, Alear030 put it into words for me. If you want to see the evidence first, jump straight there.
 
+PS: **What I actually wanted to build was never a memory system or framework. Memory is just a problem I had to solve on the way to what I actually wanted.**
+
 ---
 
 ## The Reference Point All Along: Human Memory Itself
 
-My starting point was the mechanism of human memory itself — not copying some paper, but "how memory ought to work." For the parts that can't be implemented in machinery (neural networks, neurochemical transmitters), I substituted other methods.
+My starting point was referencing how my own memory actually works — not copying some paper, or the corresponding cognitive-science, neuroscience, or brain-science literature (because at the time I knew exactly none of that! #wrong-but-confident-anyway), but "what do I think memory ought to be like?" For the parts that can't be implemented in machinery — certain properties of the human brain, for instance — I substituted other methods.
 
 ### The Brain-Region Mapping Came Later
 
@@ -50,17 +58,29 @@ Later still, this correspondence became an explicit design input. Discussing emo
 
 So the full story is: **it wasn't intentional correspondence at first — it got pointed out only after the fact, and only then did it become a conscious reference.**
 
+I was also thinking about something else at the time: now that the AI era has arrived, what's the biggest change for me personally? One of them is probably this — whatever idea pops into my head, I can immediately go find the corresponding field's knowledge, dig into and learn it, then immediately build it and see what happens. Realizing that changed a fair amount of how I've worked ever since.
+
+That's genuinely interesting — a lot of the time an LLM feels to me like a shared cloud drive of all human knowledge across all of history, haha, it really is interesting.
+
 ### On Similar Projects
 
-Partway through I searched for a few memory frameworks that were getting attention at the time, to see if anyone else was doing the same thing. There were papers in this direction, but I didn't find engineering implementations going down this road, so I started trying it myself.
+Partway through I searched for a few memory frameworks that were getting attention at the time, to see if anyone else was doing the same thing. There were papers in this direction, though some of them went pretty big on it (scared me a little), but I didn't find engineering implementations going down this road, so I started trying it myself.
+
+ps: honestly I really wanted something existing to map myself onto. Building memory was a constant grind of pushing forward while constantly doubting and second-guessing whether my own approach was even right — genuinely a form of torture. Looking back now I'm actually curious why I put myself through that. Good thing I ended up with a result that I personally think is pretty "whoa" — 030. ps's ps: that was a meme face — pouty lips, playing dumb, haha.
 
 ---
 
 ## The Foundation: Making One Event Storable First
 
-The next chapter — the discussion about the graph — opens with "you said this slice can't be changed after the fact." That's built on the premise that the slicing layer already exists. So first, how the foundation got built.
+It's worth spelling out my original cognitive model here. Early on, referencing my own memory — or human memory in general — my thinking went like this: humans don't summarize what they're experiencing in real time, on the fly. In the moment, they're just experiencing it. Only once some external trigger sets off a recollection do people start tracing back, locating, and reconstructing related fragments through various means, and then replaying them in their mind.
+
+Later I learned about some of the theories in that *How the Mind Works* book mentioned above, and it clicked for me that human memory is probably jointly constructed out of every external and internal "feeling" present at the time — not just something like a cartoon reel of images (thinking about it now, you don't even need a theory to see that — you clearly remember non-visual things too...). When we recall, sometimes it's a keyword-based approach, sometimes it's a fragment of a scene, but sometimes it's just a plain feeling, an emotion, a thought.
+
+There's another property too: sometimes human recollection isn't actively willed at all. I haven't fully worked this one out, or honestly haven't thought hard about it, but I really have observed this in myself — at various points or occasions, my mind will automatically surface related past fragments and content on its own, to help me think, without me asking for it. That's a strange thing, and I don't know why it needs to work that way, or why it does. Doesn't that raise the brain's energy cost for no reason? Not sure — maybe it actually helps? Otherwise why would it have evolved this way? Noting it here — I might dig into why later (@agent remind me about this when I'm thinking it through, down the line).
 
 ### From "Classify on Arrival" to "Stream of Experience"
+
+The next chapter — the discussion about the graph — opens with "you said this slice can't be changed after the fact." That's built on the premise that the slicing layer already exists. So first, how the foundation got built.
 
 My original plan was to actively classify information and store it in the corresponding place. By the second generation I threw that out: **don't pre-classify — save the experience as-is, as a "stream of experience,"** then form triggers, associations, and extractions on top of it.
 
@@ -76,7 +96,7 @@ I saw the cost even at the time — the early slicing decisions are irreversible
 
 ### Decoupling Slicing from Storage
 
-Slice granularity is never ideal — either too fine or too coarse. My conclusion was to stop expecting to get it right in one pass: **slicing is only responsible for slicing (chasing purity); organizing and aggregating is the storage layer's job.**
+Slice granularity is never ideal — either too fine or too coarse (LLM output is never reliably predictable, which is also why so much of this codebase reads like reflexive defensive programming — the thing really does output garbage sometimes, no matter how carefully you write the system prompt, it's honestly exasperating). My conclusion was to stop expecting to get it right in one pass: **slicing is only responsible for slicing (chasing purity); organizing and aggregating is the storage layer's job.**
 
 Today's layering — "`session_slice` is the source of truth, `slice_node` is derived storage" — is that principle put into practice.
 
@@ -92,7 +112,7 @@ Today's entire event-driven Hook system traces back to this one bad-feeling prob
 
 ## Exploring the Storage Structure — the Graph: the Direction I Deliberated Longest and Never Shipped
 
-This is the piece I spent the most time discussing and ultimately abandoned myself. The whole arc happened in a single session on 2026-06-26 — 16 turns from proposal to verdict.
+This is the piece I spent the most time discussing and ultimately abandoned myself (thinking about it still gives me a little heartache every time, T-T). The whole arc happened in a single session on 2026-06-26 — 16 turns from proposal to verdict.
 
 The original wording is kept below, because the summary alone gives no sense of this arc at all. Only typos are fixed, plus one place where I misattributed something in the moment.
 
@@ -115,6 +135,10 @@ The graph can spread, but only once you're already standing on some node. And fi
 > No wait, the problem is — I'm already running full embedding similarity over everything. Why wouldn't I just take the top three most similar and return those? What do I even need the graph for?
 
 If the entry point is already found via full embedding similarity, then top-K is already the most-similar result — one hop of spreading either returns duplicates, or returns something less similar and dilutes precision instead.
+
+There was something absurd about it — the moment I landed on that conclusion, I had this feeling of being completely absorbed in my own art, unable to pull myself out of it, and then reality just came and shattered it without mercy. Heh.
+
+That was a painful lesson: theory, ideas, and concepts can guide implementation, but you should never implement something just for the sake of implementing it, and you can't divorce yourself from engineering either — all of this exists to serve your actual goal. And what is that goal? Certainly not something flashy enough to brag about that shatters the instant it meets reality — honestly, that kind of thing isn't worth much.
 
 Alear030's answer didn't dodge it:
 
@@ -162,7 +186,7 @@ This passage is exactly where [the opening claim](#the-original-goal-was-never-a
 
 ### The Verdict
 
-I kept pushing:
+I kept pushing (a last-ditch struggle — there were times I genuinely wanted to go tweak Alear030's system prompt to make him a little less relentlessly objective and neutral... this guy never stops calling me out >-<):
 
 > Ignore all my constraints for a second — what to do, what to do later, what needs to accumulate first, none of that's the issue. What I'm actually asking is: for this whole graph setup, where's the concrete scenario and meaning that proves it's necessary, that it's a must, and that it's good?
 
@@ -172,9 +196,20 @@ The final plan came from me:
 
 Alear030's reply was three words: "Yes. That's it." Then he wrote it into one sentence — **the graph handles linking, not recall.** The primary result stays clean, relying only on embedding similarity; the graph only enhances the result, spreading one hop out from top-K to bring back linked nodes.
 
+### PS (a few thoughts as I write this)
+
+That conclusion at the time — "brute-force search is the best you can do" — looking back now isn't quite right.
+
+Because my memory system today is already facing a very real problem of its own: the data volume grows linearly.
+
+The volume of historical memory turns out to be a variable that matters a lot: full-vector similarity matching is, first, less accurate and less flexible once the data gets large, and second, its computational cost also grows linearly.
+
+Later I looked at a few memory frameworks that do this reasonably well, and pretty much all of them run some auxiliary scoping step before the embedding step, instead of comparing against everything from the start. Honestly, my own memory system's first version actually had similar comparison logic too, but I stripped it out entirely during a later full rewrite — partly because my memory framework has no dedicated type/keyword mechanism, and partly because if you match on keywords first, the LLM doesn't actually know what target keywords it should even pass in. And since then I've kept chasing the search-scope-and-matching problem from other angles instead, so the keyword mechanism never got reimplemented. Though I do think… it'll probably get added eventually… maybe.
+
 ### Where It Stands Now
 
-**This plan has never been implemented.**
+**I still haven't implemented this plan in its final form.**
+(Do I even need to write this....)
 
 It's not an oversight — it's a matter of ordering: the foundation had to be built first. To this day, `memory_recall` is still a brute-force full-embedding scan, with no graph and no associative spreading.
 
@@ -200,11 +235,17 @@ The deeper reflection came after that: the timeline is a **shared variable** —
 
 That's why `memory_recall` still keeps a full scan as the default behavior to this day — `session_ids` is only an optional narrowing parameter.
 
+When I first landed on that conclusion, I was still a little skeptical — surely the timeline wasn't going to turn into another version of the graph thing, right? But later I built my own small test set modeled on LongMemEval and ran it, and the timeline genuinely helped — especially on cross-session questions where ordering across time also mattered. On the questions that purely tested search-matching precision though, I can't say it helped zero, but I'd say it didn't help all that much either, haha.
+
+ps: that test set isn't part of the open-source scope, because... it was built in its own worktree at the time, and, well, how do I put this... I accidentally destroyed that worktree. I'm not great with the finer points of git, and I've only had so much time to learn it — I only started learning Python on June 5th, and limited time means I can't learn everything else at once too. But at the time I did also try running this memory framework against LongMemEval — the smallest version, the 500-question one, a handful of questions per category — and it got them right, at least. I never finished the full run, because the data preprocessing was too heavy, the LLM call volume too large, and the processing time too long... it kind of choked, and I kind of couldn't afford to run it either, haha. Once I've built a proper golden set later on, I'll get it into the GitHub repo eventually — that's the plan, anyway.
+
 ### Summary Quality Caps the Ceiling on Recall
 
 There was a time I tried to find a past discussion about graph-structure research, and three searches in a row came up empty. What that exposed: **if the summary never captured that meaning, recall can never find it,** no matter how accurately the vectors are computed.
 
 That remains a structural ceiling on this design to this day.
+
+That said, it's not unsolvable — it comes down to the slice's data structure and what gets stored, i.e., the question of what memory actually stores, because what you store directly determines how and what you can retrieve later.
 
 ---
 
