@@ -84,6 +84,8 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 | `skill/` | 项目运行时技能资源 |
 | `tui/` | TUI 界面：channel 路由、widget 注册体系、接收 loop 流式事件（详见"TUI 架构"） |
 
+给某个模块补对外机制文档时放 `docs/modules/<module>.md`（文件名对齐本表路径），设计取舍类叙事放 `docs/design/<topic>.md`，两者分层逻辑与已有条目见 [docs/index.md](docs/index.md)。
+
 `workspace/`、`z_ccstudy/`、`z_old_code/` 不参与主项目分析。
 
 `.cc_file/`（已 `.gitignore`）是非项目内容的存放位置（笔记、复盘、外部材料等），不参与项目代码分析，不受"外科手术式改动"等代码规范约束。

@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
 
-[架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/MEMORY.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [CHANGELOG](CHANGELOG.md)
+[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [CHANGELOG](CHANGELOG.md)
 
 **中文** · [English](README.en.md)
 
@@ -131,9 +131,9 @@ flowchart LR
 
 > ⚠️ **默认是关闭的。** `config.py` 的 `MEMORY_PIPELINE_ENABLED` 默认 `False`，而且它关掉的不只是入库——判空在切片之前，所以切片摘要也一并不跑。改成 `True` 才能体验上述能力。
 
-完整数据流、各产物的定义与消费者、以及**如实列出的已知限制**，见 **[记忆系统文档](docs/MEMORY.md)**。
+完整数据流、各产物的定义与消费者、以及**如实列出的已知限制**，见 **[记忆系统文档](docs/modules/memory.md)**。
 
-我**为什么把它做成这样**，写在 **[记忆的想法&构思](docs/MEMORY-DESIGN.md)**。
+我**为什么把它做成这样**，写在 **[记忆的想法&构思](docs/design/memory.md)**。
 
 ---
 

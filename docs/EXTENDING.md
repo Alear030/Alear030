@@ -1,5 +1,7 @@
 # Alear030 扩展指南
 
+**中文** · [English](EXTENDING.en.md)
+
 ← [返回 README](../README.md)
 
 怎么给 Alear030 加一个工具、一个 Hook、一个 Prompt 分块或一个技能。每一节都是「照抄就能跑」的最小骨架 + 一段容易踩的坑。
