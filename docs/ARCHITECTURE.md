@@ -1,8 +1,10 @@
 # Alear030 架构
 
+**中文** · [English](ARCHITECTURE.en.md)
+
 ← [返回 README](../README.md)
 
-这份文档是 Alear030 架构事实的权威来源，面向第一次读这个项目的人。想深入了解记忆链路看 [记忆系统](MEMORY.md)，想动手扩展看 [扩展指南](EXTENDING.md)，想跑起来看 [配置说明](CONFIGURATION.md)。
+这份文档是 Alear030 架构事实的权威来源，面向第一次读这个项目的人。想深入了解记忆链路看 [记忆系统](modules/memory.md)，想动手扩展看 [扩展指南](EXTENDING.md)，想跑起来看 [配置说明](CONFIGURATION.md)。
 
 Alear030 不是一个「Python Agent 框架」，它是一套完整的 Agent 基础设施（Harness）——处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。模型负责推理，剩下的每一层都在这个仓库里。
 

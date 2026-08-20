@@ -10,7 +10,7 @@ Tool orchestration · multi-agent routing · session lifecycle · event-driven h
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#what-this-is)
 
-[Architecture](docs/ARCHITECTURE.md) · [Memory](docs/MEMORY.md) · [Configuration](docs/CONFIGURATION.md) · [Extending](docs/EXTENDING.md) · [CHANGELOG](CHANGELOG.md) *(docs are in Chinese)*
+[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
 
 [中文](README.md) · **English**
 
@@ -67,7 +67,7 @@ python main.py
 
 On the first run, the local embedding weights (~195 MB) download automatically from ModelScope into `local_model/`. It needs network access only the first time; after that it works offline. This is unrelated to `MEMORY_PIPELINE_ENABLED` — the prewarm runs before that switch is read, so the weights download even with the memory pipeline off.
 
-To connect an MCP server, tune runtime constants, or see every available setting, read **[Configuration](docs/CONFIGURATION.md)** *(Chinese)*.
+To connect an MCP server, tune runtime constants, or see every available setting, read **[Configuration](docs/CONFIGURATION.en.md)**.
 
 ---
 
@@ -94,7 +94,7 @@ flowchart TB
     LOOP -->|streaming events| TUI
 ```
 
-For the full directory tree, the startup and shutdown sequences and per-module responsibilities, see **[Architecture](docs/ARCHITECTURE.md)** *(Chinese)*.
+For the full directory tree, the startup and shutdown sequences and per-module responsibilities, see **[Architecture](docs/ARCHITECTURE.en.md)**.
 
 ---
 
@@ -131,9 +131,9 @@ A few non-obvious parts:
 
 > ⚠️ **It is off by default.** `MEMORY_PIPELINE_ENABLED` in `config.py` defaults to `False`, and it disables more than storage — the check sits before slicing, so slicing and summarization do not run either. Set it to `True` to get any of the above.
 
-Full data flow, every artifact and its consumers, and an honest list of **known limitations**, are in **[the memory documentation](docs/MEMORY.md)** *(Chinese)*.
+Full data flow, every artifact and its consumers, and an honest list of **known limitations**, are in **[the memory documentation](docs/modules/memory.en.md)**.
 
-Why I shaped it this way is in **[the design journey](docs/MEMORY-DESIGN.md)** *(Chinese)*.
+Why I shaped it this way is in **[the design journey](docs/design/memory.md)** *(Chinese)*.
 
 ---
 
@@ -163,7 +163,7 @@ Nine blocks each register independently via `@register_prompt(order, condition, 
 
 `agent`, `session`, `tool`, `hook` and friends never import each other directly. They are wired together by `main.py` and interact through hook injection inside the loop. I did this to keep circular imports from appearing as the project grows, and to avoid scattering lazy imports through the codebase.
 
-> Each decision in full — plus the story behind the directional reversal in the `command` tool's security gate — lives in **[Architecture](docs/ARCHITECTURE.md)** *(Chinese)*.
+> Each decision in full — plus the story behind the directional reversal in the `command` tool's security gate — lives in **[Architecture](docs/ARCHITECTURE.en.md)**.
 
 ---
 
@@ -185,13 +185,13 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ## Security
 
-It runs commands, reads and writes files, and accesses the network on your machine. The `command` gate is built to stop the model from slipping, not to sandbox an adversary, and `file_tool` is asymmetric — writes are confined to `workspace/`, reads are not. Worth a look before you run it: **[SECURITY.md](SECURITY.md)** *(Chinese)*.
+It runs commands, reads and writes files, and accesses the network on your machine. The `command` gate is built to stop the model from slipping, not to sandbox an adversary, and `file_tool` is asymmetric — writes are confined to `workspace/`, reads are not. Worth a look before you run it: **[SECURITY.md](SECURITY.en.md)**.
 
 ---
 
 ## Contributing
 
-One-person project. No PRs for now, but issues are welcome — bugs, questions, design discussions alike. See **[CONTRIBUTING.md](CONTRIBUTING.md)** *(Chinese)*.
+One-person project. No PRs for now, but issues are welcome — bugs, questions, design discussions alike. See **[CONTRIBUTING.md](CONTRIBUTING.en.md)**.
 
 The repository also carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, and those files record how we split the work.
 

@@ -1,5 +1,7 @@
 # 参与方式
 
+**中文** · [English](CONTRIBUTING.en.md)
+
 先说清楚现状，免得白花时间：Alear030 是我一个人在做的实验性项目，架构还在动，方向由我自己拿。
 
 ## PR
@@ -23,6 +25,6 @@
 - [README](README.md) —— 项目是什么、怎么跑起来
 - [配置说明](docs/CONFIGURATION.md) —— `.env`、MCP 接入、运行常量
 - [架构文档](docs/ARCHITECTURE.md) —— 模块划分与核心设计决策
-- [记忆系统](docs/MEMORY.md) —— 机制细节，末尾如实列了已知限制
+- [记忆系统](docs/modules/memory.md) —— 机制细节，末尾如实列了已知限制
 
 跑不起来的问题，issue 里带上操作系统、Python 版本、用的模型服务商和完整报错，能省一轮来回。

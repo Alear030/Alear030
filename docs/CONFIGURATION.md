@@ -1,5 +1,7 @@
 # Alear030 配置说明
 
+**中文** · [English](CONFIGURATION.en.md)
+
 ← [返回 README](../README.md)
 
 跑起来只需要配 `.env` 里的三级模型，其余全部有默认值。这份文档把所有可配项列全，包括 README 里没展开的 MCP 接入。
@@ -148,7 +150,7 @@ MEMORY_PIPELINE_ENABLED = True
 
 代价：开启后每轮对话会额外产生若干次模型调用（一次切片 + 每个待摘要片各一次 + 分类与画像提取）。
 
-整条链路怎么工作见 **[记忆系统](MEMORY.md)**。
+整条链路怎么工作见 **[记忆系统](modules/memory.md)**。
 
 ---
 
