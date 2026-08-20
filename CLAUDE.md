@@ -4,6 +4,8 @@
 
 Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型之外的编排、状态与记忆全部自己实现**。处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
 
+**仓库已公开（MIT）。** 代码、注释、文档、commit message、`.claude/skills/` 与 `.cursor/rules/` 都会被陌生人读到——落笔前按「这会被公开」判断，不留本机绝对路径、内部语境或协作过程叙述。
+
 ## 运行与验证
 
 所有命令从仓库根目录执行：
@@ -13,6 +15,8 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 ```
 
 依赖根目录 `.env` 中的三级模型配置（`max_level` / `medium_level` / `low_level`），由 `config.py` 读取。当前没有锁文件，不能把 `pip install -e .` 等命令当成可复现的完整安装方案。
+
+往 bash 里嵌 `python -c` 或 heredoc 时，未转义的反引号会被命令替换吃掉（本项目文案里反引号标识符极密，已踩两次）。含反引号或正则转义的内容一律先落成脚本再执行，不要拼进 bash 命令行。
 
 验证改动是否可用时用 `alear030-verify` 技能——这个项目的验证方式有几个反直觉的坑（`python main.py` 有真实副作用、验证脚本必须用 `python -m` 点号路径调用、`unittest discover` 不能带 `-s test`），别凭经验直接套用通用 Python 项目的验证套路。
 
@@ -238,7 +242,7 @@ after_session / final_memory_pipeline（后台）
 - `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`、`memory/memory_config/backup/`：派生记忆、运行时日志与配置快照（均已 `.gitignore`；注意 `memory/memory_config/memory_configs/user_info.json` 被 git 跟踪）
 - `local_model/`：embedding 代码与模型元数据已跟踪；权重（`pytorch_model.bin`/`model.safetensors`）`.gitignore`，运行时从 ModelScope 下载
 
-`.gitignore` 已忽略的数据路径：`session_detail/`、`session_plan/`、`test/`、memory 数据子目录、`.claude/`、`.cc_file/`、`AGENTS.md`、local_model 权重。历史 session 文件可能在加入 ignore 规则前已经被 Git 跟踪，ignore 不会取消跟踪，也不意味着删除后一定能完整恢复。
+`.gitignore` 已忽略的数据路径：`session_detail/`、`session_plan/`、`test/`、memory 数据子目录、`.cc_file/`、`AGENTS.md`、`.agents/`、local_model 权重。`.claude/` 走默认拒绝式——`.claude/*` 全忽略，只显式放行 `skills/` 与 `settings.local.json.example`，新增文件默认不被跟踪。历史 session 文件可能在加入 ignore 规则前已经被 Git 跟踪，ignore 不会取消跟踪，也不意味着删除后一定能完整恢复。
 
 - 未经用户明确授权，禁止删除、清空或批量覆盖上述目录
 - 操作前按需检查 `git status`、`git ls-files -- <path>` 和 `git log -- <path>`，不要根据 `.gitignore` 猜测可恢复性
@@ -263,4 +267,4 @@ after_session / final_memory_pipeline（后台）
 
 ## 提交规范
 
-生成 commit message 用 `commit-message` 技能——固定格式是 `YYYYMMDD_HHMMSS 当前进度:...;后续计划:...`，只 commit 本次改动直接相关的文件。
+生成 commit message 用 `commit-message` 技能——格式是「`YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文」，标题限 50 字内以保证 `git log --oneline` 可读，正文不限长。只 commit 本次改动直接相关的文件；只记改动本身，不记协作编排过程。
