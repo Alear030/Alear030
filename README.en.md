@@ -210,17 +210,15 @@ It runs commands, reads and writes files, and accesses the network on your machi
 
 ## How It Was Built
 
-The core framework (`loop` / `session` / `tool` / `agent` / `memory` / `tui`) I wrote myself. External integrations like `local_model` and `mcp_client` were done by agents. `hook_core` sits in between — an agent wrote it, and I copied it out by hand line by line.
+The repository carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, and those files record how we split the work.
 
-The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**.
+The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**; what each of the ten skills is: **[skills catalog](.claude/skills/README.en.md)**.
 
 ---
 
 ## Contributing
 
 One-person project. No PRs for now, but issues are welcome — bugs, questions, design discussions alike. See **[CONTRIBUTING.md](CONTRIBUTING.en.md)**.
-
-The repository also carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, those files record how we split the work, and the split itself is written up in **[COLLABORATION.md](COLLABORATION.en.md)**.
 
 ---
 

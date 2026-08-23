@@ -210,17 +210,15 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ## 怎么写出来的
 
-核心框架（`loop` / `session` / `tool` / `agent` / `memory` / `tui`）是我自己写的，`local_model`、`mcp_client` 这类外部接入基本由 agent 完成，`hook_core` 介于两者之间——它是 agent 写的，我照着抄了一遍。
+仓库里放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
 
-完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里。
+完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；那十个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
 
 ---
 
 ## 参与
 
 单人维护，现阶段不接受 PR，但欢迎开 issue——bug、疑问、设计讨论都可以。见 **[参与方式](CONTRIBUTING.md)**。
-
-仓库里也放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工，具体怎么分的写在 **[协作说明](COLLABORATION.md)** 里。
 
 ---
 
