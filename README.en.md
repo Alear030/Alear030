@@ -4,13 +4,16 @@
 
 # Alear030
 
-Tool orchestration · multi-agent routing · session lifecycle · event-driven hooks · cross-session memory recall
+A self-built agent harness with long-term memory
+
+**What memory retrieves is not documents — it is the moments we lived through together**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#what-this-is)
+[![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#what-this-is)
 
-[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
+[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
 
 [中文](README.md) · **English**
 
@@ -22,9 +25,24 @@ Tool orchestration · multi-agent routing · session lifecycle · event-driven h
 
 Alear030 is not a "Python agent framework" — it is a complete agent harness. The model does the reasoning; tool orchestration, multi-agent routing, session lifecycle, event-driven hooks and cross-session memory recall are all things I wrote from scratch in this repository myself, without wrapping any existing framework.
 
+Memory is where most of that effort went, but what I originally set out to build was not a harness with memory bolted on — it was **an agent that could grow on its own**, and memory is only the necessary foundation for that. That is why almost every classification scheme in the system refuses to be hard-coded: slice feature words, profile dimensions and task nodes all grow out of use instead of being a pre-written field table. This main line explains a lot of the strange-looking choices further down, including why the graph structure — the thing I researched longest — was never shipped in the end.
+
+One thing I have to say as well: what memory does today implements only part of what I had in mind, and I am neither able nor willing to claim it is finished. Why it looks the way it does, and what is still missing, is written up in **[the design journey](docs/design/memory.en.md)**.
+
+**Zero-Infra** — once the dependencies are installed, `python main.py` is the whole thing: nothing to spin up first, nothing to connect to. Model inference still goes to whatever API you configure, but embeddings are computed in-process with local GTE weights, and slices, profile and timeline are all JSON files on disk.
+
+This is a tradeoff, not a claim of superiority. [Graphiti](https://help.getzep.com/graphiti/getting-started/quick-start) builds on a standalone graph database (Neo4j 5.26+ or FalkorDB 1.1.2+) and gets mature graph queries and production-grade operations in return; [Mem0](https://docs.mem0.ai/open-source/quickstart) needs no external service by default (local Qdrant under `/tmp/qdrant`) but [defaults to OpenAI when no embedder is configured](https://docs.mem0.ai/components/embedders/overview), trading a network hop for hosted embedding quality. This project pulls both back onto your machine, and pays for it: no graph capability, embedding quality bounded by a 195MB local model, no multi-tenancy, no horizontal scaling.
+
+If you need multi-tenancy, shared team memory, or production operations, those projects fit better. This one fits the other end: one person, one machine, runs after install, data never leaves the box.
+
+(Dependency details as of 2026-08; upstream may change — links go straight to the relevant docs pages so you can check.)
+
 > **An experimental project I build and maintain on my own. APIs may change.**
 > Chinese-first: system prompts, agent identities and memory prompts are all written in Chinese, and the embedding model is a Chinese GTE.
 > Developed and tested on Windows only; Linux and macOS are unverified — nothing is known to block them, but nothing is guaranteed.
+> Cross-session memory is **off by default** — `MEMORY_PIPELINE_ENABLED` in `config.py` defaults to `False`; set it to `True` before anything is sliced, stored or recalled.
+
+What the memory system looks like today is in **[the memory documentation](docs/modules/memory.en.md)**.
 
 ---
 
@@ -174,6 +192,7 @@ Nine blocks each register independently via `@register_prompt(order, condition, 
 - [ ] First version of slash commands
 - [ ] First golden set for evaluation
 - [ ] Tool-call tracing
+- [ ] Other things I want to build 😊
 
 ---
 
@@ -189,11 +208,19 @@ It runs commands, reads and writes files, and accesses the network on your machi
 
 ---
 
+## How It Was Built
+
+The core framework (`loop` / `session` / `tool` / `agent` / `memory` / `tui`) I wrote myself. External integrations like `local_model` and `mcp_client` were done by agents. `hook_core` sits in between — an agent wrote it, and I copied it out by hand line by line.
+
+The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**.
+
+---
+
 ## Contributing
 
 One-person project. No PRs for now, but issues are welcome — bugs, questions, design discussions alike. See **[CONTRIBUTING.md](CONTRIBUTING.en.md)**.
 
-The repository also carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, and those files record how we split the work.
+The repository also carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, those files record how we split the work, and the split itself is written up in **[COLLABORATION.md](COLLABORATION.en.md)**.
 
 ---
 

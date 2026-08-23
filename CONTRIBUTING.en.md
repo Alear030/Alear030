@@ -26,5 +26,6 @@ Please report security issues through the private channel described in [SECURITY
 - [Configuration](docs/CONFIGURATION.en.md) — `.env`, MCP setup, runtime constants
 - [Architecture](docs/ARCHITECTURE.en.md) — module layout and core design decisions
 - [Memory](docs/modules/memory.en.md) — mechanism details, with known limitations listed honestly at the end
+- [Collaboration](COLLABORATION.en.md) — how I split the work with coding agents, and which parts of the code came from whom
 
 For “it will not run” issues, include OS, Python version, model provider, and the full error — that saves a round trip.
