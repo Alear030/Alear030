@@ -23,10 +23,12 @@ from textual.widgets import Static
 #      过期目标值，表现为内容长出来了视口却停在原地，必须走延迟贴底
 #   4. widget未排版时量不出高度；出窗前先删就永久坐实猜测值——widget置None后重排链断掉，
 #      这条entry再没有被测量的机会。得推迟出窗并卡重试上限
-#   5. 存档分支的tcss注释里写「align-vertical: bottom 以前是anchor()把scroll_y设成负值的
-#      副作用」，这句是错的：Widget.validate_scroll_y 把scroll_y钳在[0, max_scroll_y]，
-#      取不到负值。「内容不满屏时从底部往上长」是一条独立的CSS取舍，想要就直接写这行，
-#      与窗口化无关
+#   5. 「内容不满屏时从底部往上长」是anchor()的副作用：_compositor.py的container分支用
+#      set_reactive直写scroll_y、绕开validate_scroll_y的[0,max]钳位，内容不满屏时算出负值
+#      把内容顶下去。所以不走anchor()就得靠CSS align-vertical: bottom补回这个观感
+
+
+
 # channel内容区：VerticalScroll子类
 class ChannelBody(VerticalScroll):
     def __init__(self,channel,body_id:str):
