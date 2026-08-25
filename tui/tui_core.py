@@ -85,8 +85,13 @@ class Alear030TUI(App,inherit_bindings=False):
         # 触发 UserContent 挂载，并传入 stream_id
         self.bottom_bar.UserInput_clear()
         self.now_channel.append_once(content_type="UserContent",content={"user_input":inptu_content})
-        # 新一轮：Textual anchor贴底
+        
+        
+        # 新一轮：唯一的显式贴底点。跟随中的自动贴底由compositor每次arrange负责，
+        # 不必每轮再调；这里是为了处理「用户上滚看过历史」——那时_anchor_released=True，
+        # compositor停止跟底，靠anchor()内部scroll_end把它清掉才能恢复跟随
         self.now_channel.body.stick_bottom()
+        
         # 锁住输入；解锁走 do_work finally
         self.bottom_bar.UserInput_set_disabled(True) # @claude: 后续有中途打断后，再重看这套 lock
         # 挂 do_work：按当前 channel 找 agent / loop
@@ -107,8 +112,6 @@ class Alear030TUI(App,inherit_bindings=False):
         finally:
             self.call_from_thread(self.bottom_bar.UserInput_set_disabled,False)
             self.call_from_thread(self.bottom_bar.UserInput_set_focus)
-            # 异常也收尾：下一轮前再贴底
-            self.call_from_thread(self.now_channel.body.stick_bottom)
 
     # 跑一轮：before_round → 当前 channel 的 loop → after_round
     def _run_round(self,user_input:str=None):
@@ -123,9 +126,6 @@ class Alear030TUI(App,inherit_bindings=False):
         self.now_channel.channel_loop.loop_run(agent_name = agent_name,message = user_input)
         # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
         self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
-
-        # 本轮流式结束：下一轮前再贴底（正常路径；异常靠do_work finally）
-        self.call_from_thread(self.now_channel.body.stick_bottom)
 
 
     # loop 外发入口：未知 agent 兜底；底栏 event 先截；其余丢给对应 channel

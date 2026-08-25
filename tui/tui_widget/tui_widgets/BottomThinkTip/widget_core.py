@@ -1,60 +1,53 @@
 from ...tui_widgets import widget_register
+from .widget_tip_messages import THINKING_BAR_MESSAGES, THINKING_BAR_TIPS
 
-import asyncio
 from time import monotonic
 from pathlib import Path
-from textual import on, work
+from textual import on
 from textual.widget import Widget
 from textual.widgets import Static
-from textual.containers import Horizontal,Vertical
-from textual.events import Click, Mount
+from textual.containers import Horizontal
+from textual.events import Mount
 import random
 
 
 css_file = Path(__file__).parent/'widget_css.tcss'
 
-# 每5秒换一句
-CHANGE_INTERVAL = 5
-
-# 底栏口吻，不说 thinking
-THINING_BAR_MESSAGES = [
-    "Default mode on",
-    "Other modes will release soon",
-    "Alear030 may run away... well just a joke lol",
-    "Alear030 is doing something important..."
-]
-
-# 思考提示语
-THINKING_BAR_TIPS = [
-    "Alear030 only has default mode, and other modes will release soon",
-    "Alear030 can remember ur information, and it can help Alear030 do better work"
-]
+# 换句间隔上下界；每次轮换重抽
+CHANGE_INTERVAL_MIN = 4
+CHANGE_INTERVAL_MAX = 6
 
 
 @widget_register(widget_type="BottomThinkTip",widget_css_file=css_file,widget_enable=True)
 class BottomThinkTip(Widget):
+    # 底栏置底条：主行⬡+轮换文案，脚注⎿+tip；LoopEnd finalize卸
     def __init__(self,widget_content:dict=None,widget_id:str=None):
         super().__init__(classes='BottomThinkTip')
         self.widget_id = widget_id
 
+        # 计时：mount起跑，finalize停
         self.start_time = monotonic()
         self.elapsed_time = 0
         self._timer = None
-        # 已轮换过的窗口；0 表示首个 CHANGE_INTERVAL 内不换句
-        self._last_rotate_bucket = 0
+        # 下次换句阈值；首段Digging...到点前不换
+        self._next_rotate_at = random.randint(CHANGE_INTERVAL_MIN,CHANGE_INTERVAL_MAX)
 
+        # 文案权威；tip None则藏脚注行
         self.thinking_bar_message_content = "Digging..."
         self.thinking_bar_tip_message_content = None
+        
         # 呼吸开关；只打主行那颗⬡
         self.pointer_blinking = False
         self.pointer_blinking_target = None
         
     def compose(self):
+        # 主行：⬡ + 轮换主文案
         self.thinking_bar = Horizontal(classes='BottomThinkTip_thinking_bar')
         self.thinking_bar_pointer = Static(content="⬡",classes='BottomThinkTip_thinking_bar_pointer')
         self.pointer_blinking_target = self.thinking_bar_pointer
         self.thinking_bar_message = Static(content=self.thinking_bar_message_content,markup=False,classes='BottomThinkTip_thinking_bar_message')
 
+        # 脚注：⎿ + tip；抽到内容才显示
         self.thinking_bar_tip = Horizontal(classes='BottomThinkTip_thinking_bar_tip')
         self.thinking_bar_tip_pointer = Static(content="⎿",classes='BottomThinkTip_thinking_bar_tip_pointer')
         self.thinking_bar_tip_message = Static(content=self.thinking_bar_tip_message_content or '',markup=False,classes='BottomThinkTip_thinking_bar_tip_message')
@@ -69,6 +62,7 @@ class BottomThinkTip(Widget):
             yield self.thinking_bar_tip_message
 
         
+    # mount：1秒tick驱动换句，开呼吸
     @on(Mount)
     def _mount_handler(self):
         self._timer = self.set_interval(1.0,self._refresh_timer)
@@ -78,24 +72,23 @@ class BottomThinkTip(Widget):
     def _refresh_timer(self):
         self.elapsed_time = monotonic() - self.start_time
         elapsed_sec = int(self.elapsed_time)
-        rotate_bucket = elapsed_sec // CHANGE_INTERVAL
 
-        # 每 CHANGE_INTERVAL 窗口换一句；窗口内只抽一次，跳秒也不连抽
-        if rotate_bucket > self._last_rotate_bucket:
-            self._last_rotate_bucket = rotate_bucket
-            self.thinking_bar_message_content = random.choice(THINING_BAR_MESSAGES)
+        # 到阈值换句并重抽间隔；跳秒也只换一次
+        if elapsed_sec >= self._next_rotate_at:
+            self.thinking_bar_message_content = random.choice(THINKING_BAR_MESSAGES)
             self.thinking_bar_tip_message_content = random.choice(THINKING_BAR_TIPS)
+            self._next_rotate_at = elapsed_sec + random.randint(CHANGE_INTERVAL_MIN,CHANGE_INTERVAL_MAX)
+            self.thinking_bar_message.update(self.thinking_bar_message_content)
+            if self.thinking_bar_tip_message_content:
+                self.thinking_bar_tip_message.update(self.thinking_bar_tip_message_content)
 
+        # tip有内容才露脚注行
         if self.thinking_bar_tip_message_content:
             self.thinking_bar_tip.display = True
         else:
             self.thinking_bar_tip.display = False
-
-        if self.elapsed_time >= CHANGE_INTERVAL:
-            self.thinking_bar_message.update(self.thinking_bar_message_content)
-            if self.thinking_bar_tip_message_content:
-                self.thinking_bar_tip_message.update(self.thinking_bar_tip_message_content)
     
+    # LoopEnd收尾：停呼吸+timer，卸widget
     def finalize(self):
         self._pointer_blinking_stop()
         if self._timer:
