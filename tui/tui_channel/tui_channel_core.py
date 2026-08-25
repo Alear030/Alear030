@@ -8,6 +8,25 @@ from textual.containers import VerticalScroll,Horizontal
 from textual.widgets import Static
 
 
+# DOM窗口化尝试记录（20260825回退，完整实现存档在本地分支tui-channel-window）
+# 曾在这里做过窗口化：body_log存全量快照，DOM只挂视口上下各约1.5屏内的真widget，
+# 出窗删、进窗按restore_content重建，窗外累计高度由上下两个spacer吃掉稳住virtual_size。
+# 回退不是因为没跑通，是代价错位——重建要求channel侧长期维护一份与widget平行的
+# restore_content，每新增一种流式widget都得回这里补一条合并规则，widget注册体系
+# 「加widget只碰自己目录」的局部性被打破；自管跟随态则是在重写Textual已有的机制。
+# 下次真要做，这几条是当时踩出来的：
+#   1. 零高spacer仍参与布局，会把相邻消息的单次margin折叠拆成两段、凭空多出一行；
+#      必须同时置display=False才不进arrange
+#   2. anchor()靠 scroll_y >= max_scroll_y 复位锚点（Widget._check_anchor），窗口化让
+#      virtual_size天然抖动就会打坏它，被迫自造跟随态——那是复杂度的主要来源
+#   3. watch_virtual_size触发时max_scroll_y尚未按新布局重算，在watcher里同步滚动会滚向
+#      过期目标值，表现为内容长出来了视口却停在原地，必须走延迟贴底
+#   4. widget未排版时量不出高度；出窗前先删就永久坐实猜测值——widget置None后重排链断掉，
+#      这条entry再没有被测量的机会。得推迟出窗并卡重试上限
+#   5. 存档分支的tcss注释里写「align-vertical: bottom 以前是anchor()把scroll_y设成负值的
+#      副作用」，这句是错的：Widget.validate_scroll_y 把scroll_y钳在[0, max_scroll_y]，
+#      取不到负值。「内容不满屏时从底部往上长」是一条独立的CSS取舍，想要就直接写这行，
+#      与窗口化无关
 # channel内容区：VerticalScroll子类
 class ChannelBody(VerticalScroll):
     def __init__(self,channel,body_id:str):
