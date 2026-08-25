@@ -224,4 +224,4 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — some vendored files carry their own upstream license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

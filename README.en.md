@@ -224,4 +224,4 @@ One-person project. No PRs for now, but issues are welcome — bugs, questions, 
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — some vendored files carry their own upstream license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
