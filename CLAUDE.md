@@ -50,7 +50,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 
 **代码里的 `@claude` 任务标记**：
 
-- SessionStart hook 每次会话开始扫描仓库并注入待办标记（配置在本机 `.claude/settings.local.json`,不进版本控制,新 clone 不自带该行为）
+- 仓库没有提供自动扫描机制,`scan-claude-markers` 技能是现成的可复现入口;想要会话开始自动扫,可另行配置 SessionStart hook,是否随仓库分发取决于配置放在哪里
 - 完成标记后将原行改写成 `# done(@claude): <做了什么>`，保留痕迹且避免下次重复扫描
 - `# @claude(ignore) ...` 是用户自己的备注，不是 Claude 任务，不要修改
 

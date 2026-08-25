@@ -26,5 +26,6 @@
 - [配置说明](docs/CONFIGURATION.md) —— `.env`、MCP 接入、运行常量
 - [架构文档](docs/ARCHITECTURE.md) —— 模块划分与核心设计决策
 - [记忆系统](docs/modules/memory.md) —— 机制细节，末尾如实列了已知限制
+- [协作说明](COLLABORATION.md) —— 我和 coding agent 怎么分工，代码的哪些部分出自谁手
 
 跑不起来的问题，issue 里带上操作系统、Python 版本、用的模型服务商和完整报错，能省一轮来回。

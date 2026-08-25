@@ -4,13 +4,16 @@
 
 # Alear030
 
-工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回
+自研长程记忆 Agent Harness
+
+**记忆检索的不是资料，而是一起经历过的片段**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
+[![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#定位)
 
-[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [CHANGELOG](CHANGELOG.md)
+[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
 
 **中文** · [English](README.en.md)
 
@@ -22,9 +25,24 @@
 
 Alear030 不是一个「Python Agent 框架」，是一套完整的 Agent 基础设施（Harness）。模型负责推理，工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回全部由我在这个仓库里从零写出来，不包装任何现成框架。
 
+其中记忆模块是投入最多的地方，但实际上我最初的目标并非是做一个带有记忆能力的 harness 框架，而是一个能自己生长的 agent，记忆只是实现它必需的底座。所以系统里几乎所有分类体系都不预先写死：切片特征词、画像维度、任务节点，都是随使用长出来的。这条主线解释了后面很多看起来奇怪的选择，包括研究了最久的图结构为什么最终没有落地。
+
+同时也必须说一点：目前 memory 的设计只实现了我部分的想法，我不能也不想声称已经做完了。为什么是现在这个样子、还差的是什么，我写在 **[记忆的想法&构思](docs/design/memory.md)** 里了。
+
+**Zero-Infra** —— 装完依赖 `python main.py` 就是完整形态，没有要先起的服务，也没有要连的库。模型推理仍走你自己配的 API，但嵌入用本地 GTE 权重在进程内算完，切片、画像、时间线都是磁盘上的 JSON 文件。
+
+这是一条取舍，不是一条优势。同类方案各有各的换法：[Zep 的 Graphiti](https://help.getzep.com/graphiti/getting-started/quick-start) 依托 Neo4j 5.26+ 或 FalkorDB 1.1.2+ 这样的独立图数据库，换来成熟的图谱查询与生产级运维；[Mem0](https://docs.mem0.ai/open-source/quickstart) 开源版默认不需要外部服务（本地 Qdrant 落在 `/tmp/qdrant`），但[不配置 embedder 时默认走 OpenAI](https://docs.mem0.ai/components/embedders/overview)，换来开箱即用的托管嵌入质量。这个项目把两样都收回本机，代价也很实在：没有图谱能力、嵌入质量取决于那个 195MB 的本地权重、没有多租户与横向扩展。
+
+如果你需要多租户、团队共享记忆或生产级运维，上面那些更合适。这个项目适用的是另一头：单人、单机、装完就跑、数据不出本地。
+
+（依赖情况截至 2026-08，上游可能变化，链接直达对应文档页便于自行核对。）
+
 > **我自己在做的实验性项目，单人维护，API 可能变动。**
 > 中文优先：system prompt、agent 身份、memory prompt 均为中文，嵌入模型为中文 GTE。
 > 仅在 Windows 上开发与实测；Linux / macOS 未验证，没有已知的硬性阻断，但不作保证。
+> 跨会话记忆管线**默认关闭**：`config.py` 的 `MEMORY_PIPELINE_ENABLED` 默认 `False`，改成 `True` 才会切片、入库与召回。
+
+记忆现在是什么样，写在 **[记忆系统文档](docs/modules/memory.md)**。
 
 ---
 
@@ -174,6 +192,7 @@ agent、session、tool、hook 等模块彼此不直接引用，而是通过 `mai
 - [ ] slash 命令初版实现
 - [ ] eval 评测题集 golden set 初版建立
 - [ ] toolcall trace 机制建立
+- [ ] 其他我想做的东西 😊
 
 ---
 
@@ -189,11 +208,17 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ---
 
+## 怎么写出来的
+
+仓库里放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
+
+完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；那十个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
+
+---
+
 ## 参与
 
 单人维护，现阶段不接受 PR，但欢迎开 issue——bug、疑问、设计讨论都可以。见 **[参与方式](CONTRIBUTING.md)**。
-
-仓库里也放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
 
 ---
 
