@@ -216,7 +216,7 @@ MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_client/mcp
 
 `session/session_plan.py` 的 `Plan.advance()` 是 step 推进的公开入口：刷新磁盘状态、取得首个未完成 step、写入 `active_step_number` 后返回该 step，全部完成时返回 `None`。`active_step_number` 限制本轮唯一允许更新的 step，防止跳步或一次连续完成多个 step。
 
-Memory 当前实际主线位于 `memory/memory_core.py`：负责 slice 分类、按 `(session_id, start_round, end_round)` 去重、`slice_node` 入库、`user_info` 提炼以及对应模板更新。两模块（`memory_core`/`memory_storage`）的职责划分以 `memory_core.py` 顶部 `@claude(ignore)` 注释为准。`memory_storage/` 和 `memory_config/` 都可能被运行时更新。
+Memory 当前实际主线位于 `memory/memory_core.py`：负责 slice 分类、按 `(session_id, start_round, end_round)` 去重、`slice_node` 入库、`user_info` 提炼以及对应模板更新。两模块（`memory_core`/`memory_storage`）的职责划分以 `memory_core.py` 顶部 `@claude(ignore)` 注释为准。`memory_storage/` 和 `memory_config/` 都可能被运行时更新（`memory_config` 的真身已 `.gitignore`，仓库里只跟踪 `.example.json` 种子）。
 
 Session 切片流入 Memory 的路径：
 
@@ -241,7 +241,8 @@ after_session / final_memory_pipeline（后台）
 以下内容都不是可随意重建的临时文件：
 
 - `session/session_detail/`、`session/session_plan/`：真实会话与计划运行数据
-- `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`、`memory/memory_config/backup/`：派生记忆、运行时日志与配置快照（均已 `.gitignore`；注意 `memory/memory_config/memory_configs/user_info.json` 被 git 跟踪）
+- `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`：派生记忆与运行时日志（均已 `.gitignore`）
+- `memory/memory_config/memory_configs/*.json`：会被管线改写并长出新维度/新特征的运行时配置真身，已 `.gitignore`；随仓库分发的是同名 `.example.json` 种子，首次运行由 `get_memory_config` 自动播种。**播种只在真身不存在时发生，绝不覆盖已有文件**——覆盖等于把用户积累的维度清零
 - `local_model/`：embedding 代码与模型元数据已跟踪；权重（`pytorch_model.bin`/`model.safetensors`）`.gitignore`，运行时从 ModelScope 下载
 
 `.gitignore` 已忽略的数据路径：`session_detail/`、`session_plan/`、`test/`、memory 数据子目录、`.cc_file/`、`AGENTS.md`、`.agents/`、local_model 权重。`.claude/` 走默认拒绝式——`.claude/*` 全忽略，只显式放行 `skills/` 与 `settings.local.json.example`，新增文件默认不被跟踪。历史 session 文件可能在加入 ignore 规则前已经被 Git 跟踪，ignore 不会取消跟踪，也不意味着删除后一定能完整恢复。

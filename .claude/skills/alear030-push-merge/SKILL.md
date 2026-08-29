@@ -95,6 +95,26 @@ squash 会把本批 commit 压成一条,那些 commit message 里的「当前进
   这一步容易漏:用 worktree 开发时,PR 在 GitHub 上合并之后,主仓库那个 checkout 的本地 `master`
   仍然停在旧提交上,而它看起来一切正常。下次在主仓库做事就是从一个落后的 master 出发。
 
+- **同步前先查主仓库工作区,脏则停下报告,不要自动 stash。**
+
+  ```bash
+  git -C <主仓库路径> status --short
+  ```
+
+  主仓库很可能摊着 memory 运行时数据——`memory/memory_config/memory_configs/user_info.json`
+  这类被 git 跟踪、又会被管线改写的文件。stash 它们风险太大,该由用户决定怎么处理。
+
+  报告时要给出**真正的阻塞交集**,而不是笼统一句「工作区脏」。多数未提交文件根本不在 pull 的
+  更新路径上,不影响同步:
+
+  ```bash
+  comm -12 <(git diff --name-only <本地master> origin/master | sort) <(git diff --name-only | sort)
+  ```
+
+  实际撞到过一次:主仓库有 5 个未提交文件,但 `git pull` 要更新的 21 个文件里只和 `.gitignore`
+  有交集,两边改的还是不同的行。说清这一点,用户才好判断是先提交、只 stash 那一个文件,
+  还是干脆先不同步。
+
 **临时分支**:
 
 - 合并成功后**先问用户再删**,不要自动删。

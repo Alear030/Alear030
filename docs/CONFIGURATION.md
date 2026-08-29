@@ -14,6 +14,7 @@
 - [可选：网络代理](#可选网络代理)
 - [接入 MCP server](#接入-mcp-server)
 - [开启记忆管线](#开启记忆管线)
+  - [画像维度的种子文件](#画像维度的种子文件)
 - [本地嵌入模型](#本地嵌入模型)
 - [运行常量（config.py）](#运行常量configpy)
 
@@ -151,6 +152,27 @@ MEMORY_PIPELINE_ENABLED = True
 代价：开启后每轮对话会额外产生若干次模型调用（一次切片 + 每个待摘要片各一次 + 分类与画像提取）。
 
 整条链路怎么工作见 **[记忆系统](modules/memory.md)**。
+
+
+### 画像维度的种子文件
+
+`memory/memory_config/memory_configs/` 下有两份运行时配置——`memory_type.json`（顶层分类的特征词）和 `user_info.json`（画像维度模板）。它们会被管线持续改写：分类时长出新特征词，提取时长出新画像维度。
+
+所以仓库里跟踪的**不是**这两个文件本身，而是同名的 `.example.json` 种子：
+
+```
+memory_configs/
+├── memory_type.example.json    ← 跟踪，最小种子
+├── memory_type.json            ← gitignore，你的运行时真身
+├── user_info.example.json      ← 跟踪，最小种子
+└── user_info.json              ← gitignore，你的运行时真身
+```
+
+首次运行时 `get_memory_config` 发现真身不存在，会从同名种子复制一份，**不需要你手动做任何事**。
+
+**播种只在真身不存在时发生，永远不覆盖已有文件**——你积累出来的维度不会被种子冲掉。想重置回初始状态，删掉真身再跑一次即可。
+
+种子刻意保持最小：`memory_type` 只有 `task`，`user_info` 只有 `identity` 和 `cognitive_style` 两维。不是能再少——`memory_type.md` 与 `user_info.md` 的示例点名引用了这两个维度，删掉会让模型拿到自相矛盾的上下文。其余维度由管线随使用长出来，这正是这套设计想演示的东西。
 
 ---
 

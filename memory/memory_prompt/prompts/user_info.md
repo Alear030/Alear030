@@ -85,8 +85,8 @@
 >         "type_desc":"Alear030大人基础身份信息维度 - 我在什么坐标系里理解你",
 >         "type_feature":["职业与行业背景特征","所在地域与文化背景特征"],
 >         "info_list":[
->             {"info":"Alear030大人是一名产品经理","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
->             {"info":"Alear030大人常驻杭州","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
+>             {"info":"Alear030大人是一名后端工程师","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
+>             {"info":"Alear030大人常驻在一座南方城市","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
 >         ]
 >     },
 >     {
@@ -111,8 +111,8 @@
             "type_desc":"Alear030大人基础身份信息维度 - 我在什么坐标系里理解你",
             "type_feature":["职业与行业背景特征","所在地域与文化背景特征"],
             "info_list":[
-                {"info":"Alear030大人是一名产品经理","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
-                {"info":"Alear030大人常驻杭州","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
+                {"info":"Alear030大人是一名后端工程师","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
+                {"info":"Alear030大人常驻在一座南方城市","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
             ]
         },
         {
@@ -128,18 +128,18 @@
 
 - **命中已有维度、新增一条info（其余info与维度原样保留）**
 
-    本次slice中Alear030大人自述今年30岁，命中identity维度但属于该维度下的新信息，往identity的info_list里追加一条，identity原有的两条info、cognitive_style维度全部原样保留：
+    本次slice中Alear030大人自述本科是计算机相关专业，命中identity维度但属于该维度下的新信息，往identity的info_list里追加一条，identity原有的两条info、cognitive_style维度全部原样保留：
 
     ```
     [
         {
             "type_name":"identity",
             "type_desc":"Alear030大人基础身份信息维度 - 我在什么坐标系里理解你",
-            "type_feature":["职业与行业背景特征","所在地域与文化背景特征","年龄阶段与代际特征"],
+            "type_feature":["职业与行业背景特征","所在地域与文化背景特征","教育经历与专业背景特征"],
             "info_list":[
-                {"info":"Alear030大人是一名产品经理","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
-                {"info":"Alear030大人常驻杭州","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]},
-                {"info":"Alear030大人今年30岁","info_source":[{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":1,"end_round":4}]}
+                {"info":"Alear030大人是一名后端工程师","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
+                {"info":"Alear030大人常驻在一座南方城市","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]},
+                {"info":"Alear030大人本科是计算机相关专业","info_source":[{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":1,"end_round":4}]}
             ]
         },
         {
@@ -153,11 +153,11 @@
     ]
     ```
 
-    注意上面identity的type_feature里多出了"年龄阶段与代际特征"：当新info对应的特征角度在该维度type_feature中尚不存在时，可一并补进type_feature；若已存在则不动。
+    注意上面identity的type_feature里多出了"教育经历与专业背景特征"：当新info对应的特征角度在该维度type_feature中尚不存在时，可一并补进type_feature；若已存在则不动。
 
 - **同一维度内：一条info被印证 + 一条info被更新**
 
-    本次slice里Alear030大人再次提到自己在杭州（印证"常驻杭州"，内容不变，仅追加来源），同时透露已从产品经理转为独立开发者（与历史"是一名产品经理"冲突，改写该info内容并追加来源）。cognitive_style维度未涉及，原样保留：
+    本次slice里Alear030大人再次提到自己所在的城市（印证"常驻在一座南方城市"，内容不变，仅追加来源），同时透露已从后端工程师转为独立开发者（与历史"是一名后端工程师"冲突，改写该info内容并追加来源）。cognitive_style维度未涉及，原样保留：
 
     ```
     [
@@ -166,8 +166,8 @@
             "type_desc":"Alear030大人基础身份信息维度 - 我在什么坐标系里理解你",
             "type_feature":["职业与行业背景特征","所在地域与文化背景特征"],
             "info_list":[
-                {"info":"Alear030大人现为独立开发者（曾任产品经理）","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8},{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":2,"end_round":6}]},
-                {"info":"Alear030大人常驻杭州","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12},{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":7,"end_round":9}]}
+                {"info":"Alear030大人现为独立开发者（曾任后端工程师）","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8},{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":2,"end_round":6}]},
+                {"info":"Alear030大人常驻在一座南方城市","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12},{"session_id":"20260705_170451","time_stamp":"20260705_171051","start_round":7,"end_round":9}]}
             ]
         },
         {
@@ -192,8 +192,8 @@
             "type_desc":"Alear030大人基础身份信息维度 - 我在什么坐标系里理解你",
             "type_feature":["职业与行业背景特征","所在地域与文化背景特征"],
             "info_list":[
-                {"info":"Alear030大人是一名产品经理","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
-                {"info":"Alear030大人常驻杭州","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
+                {"info":"Alear030大人是一名后端工程师","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":3,"end_round":8}]},
+                {"info":"Alear030大人常驻在一座南方城市","info_source":[{"session_id":"20260701_230152","time_stamp":"20260701_233422","start_round":9,"end_round":12}]}
             ]
         },
         {

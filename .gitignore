@@ -36,8 +36,10 @@ memory/memory_storage/memory_storages/
 # memory 诊断与评估日志(agent 输出与 thinking 默认不落盘,见 memory_log_core.LOG_AGENT_RESPONSE)
 memory/memory_log/memory_logs/
 
-# memory config 备份(运行时快照,不进版本控制)
-memory/memory_config/backup/
+# memory config 运行时真身:会被 memory 管线改写并长出新维度/新特征,属于个人积累。
+# 随仓库分发的是同名 .example.json 种子,首次运行由 get_memory_config 自动播种一份。
+memory/memory_config/memory_configs/*.json
+!memory/memory_config/memory_configs/*.example.json
 
 # 本地 IDE 与协作配置。CLAUDE.md、.cursor/rules/ 与 .claude/skills/ 已纳入版本控制
 # ——它们记录这个项目实际是怎么被开发的,不含本机信息。默认忽略 .claude/ 下其余内容,

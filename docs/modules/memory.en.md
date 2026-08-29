@@ -243,6 +243,8 @@ Code comments state the motive: avoid configuration sprawl from too many subagen
 
 The template's role is to serve as dimension reference in the next extract prompt, so profile dimensions can self-emerge with use rather than hard-coding a fixed field set.
 
+Because it is rewritten continuously and the dimensions it grows are personal, the repository tracks a `user_info.example.json` seed rather than the file itself — seeded on first run, never overwritten once it exists. See [Configuration](../CONFIGURATION.en.md#profile-dimension-seed-files).
+
 ### "Full-payload" extraction
 
 Unlike `slice_node`'s structured coordinate dedupe, profile "confirm / update / drop / merge dimensions" is semantic judgment and hard to express as fixed field rules. So the approach is: **have the model each time output the complete profile after merging "history + this pass"**, and Python overwrites the file wholesale.
