@@ -234,7 +234,7 @@ It kept me company through a good period.
 
 ### Claude Code
 
-The current mainstay. `CLAUDE.md` and [the ten skills under `.claude/skills/`](.claude/skills/README.en.md) are all for it. Cross-module mechanism changes, user-facing docs, the CHANGELOG, and commit messages basically all go through it.
+The current mainstay. `CLAUDE.md` and [the eleven skills under `.claude/skills/`](.claude/skills/README.en.md) are all for it. Cross-module mechanism changes, user-facing docs, the CHANGELOG, and commit messages basically all go through it.
 
 I use it mainly because it's the only agent so far (of the ones I've used) that shows me a diff before editing a file and then asks me to approve. The others just hand me one of those giant reviews — and frankly, me saying that is me saying nothing, because who's going to actually read that giant review? And if one spot has a problem, do the other spots stay or go? Tsk...
 
@@ -310,7 +310,7 @@ Three things in the repo are for agents to use, or get loaded into their context
 
 - `CLAUDE.md` — project overview, stable module map, core runtime data flows, how we work together, data-safety red lines
 - `.cursor/rules/` — 5 rules
-- `.claude/skills/` — 10 skills, described one by one in the [skills catalog](.claude/skills/README.en.md)
+- `.claude/skills/` — 11 skills, described one by one in the [skills catalog](.claude/skills/README.en.md)
 
 I put them under version control not so humans can go in and study them — no need for that. It's because an agent's context is precious, and you can't have it going in blank every time and exploring the entire repo just to write some small thing. That would be too... how do I put it... too extravagant. Impressive!
 
@@ -350,7 +350,7 @@ ps: I lived through the wave of skill hype, and early on I even built myself an 
 
 The skill thing in this repo lives in two separate places.
 
-One is `.claude/skills/`, the ten skills I wrote for coding agents. The other is `skill/`, Alear030's own runtime skill system.
+One is `.claude/skills/`, the eleven skills I wrote for coding agents. The other is `skill/`, Alear030's own runtime skill system.
 
 **The format is the same one.** Both are one directory holding one `.md` file, both write `name` and `description` in YAML frontmatter with a Markdown body underneath. Triggering in both cases is mainly `description` matching — whoever is reading looks at the description and decides for itself whether to use it this time, rather than me hardcoding into the flow when it gets called.
 
@@ -358,7 +358,7 @@ One is `.claude/skills/`, the ten skills I wrote for coding agents. The other is
 
 **The difference is who does the distilling.**
 
-Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Ten skills, 987 lines, all accumulated that way.
+Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Eleven skills, 1133 lines, all accumulated that way.
 
 The Alear030 side is automatic (only one so far has come out of an automatic proposal). When similar tasks accumulate past a threshold, the memory pipeline produces a skill candidate and interrupts the current conversation with an attachment: you've done this kind of thing several times, consider fixing it into a reusable skill. Then it goes through `create-skill` to draft, me to confirm, and landing on disk; finally `skill_finish` writes back to the task node and zeroes the accumulation counter, so it doesn't keep prompting for the same thing.
 

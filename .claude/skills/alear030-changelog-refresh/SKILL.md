@@ -1,6 +1,6 @@
 ---
-name: changelog-refresh
-description: "刷新 Alear030 项目的 CHANGELOG.md：把近期一批 git 提交归纳成新版本块，或审查修正历史版本块。当用户说'刷新/更新/整理/补 changelog'、'把这批改动写进 changelog'、'changelog 该更新了'，或完成一个功能批次准备记录变更日志时使用。注意和 commit-message 区分：后者生成单次提交的 message，本 skill 把一批提交归纳成 CHANGELOG 里的版本块。这个项目的 CHANGELOG 有固定格式（版本块 + 中文类型标签 + 契机/验证/对应提交/后续计划），不要用通用的 Keep a Changelog 英文分类或随意流水账写法，必须走这个 skill 生成符合项目规范的版本块。"
+name: alear030-changelog-refresh
+description: "刷新 Alear030 项目的 CHANGELOG.md：把近期一批 git 提交归纳成新版本块，或审查修正历史版本块。当用户说'刷新/更新/整理/补 changelog'、'把这批改动写进 changelog'、'changelog 该更新了'，或完成一个功能批次准备记录变更日志时使用。注意和 alear030-commit-message 区分：后者生成单次提交的 message，本 skill 把一批提交归纳成 CHANGELOG 里的版本块。这个项目的 CHANGELOG 有固定格式（版本块 + 中文类型标签 + 契机/验证/对应提交/后续计划），不要用通用的 Keep a Changelog 英文分类或随意流水账写法，必须走这个 skill 生成符合项目规范的版本块。"
 ---
 
 # Alear030 CHANGELOG 刷新
@@ -115,6 +115,6 @@ description: "刷新 Alear030 项目的 CHANGELOG.md：把近期一批 git 提�
 - 用户明确要求不用这个格式（如临时想用英文 Keep a Changelog）：尊重用户临时指令，不要强套。
 - 修正历史版本块（而非新增）：同样按本格式重写，重点查重复记录和遗漏提交；用 Edit 时注意 em dash，old_string 标题必须用 em dash（—），new_string 标题也保持 em dash。
 
-## 衔接 commit-message
+## 衔接 alear030-commit-message
 
-刷新产生的 CHANGELOG.md 改动，用 commit-message skill 提交。commit message 的“当前进度”可写“CHANGELOG 补 vX.Y 版本块”之类。注意：这次 changelog 自身的 commit 不列入版本块的“对应提交”（它是元操作，见“各字段说明”）。
+刷新产生的 CHANGELOG.md 改动，用 alear030-commit-message skill 提交。commit message 的“当前进度”可写“CHANGELOG 补 vX.Y 版本块”之类。注意：这次 changelog 自身的 commit 不列入版本块的“对应提交”（它是元操作，见“各字段说明”）。

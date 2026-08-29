@@ -1,5 +1,5 @@
 ---
-name: commit-message
+name: alear030-commit-message
 description: "生成 Alear030 项目的 git commit message。当用户要求提交代码、创建 commit、或说'commit一下'、'提交这次改动'时使用。这个项目的 commit message 有固定格式（时间戳前缀 + 当前进度/后续计划结构），不要用通用的 conventional commits 或随意总结式的写法，必须走这个 skill 生成符合项目规范的 message。"
 ---
 
@@ -50,8 +50,8 @@ commit 的作者署名是项目作者本人,不是 AI。message 里不要出现�
 
 分界线是**记录发现与证据,不记录编排**：
 
-- ❌ `三路子代理体检后逐条回文件核实再改;changelog-refresh 示例区块漂移`
-- ✅ `changelog-refresh 的示例区块与正式 CHANGELOG 已漂移(逐条核对确认)`
+- ❌ `三路子代理体检后逐条回文件核实再改;alear030-changelog-refresh 示例区块漂移`
+- ✅ `alear030-changelog-refresh 的示例区块与正式 CHANGELOG 已漂移(逐条核对确认)`
 
 后者保留了"核对过"这个证据,去掉了"谁核对的、用什么方式核对"。
 
@@ -115,6 +115,17 @@ commit 完之后跑 `git log -1` 确认正文完整,再跑 `git log --oneline -3
 - 如果用户明确要求不用这个格式（比如临时想用英文/conventional commits）,尊重用户的临时指令,不要强套。
 - 不确定这次改动算不算"相关"时,列出候选文件问用户,不要自己判断着 add 进去。
 
-## 衔接 changelog-refresh
+## 衔接 alear030-changelog-refresh
 
-本 commit 的“当前进度”是 changelog-refresh skill 归纳版本块的素材来源。写清楚改了什么、为什么改，积累一批同主题 commit 后用 changelog-refresh 刷新 CHANGELOG。单次 commit 不等于一个版本块，不要每次 commit 都刷 changelog。
+本 commit 的“当前进度”是 alear030-changelog-refresh skill 归纳版本块的素材来源。写清楚改了什么、为什么改，积累一批同主题 commit 后用 alear030-changelog-refresh 刷新 CHANGELOG。单次 commit 不等于一个版本块，不要每次 commit 都刷 changelog。
+
+## 衔接 alear030-push-merge
+
+**本技能的职责到 commit 为止**——生成 message、暂存相关文件、提交,不做 push、不开 PR、不合并、不删分支。
+
+commit 完之后如果要把分支发出去,走 `alear030-push-merge`:push → 开 PR → `gh pr merge --merge`
+→ 清理分支/worktree → 同步本地 master。那边写死了常驻分支名单(`master` / `Alear030_dev` 永不删除),
+也定了这个项目走 GitHub PR 而不是本地 merge。
+
+两个技能分开的理由是**留一个复查窗口**:commit 之后、发出去之前,通常还要再读一遍改动。
+把 push 和 merge 并进"commit一下"会让这个窗口消失,而合并进 master 之后再改就得多绕一圈。

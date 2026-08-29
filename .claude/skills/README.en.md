@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the ten skills I use when working with coding agents — 987 lines in total, all under version control, and you can open any of them directly.
+This directory holds the eleven skills I use when working with coding agents — 1133 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Nine of these ten have exactly those two fields in frontmatter; only `worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Ten of these eleven have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -17,15 +17,18 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | Skill | Lines | In one line |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 128 | This project's verification doesn't work like a normal Python project's |
-| [`worktree-change-guard`](worktree-change-guard/SKILL.md) | 32 | After changing production code in a worktree, you must read it back and confirm |
-| [`commit-message`](commit-message/SKILL.md) | 120 | The fixed format for commit messages |
-| [`changelog-refresh`](changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
+| [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
+| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 131 | After a commit: push, open a PR, merge, clean up branches |
+| [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
-| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 80 | Label and body conventions for tech-debt issues |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 65 | The full flow from claiming an issue off the board to wrapping up |
-| [`scan-claude-markers`](scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
+| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
+| [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | The dispatch protocol for four-role parallel changes |
 | [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | The three-stage discipline for changing production code |
+
+Every name carries the `alear030-` prefix. Early on only the project-specific ones did — format rules like `commit-message` did not — but those hold only inside this project too, so the presence or absence of a prefix marked no real distinction while implying one. They were unified afterwards, turning the convention into a rule with no exceptions.
 
 By the kind of knowledge they encode, they fall into four groups.
 
@@ -51,7 +54,7 @@ There's also a Windows-specific one, written like this in the original:
 
 This is the most-referenced skill of the set; the other three (`alear030-issue-pretodoHandle`, `alear030-multitask-code`, `alear030-multitask-pipeline`) all point at it from their own verification stages.
 
-### `worktree-change-guard` (32 lines)
+### `alear030-worktree-change-guard` (34 lines)
 
 The shortest one, and the only one marked `user-invocable: false` — meaning it doesn't show up in my manual menu, and the hope is that the agent remembers to use it after changing code.
 
@@ -67,7 +70,7 @@ The phenomenon it guards against goes like this: you use Edit to change producti
 
 This group constrains what the output looks like. They all exist for the same reason: **the general approach loses something I need in this project.**
 
-### `commit-message` (120 lines)
+### `alear030-commit-message` (131 lines)
 
 The format is `YYYYMMDD_HHMMSS <one-line subject>` + blank line + body, with the body split into "current progress / next steps." The subject is capped at 50 characters.
 
@@ -79,7 +82,7 @@ The consequence was that `git log --oneline` filled the terminal and couldn't be
 
 The skill also draws one boundary: **record the change itself, not the collaboration choreography.** "Dispatched several subagents" and "explored first, then planned" belong to the production process, not to the change. The commit is signed by me; an agent's account of itself shouldn't appear in it.
 
-### `changelog-refresh` (120 lines)
+### `alear030-changelog-refresh` (120 lines)
 
 The fixed format for version blocks (title / trigger / changes / verification / corresponding commits / next steps), plus 7 Chinese type labels, instead of the generic Keep a Changelog English categories.
 
@@ -93,7 +96,7 @@ The taste for writing comments in my code: Chinese, minimal, verb- or action-ori
 
 There are three more about changing my code: keep my existing identifier naming, prefer helpers that already exist in the same file, and explain before changing. That last one matters most — I need to know what changed and why, otherwise that stretch of code goes from "mine" to "no idea whose."
 
-### `alear030-issue-techdebt` (80 lines)
+### `alear030-issue-techdebt` (81 lines)
 
 Conventions for tech-debt issues: always the `tech-debt` label (not GitHub's default bug/enhancement), severity as a title prefix `[高]`/`[中]`/`[低]`, and a three-part body — background (current state + risk) / what to do (goal + proposed approach) / checks (acceptance criteria). Evidence has to go down to `file:line`.
 
@@ -105,13 +108,27 @@ It got used five times while writing this very collaboration document, all for t
 
 This group is process orchestration: many steps, ordering dependencies, and gates in the middle where I have to make the call.
 
-### `alear030-issue-pretodoHandle` (65 lines)
+### `alear030-issue-pretodoHandle` (66 lines)
 
-Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → merge into local master → delete branch → push the board to done → ask me whether to take the next one.
+Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → merge (handed to `alear030-push-merge`) → push the board to done → ask me whether to take the next one.
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `scan-claude-markers` (52 lines)
+### `alear030-push-merge` (131 lines)
+
+The wrap-up after a commit: push, open a PR, `gh pr merge --merge`, clean up the branch and its worktree, sync local master.
+
+Keeping it separate from `alear030-commit-message` is deliberate: **there has to be a review window in between.** After committing I usually read the change once more, and anything found then is still cheap to fix; after it lands on master it is not. So "commit this" never pushes anything on its own.
+
+Three things are hard-coded in it, because none can safely be inferred:
+
+- **The permanent-branch list** (`master`, `Alear030_dev`) is never deleted. Not judged by whether a branch "looks long-lived" — getting that judgement wrong is an irreversible deletion. Anything off the list counts as temporary, and even temporary branches get one more confirmation before removal.
+- **Merges go through a GitHub PR, not a local merge.** This one grew out of a contradiction: `alear030-issue-pretodoHandle` prescribed `git checkout master && git merge`, while every real merge had gone through a PR. A rule that disagrees with the actual habit is a dead rule. Squash is explicitly ruled out too — it collapses a batch of commits into one, and the "progress / next steps" fields in those messages are this project's development log.
+- **Cleanup means three things at once**: local branch, remote branch, worktree. Miss one and a remnant is left behind. If the branch carries commits that were never meant to be merged, what will disappear has to be spelled out before deleting.
+
+One more came from a worktree trap: after a PR is merged on GitHub, the local `master` in the main checkout still sits on the old commit — **and it looks perfectly fine**. The next piece of work there starts from a stale base. So syncing local master became a fixed step of the wrap-up rather than something to remember.
+
+### `alear030-scan-claude-markers` (52 lines)
 
 Scans the to-do markers I leave in code comments. Three meanings have to be kept apart: `@claude` is a task for it, `done(@claude): what got done` is a completed trace (kept but not picked up again), and `@claude(ignore)` is a note to myself that must not be touched.
 
@@ -141,16 +158,17 @@ Three stages of discipline: Plan (plan first, **nothing lands on disk**) → Exe
 
 ---
 
-## They Aren't Ten Isolated Files
+## They Aren't Eleven Isolated Files
 
-There are reference relationships among these ten skills:
+There are reference relationships among these eleven skills:
 
 - `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle`, `alear030-multitask-code`, and `alear030-multitask-pipeline` — anything that reaches a "verification" step points at it
-- `commit-message` and `changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
+- `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
+- `alear030-commit-message` → `alear030-push-merge` is a one-way handoff: the first stops at the commit, the second takes over from there. `alear030-issue-pretodoHandle` points its merge step straight at the latter instead of writing its own
 - `alear030-multitask-code` and `alear030-multitask-pipeline` explicitly declare themselves complementary and don't restate each other's content
 - `alear030-style-notes` and `alear030-multitask-code` both point at `.cursor/rules/coding-conventions.mdc`, so the same set of writing discipline doesn't get copied into three places
 
-So what actually got distilled isn't just ten rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just eleven rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 

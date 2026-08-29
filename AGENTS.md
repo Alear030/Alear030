@@ -84,12 +84,13 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - `$alear030-multitask-code`：生产代码修改采用 Plan → Execute → Review 纪律。
 - `$alear030-multitask-pipeline`：跨模块大改或机制路径变更采用完整协作流水线；小改使用轻量执行与复核。
 - `$alear030-style-notes`：编写或修改用户代码及注释时遵守中文、极简、动作导向的注释风格。
-- `$worktree-change-guard`：在 worktree 修改非 `test/` 生产代码后核对改动确实落在目标 checkout。
-- `$scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
+- `$alear030-worktree-change-guard`：在 worktree 修改非 `test/` 生产代码后核对改动确实落在目标 checkout。
+- `$alear030-scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
 - `$alear030-issue-pretodoHandle`：从 GitHub Projects 的 pre-todo 列处理下一个 issue。
 - `$alear030-issue-techdebt`：按项目格式记录审查或复盘发现的技术债。
-- `$commit-message`：生成符合项目规范的提交信息。
-- `$changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。
+- `$alear030-commit-message`：生成符合项目规范的提交信息。
+- `$alear030-changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。
+- `$alear030-push-merge`：commit 之后 push、开 PR、合并进 master、清理分支与 worktree、同步本地 master。本项目走 GitHub PR 而非本地 merge；`master` 与 `Alear030_dev` 为常驻分支，永不删除。
 
 新增 Tool、Hook、Prompt 或 Widget 时，当前没有可调用的本地扩展技能；应从现有同类实现、注册器和目录加载逻辑开始探索，不得把仅有目录但缺少 `SKILL.md` 的内容当成技能调用。
 
@@ -99,6 +100,8 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 
 `YYYYMMDD_HHMMSS <一句话主题，最多 50 字>`
 
-空一行后填写正文。提交时必须使用 `$commit-message` 生成信息，并且只暂存本任务相关文件。
+空一行后填写正文。提交时必须使用 `$alear030-commit-message` 生成信息，并且只暂存本任务相关文件。
 
-版本叙事使用 `$changelog-refresh` 按版本块归纳，不机械对应单次提交。未经用户要求，不暂存、不提交，也不修改 Git 配置。
+版本叙事使用 `$alear030-changelog-refresh` 按版本块归纳，不机械对应单次提交。未经用户要求，不暂存、不提交，也不修改 Git 配置。
+
+提交之后如需把分支发出去，使用 `$alear030-push-merge`；该技能与 `$alear030-commit-message` 刻意分离，以便在 commit 与 push 之间保留一次复查。未经用户要求不得 push、开 PR 或合并。
