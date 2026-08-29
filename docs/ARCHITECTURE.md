@@ -173,7 +173,7 @@ Alear030/
 ├── memory/                     # 跨会话记忆
 │   ├── memory_core.py          # 主线：slice 分类、去重、slice_node 入库、user_info 画像提炼
 │   ├── memory_storage/         # 派生存储（slice_node / user / timeline / advanced_task_node）
-│   ├── memory_config/          # 画像维度模板等运行时配置
+│   ├── memory_config/          # 画像维度模板等运行时配置(真身 gitignore,仓库只带 .example.json 种子)
 │   ├── memory_prompt/          # memory agent 的 system prompt 来源，按 type 分文件
 │   └── memory_log/             # 失败诊断与评估日志
 │

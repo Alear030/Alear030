@@ -14,6 +14,7 @@ To get running you only need the three model tiers in `.env`; everything else ha
 - [Optional: network proxy](#optional-network-proxy)
 - [Connecting an MCP server](#connecting-an-mcp-server)
 - [Enabling the memory pipeline](#enabling-the-memory-pipeline)
+  - [Profile-dimension seed files](#profile-dimension-seed-files)
 - [Local embedding model](#local-embedding-model)
 - [Runtime constants (config.py)](#runtime-constants-configpy)
 
@@ -151,6 +152,27 @@ MEMORY_PIPELINE_ENABLED = True
 Cost: once enabled, every dialogue round incurs extra model calls (one slice + one per pending summary slice + classification and profile extraction).
 
 How the full pipeline works: **[Memory system](modules/memory.en.md)**.
+
+
+### Profile-dimension seed files
+
+Two runtime config files live under `memory/memory_config/memory_configs/` — `memory_type.json` (feature words for top-level classification) and `user_info.json` (the profile-dimension template). The pipeline rewrites both as it runs: classification grows new feature words, extraction grows new profile dimensions.
+
+So the repository does **not** track those two files. It tracks same-named `.example.json` seeds instead:
+
+```
+memory_configs/
+├── memory_type.example.json    ← tracked, minimal seed
+├── memory_type.json            ← gitignored, your live file
+├── user_info.example.json      ← tracked, minimal seed
+└── user_info.json              ← gitignored, your live file
+```
+
+On first run `get_memory_config` finds the live file missing and copies the matching seed. **Nothing to do by hand.**
+
+Seeding happens only when the live file is absent, and **never overwrites an existing one** — the dimensions you accumulate are not at risk of being flattened back to the seed. To reset, delete the live file and run again.
+
+The seeds are deliberately minimal: `memory_type` carries only `task`, `user_info` only `identity` and `cognitive_style`. That is a floor rather than a preference — the worked examples in `memory_type.md` and `user_info.md` refer to those dimensions by name, so dropping them would hand the model a self-contradictory context. Everything else grows out of use, which is the point of the design.
 
 ---
 

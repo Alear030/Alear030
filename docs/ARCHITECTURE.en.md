@@ -173,7 +173,7 @@ Alear030/
 ├── memory/                     # cross-session memory
 │   ├── memory_core.py          # main line: slice classify, dedupe, slice_node ingest, user_info profile extraction
 │   ├── memory_storage/         # derived storage (slice_node / user / timeline / advanced_task_node)
-│   ├── memory_config/          # runtime config such as profile-dimension templates
+│   ├── memory_config/          # runtime config such as profile-dimension templates (live files gitignored; only .example.json seeds ship)
 │   ├── memory_prompt/          # source of memory agent system prompt, one file per type
 │   └── memory_log/             # failure diagnostics and evaluation logs
 │
