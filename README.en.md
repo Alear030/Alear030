@@ -13,7 +13,7 @@ A self-built agent harness with long-term memory
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#what-this-is)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#what-this-is)
 
-[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
+[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Research](docs/index.en.md#research) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
 
 [中文](README.md) · **English**
 
@@ -182,6 +182,32 @@ Nine blocks each register independently via `@register_prompt(order, condition, 
 `agent`, `session`, `tool`, `hook` and friends never import each other directly. They are wired together by `main.py` and interact through hook injection inside the loop. I did this to keep circular imports from appearing as the project grows, and to avoid scattering lazy imports through the codebase.
 
 > Each decision in full — plus the story behind the directional reversal in the `command` tool's security gate — lives in **[Architecture](docs/ARCHITECTURE.en.md)**.
+
+---
+
+## Research
+
+While designing Alear030 I also keep poking at side questions. Some of them are not substantial enough to warrant their own mechanism or design-journey doc, and some I have simply not worked out yet. Those get an issue under the `research` label to track, and a research-genre doc to keep what I found.
+
+Here is one I hit while building the trace groundwork for eval, just from watching usage numbers: **every time I start a fresh session, the first request only gets 14% prompt cache hits.** I already knew the ordering of the pieces inside a system prompt affects both model attention and cache hit rate — I had split and ordered them accordingly early on. What the measurements actually showed was worse than I expected.
+
+My first suspect was the `timeline` / `memory_prompt` chunks — they sit before the timestamp in the order, and background pipelines keep rewriting their content. But a byte-level diff of the system prompts from two real sessions in which `timeline` / `memory_prompt` had not changed at all showed the **first 4333 characters were byte-identical**, the only difference being the trailing timestamp.
+
+Breaking that request's tokens apart is where the numbers finally add up:
+
+| | tokens | cached |
+|---|---|---|
+| system prompt | 2586 | 2176 |
+| **tool schema** | **12709** | **0** |
+| total | 15295 | 2176 (~14%) |
+
+The tool schema is 83% of the entire request and misses completely. Its own content is byte-stable across process restarts — tool discovery is explicitly `sorted()`, schemas are derived from `inspect.signature`, nothing runtime-dependent gets in. **It is invalidated by the timestamp sitting in front of it.**
+
+One line of "the current system time is ..." throws away the 12709 tokens behind it — on every single new session, for the entire time this project has been running.
+
+I also retracted a conclusion during this. I had measured the shared prefix at 2579 tokens with `tiktoken` against 2176 reported cached, and called the 400-token gap a real cache phenomenon. It wasn't: tiktoken and the provider's own tokenizer diverge by up to ±30% on Chinese text, in *both* directions. **Subtracting one ruler's reading from another ruler's reading gives you nothing.** Those 400 tokens were measurement error, not a cache behaviour. The retraction and the questions still open are kept in the doc rather than edited away.
+
+Full write-up: **[LLM cache research notes](docs/research/llm-cache.md)** (Chinese).
 
 ---
 

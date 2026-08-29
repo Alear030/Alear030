@@ -13,7 +13,7 @@
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#定位)
 
-[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
+[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [研究](docs/index.md#研究) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
 
 **中文** · [English](README.en.md)
 
@@ -182,6 +182,32 @@ flowchart LR
 agent、session、tool、hook 等模块彼此不直接引用，而是通过 `main.py` 装配链接、通过 hook 在 loop 中的注入交互。我这么做是为了避免后续扩展时产生循环引用，也避免在子文件里写懒引用那种不优雅的绕法。
 
 > 每条的完整版本、以及 command 工具安全闸门那次方向性反转的来龙去脉，见 **[架构文档](docs/ARCHITECTURE.md#核心设计决策)**。
+
+---
+
+## 研究
+
+我在设计Alear030的时候，同时也会对不同的方向进行研究，有的内容不足以让我新开一篇说明或者想法文档写下来或者我其实也没太搞明白的我就会开一些research标签的issue用来记录，然后开一篇research题材的文档留存下来。
+
+举一个在eval前期搭建trace基架时观察usage发现的问题：**每次新开 session，第一轮请求的 prompt cache 命中率只有 14%。** 我之前倒是知道system_prompt不同部分的顺序不同，可能会存在模型注意力和cache缓存命中率的问题，所以初期已经做了一些拆分和排序，但是没想到真正开始观测数据的时候竟然会这样。
+
+一开始我怀疑是 `timeline` / `memory_prompt` 这两个「启动快照」分块——它们排在时间戳前面，内容又会被后台管线持续改写。但拿两次真实的`timeline` / `memory_prompt`完全没有变化的  session 的 system prompt 做字节级 diff，**前 4333 个字符逐字节完全相同**，唯一差异是结尾那句时间戳。
+
+把那次请求的 token 拆开算，账才对上：
+
+| | token | 命中 |
+|---|---|---|
+| system prompt | 2586 | 2176 |
+| **工具 schema** | **12709** | **0** |
+| 合计 | 15295 | 2176（~14%） |
+
+工具 schema 占了整个请求的 83%，全量 miss。而它自己的内容跨进程是逐字节稳定的（工具发现显式 `sorted()`，schema 由 `inspect.signature` 推导，不含任何运行时状态）——**它是被排在它前面的那句时间戳连累作废的**。
+
+一句「当前系统时间是……」，作废掉后面 12709 个 token（额的钱包！！！！！！两个多月的对话算什么？！算我赞助模型厂商嘛！！！可恶啊！）
+
+这条排查里我还撤回过一个结论：曾经用 `tiktoken` 量出「共享前缀应该有 2579 token，但只命中 2176，缺口 400」，后来发现 tiktoken 和 provider 自己的分词器对中文的偏差能到 ±30%，方向还相反——**拿一把尺子的读数减另一把尺子的读数，差值没有意义**。那 400 token 是测量误差，不是缓存现象。撤回过程和残留的开放问题都留在文里。
+
+完整排查过程见 **[LLM Cache 方向研究&现象观察](docs/research/llm-cache.md)**。
 
 ---
 
