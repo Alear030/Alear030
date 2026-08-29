@@ -10,7 +10,7 @@ description: "commit 之后把分支发出去，分两段：第一段 push + 开
 ```text
 第一段（说「推上去/开个 PR」时跑）：前置检查 → push → 开 PR → 报告链接 → 停
         ⏸  用户自己读，或交给 GitHub Copilot review
-第二段（说「可以合了」时才跑）：合并 → 清理分支/worktree → 同步本地 master
+第二段（说「可以合了」时才跑）：合并 → 清理分支/worktree（常驻分支除外） → 同步本地 master
 ```
 
 **开完 PR 必须停下把链接交回用户，绝不顺手合并。** 这条不是流程洁癖：在这个项目里 PR 的全部
@@ -111,39 +111,44 @@ squash 会把本批 commit 压成一条,那些 commit message 里的「当前进
 
 ### 6. 收尾（按分支类别分叉）
 
-先 `git fetch --prune` 刷新引用,否则本地看到的还是合并前的状态。
+两个分叉共享的固定步骤,不因分支类别跳过:
+
+**① 先 `git fetch --prune` 刷新引用**——否则本地看到的还是合并前的状态。
+
+**② 把本地 `master` 同步到远端:**
+
+```bash
+git -C <主仓库路径> checkout master && git pull
+```
+
+这一步容易漏:用 worktree 开发时,PR 在 GitHub 上合并之后,主仓库那个 checkout 的本地 `master`
+仍然停在旧提交上,而它看起来一切正常。下次在主仓库做事就是从一个落后的 master 出发。
+
+同步前先查主仓库工作区,脏则停下报告,不要自动 stash:
+
+```bash
+git -C <主仓库路径> status --short
+```
+
+主仓库很可能摊着 memory 运行时数据——`memory/memory_config/memory_configs/user_info.json`
+这类被 git 跟踪、又会被管线改写的文件。stash 它们风险太大,该由用户决定怎么处理。
+
+报告时要给出**真正的阻塞交集**,而不是笼统一句「工作区脏」。多数未提交文件根本不在 pull 的
+更新路径上,不影响同步:
+
+```bash
+comm -12 <(git diff --name-only <本地master> origin/master | sort) <(git diff --name-only | sort)
+```
+
+实际撞到过一次:主仓库有 5 个未提交文件,但 `git pull` 要更新的 21 个文件里只和 `.gitignore`
+有交集,两边改的还是不同的行。说清这一点,用户才好判断是先提交、只 stash 那一个文件,
+还是干脆先不同步。
+
+然后按分支类别分叉:
 
 **常驻分支**(在上面名单里):
 
 - **不删分支。**
-- 把本地 `master` 同步到远端:
-
-  ```bash
-  git -C <主仓库路径> checkout master && git pull
-  ```
-
-  这一步容易漏:用 worktree 开发时,PR 在 GitHub 上合并之后,主仓库那个 checkout 的本地 `master`
-  仍然停在旧提交上,而它看起来一切正常。下次在主仓库做事就是从一个落后的 master 出发。
-
-- **同步前先查主仓库工作区,脏则停下报告,不要自动 stash。**
-
-  ```bash
-  git -C <主仓库路径> status --short
-  ```
-
-  主仓库很可能摊着 memory 运行时数据——`memory/memory_config/memory_configs/user_info.json`
-  这类被 git 跟踪、又会被管线改写的文件。stash 它们风险太大,该由用户决定怎么处理。
-
-  报告时要给出**真正的阻塞交集**,而不是笼统一句「工作区脏」。多数未提交文件根本不在 pull 的
-  更新路径上,不影响同步:
-
-  ```bash
-  comm -12 <(git diff --name-only <本地master> origin/master | sort) <(git diff --name-only | sort)
-  ```
-
-  实际撞到过一次:主仓库有 5 个未提交文件,但 `git pull` 要更新的 21 个文件里只和 `.gitignore`
-  有交集,两边改的还是不同的行。说清这一点,用户才好判断是先提交、只 stash 那一个文件,
-  还是干脆先不同步。
 
 **临时分支**:
 
