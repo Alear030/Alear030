@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the eleven skills I use when working with coding agents — 1153 lines in total, all under version control, and you can open any of them directly.
+This directory holds the eleven skills I use when working with coding agents — 1201 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -19,7 +19,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-verify`](alear030-verify/SKILL.md) | 128 | This project's verification doesn't work like a normal Python project's |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
-| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 151 | After a commit: push, open a PR, merge, clean up branches |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
@@ -114,11 +114,19 @@ Claim an issue from the `pre-todo` column of the GitHub Projects board, then: br
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `alear030-push-merge` (151 lines)
+### `alear030-push-merge` (199 lines)
 
-The wrap-up after a commit: push, open a PR, `gh pr merge --merge`, clean up the branch and its worktree, sync local master.
+The wrap-up after a commit, **in two stages with a mandatory stop between them**:
 
-Keeping it separate from `alear030-commit-message` is deliberate: **there has to be a review window in between.** After committing I usually read the change once more, and anything found then is still cheap to fix; after it lands on master it is not. So "commit this" never pushes anything on its own.
+```text
+Stage 1: pre-flight -> push -> open PR -> report the link -> stop
+       (I read it myself, or hand it to GitHub Copilot for review)
+Stage 2: merge -> clean up branch/worktree (permanent branches exempt) -> sync local master
+```
+
+That pause is the most important part of the skill, and it had to be added afterwards. The first version chained push, PR and merge into one unattended pipeline, so the PR was merged seconds after being opened — **choosing "PR rather than local merge" is a choice for something you can stop and look at; merging immediately means the PR never existed**, and a local merge would have been simpler.
+
+The same reasoning keeps it separate from `alear030-commit-message`: committing leaves a window to read the change once more, while a fix is still cheap. So "commit this" never pushes, and "push this" never merges. Only an explicit "push and merge" runs both stages, and the report has to say the review window was skipped.
 
 Three things are hard-coded in it, because none can safely be inferred:
 

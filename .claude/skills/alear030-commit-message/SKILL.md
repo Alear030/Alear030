@@ -123,8 +123,8 @@ commit 完之后跑 `git log -1` 确认正文完整,再跑 `git log --oneline -3
 
 **本技能的职责到 commit 为止**——生成 message、暂存相关文件、提交,不做 push、不开 PR、不合并、不删分支。
 
-commit 完之后如果要把分支发出去,走 `alear030-push-merge`:push → 开 PR → `gh pr merge --merge`
-→ 清理分支/worktree → 同步本地 master。那边写死了常驻分支名单(`master` / `Alear030_dev` 永不删除),
+commit 完之后如果要把分支发出去,走 `alear030-push-merge`:第一段 push + 开 PR 后停下交回用户,
+放行后第二段合并并清理分支/worktree、同步本地 master。那边写死了常驻分支名单(`master` / `Alear030_dev` 永不删除),
 也定了这个项目走 GitHub PR 而不是本地 merge。
 
 两个技能分开的理由是**留一个复查窗口**:commit 之后、发出去之前,通常还要再读一遍改动。
