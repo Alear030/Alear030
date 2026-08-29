@@ -52,6 +52,7 @@ class Loop:
             tui_thinking_enabled = False # 标记TUI是否开启ThinkingWidget
         # 打开流式：create 返回 stream，chunk 逐个到
         params["stream"] = True
+        params["stream_options"] = {"include_usage":True}
 
         # 本次调用的流序号，TUI 用它区分流；建连失败时未赋值，异常路径据此跳过 end 信号
         stream_key = None
@@ -68,9 +69,14 @@ class Loop:
             AssistantThinking = ''
             AssistantThinkingStreamEndFlag = False
             AssistantToolCalls = []
+            AssistantUsage = None
             
             # 迭代 stream：空 choices 跳过，中途异常与建连失败同款兜底
             for chunk in stream:
+                # 接取usage token消耗字段位置，ps：这里后续可能得跟多provider结合，不同provider适配返回的usage不同
+                if getattr(chunk,"usage",None):
+                    AssistantUsage = chunk.usage
+
                 # 部分 provider 会夹空 choices 心跳包，跳过避免 IndexError
                 if not chunk.choices:
                     continue
@@ -140,9 +146,13 @@ class Loop:
                 content=AssistantMessage or None,
                 tool_calls=AssistantToolCalls or None
             )
-            if AssistantThinking:
+            if AssistantThinking:# 判断是否返回Thinking数据
                 complete_message.reasoning_content = AssistantThinking.rstrip('\n')
+            if AssistantUsage is not None:#判断是否返回了CompletionUsage pydantic 对象
+                complete_message.usage = AssistantUsage
+
             return complete_message
+
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
             raise

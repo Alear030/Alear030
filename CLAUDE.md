@@ -84,7 +84,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 | `skill/` | 项目运行时技能资源 |
 | `tui/` | TUI 界面：channel 路由、widget 注册体系、接收 loop 流式事件（详见"TUI 架构"） |
 
-给某个模块补对外机制文档时放 `docs/modules/<module>.md`（文件名对齐本表路径），设计取舍类叙事放 `docs/design/<topic>.md`，两者分层逻辑与已有条目见 [docs/index.md](docs/index.md)。
+给某个模块补对外机制文档时放 `docs/modules/<module>.md`（文件名对齐本表路径），设计取舍类叙事放 `docs/design/<topic>.md`，尚无定论的研究议题放 `docs/research/<topic>.md`——研究文档允许没有结论，且要保留被推翻的假设与撤回的结论，出了结论后再落地成改动型 issue 或沉淀进前两类。三者分层逻辑与已有条目见 [docs/index.md](docs/index.md)。
 
 `workspace/`、`z_ccstudy/`、`z_old_code/` 不参与主项目分析。
 

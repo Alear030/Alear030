@@ -480,19 +480,19 @@ class Session:
         # loop 侧只交对象/字符串，不感知 session JSON 形状。
         def do_insert(data):
             if role == 'assistant' and isinstance(content, ChatCompletionMessage):
+                
+                # 处理Thinking数据，先判断是否返回了Thinking内容
+                assistant_thinking = getattr(content, 'reasoning_content', None)
+                assistant_usage = getattr(content,'usage',None)
+
                 msg = {
                     "message_round": self.round,
                     "message_role": "assistant",
+                    "message_thinking": str(assistant_thinking) if assistant_thinking else '',
                     "message_content": content.content or '',
+                    "message_usage": assistant_usage.model_dump() if assistant_usage else ''
                 }
-                thinking = getattr(content, 'reasoning_content', None)
-                if thinking:
-                    msg = {
-                        "message_round": self.round,
-                        "message_role": "assistant",
-                        "message_thinking": str(thinking),
-                        "message_content": content.content or ''
-                    }
+
                 data['session_messages'].append(msg)
                 if content.tool_calls:
                     data['session_messages'].append({

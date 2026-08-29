@@ -50,7 +50,6 @@ memory/memory_config/backup/
 
 # 准用于claudecode产出代码的文件夹
 .cc_file/
-AGENTS.md
 
 # codex 产出的 changelog 展示站(独立 git 仓库,不进主仓库版本控制;忽略防 git clean 误删)
 changelog-site/
