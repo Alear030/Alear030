@@ -1,6 +1,6 @@
 ---
 name: alear030-push-merge
-description: "commit 之后把分支发出去，分两段：第一段 push + 开 PR 就停下（当用户说'推上去'、'开个 PR'、'发出去'时用）；第二段合并进 master 并清理分支、同步本地 master，只在用户明确说'可以合了'、'合并这个 PR' 时才跑。**PR 是评审闸门，开完必须停下交回用户，绝不自动合并。** 这个项目走 GitHub PR 而不是本地 merge，且常驻分支（master / Alear030_dev）永不删除——不要凭通用 git 经验直接 checkout master && merge，也不要合完就删当前分支。"
+description: "commit 之后把分支发出去，分两段：第一段 push + 开 PR 就停下（当用户说'推上去'、'开个 PR'、'发出去'时用）；第二段合并进 master 并清理分支、同步本地 master，只在用户明确说'可以合了'、'合并这个 PR' 时才跑；用户一句话明确说'推上去并合并'才两段连跑，且报告要点出跳过了评审窗口。PR 是评审闸门，开完必须停下交回用户，绝不自动合并。这个项目走 GitHub PR 而不是本地 merge，且常驻分支（master / Alear030_dev）永不删除——不要凭通用 git 经验直接 checkout master && merge，也不要合完就删当前分支。"
 ---
 
 # Alear030 分支收尾：push → PR ⏸ 评审 → merge → 清理
