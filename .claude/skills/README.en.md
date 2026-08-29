@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the eleven skills I use when working with coding agents — 1198 lines in total, all under version control, and you can open any of them directly.
+This directory holds the eleven skills I use when working with coding agents — 1196 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -19,7 +19,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-verify`](alear030-verify/SKILL.md) | 128 | This project's verification doesn't work like a normal Python project's |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
-| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 196 | After a commit: push and open a PR, stop for review, merge only when released |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 194 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
@@ -114,7 +114,7 @@ Claim an issue from the `pre-todo` column of the GitHub Projects board, then: br
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `alear030-push-merge` (196 lines)
+### `alear030-push-merge` (194 lines)
 
 The wrap-up after a commit, **in two stages with a mandatory stop between them**:
 

@@ -47,8 +47,8 @@ pre-todo → Planning → inprogress → done
 6. **自检**
    - 逐条对照 issue 的「issue检查」验收清单；测试全绿才允许合并。
 7. **合并**
-   - 走 `alear030-push-merge`：push → 开 PR → `gh pr merge --merge` → 清理分支/worktree → 同步本地 master。
-     不在本技能里另写一套合并流程——常驻分支名单、删除边界与清理项以那个技能为准。
+   - 走 `alear030-push-merge`：第一段 push + 开 PR 后停下交回用户，放行后第二段合并并清理分支/worktree、同步本地 master。
+     不在本技能里另写一套合并流程——两段闸门、常驻分支名单、删除边界与清理项以那个技能为准。
    - `feat/issue-<n>-<slug>` 属于临时分支，合并后按那边的规则询问再删。
    - 移卡 inprogress → done；`gh issue close <n>`。
 8. **收尾**

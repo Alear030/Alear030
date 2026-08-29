@@ -272,4 +272,4 @@ after_session / final_memory_pipeline（后台）
 
 生成 commit message 用 `alear030-commit-message` 技能——格式是「`YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文」，标题限 50 字内以保证 `git log --oneline` 可读，正文不限长。只 commit 本次改动直接相关的文件；只记改动本身，不记协作编排过程。
 
-commit 之后把分支发出去用 `alear030-push-merge` 技能——push → 开 PR → `gh pr merge --merge` → 清理分支/worktree → 同步本地 master。这个项目走 GitHub PR 而不是本地 merge；`master` 与 `Alear030_dev` 是常驻分支，永不删除，其余分支合并后询问再删。两个技能刻意分开：commit 到 push 之间留一个复查窗口，「commit一下」不会顺带推上去。
+commit 之后把分支发出去用 `alear030-push-merge` 技能——分两段：第一段 push + 开 PR 后停下交回用户，放行后第二段才合并进 master 并清理分支/worktree、同步本地 master。这个项目走 GitHub PR 而不是本地 merge；`master` 与 `Alear030_dev` 是常驻分支，永不删除，其余分支合并后询问再删。两个技能刻意分开：commit 到 push 之间留一个复查窗口，「commit一下」不会顺带推上去。

@@ -4,7 +4,7 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十一个技能，一共 1198 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十一个技能，一共 1196 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
@@ -19,7 +19,7 @@
 | [`alear030-verify`](alear030-verify/SKILL.md) | 128 | 这个项目的验证方式和常规 Python 项目不一样 |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | 在 worktree 改完生产代码必须回读确认 |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
-| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 196 | commit 之后 push、开 PR，停下评审，放行后才合并 |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 194 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | 技术债 issue 的标签与正文规范 |
@@ -114,7 +114,7 @@
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
-### `alear030-push-merge`（196 行）
+### `alear030-push-merge`（194 行）
 
 commit 之后的收尾，**分两段，中间必须停**：
 

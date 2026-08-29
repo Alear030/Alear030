@@ -358,7 +358,7 @@ One is `.claude/skills/`, the eleven skills I wrote for coding agents. The other
 
 **The difference is who does the distilling.**
 
-Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Eleven skills, 1198 lines, all accumulated that way.
+Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Eleven skills, 1196 lines, all accumulated that way.
 
 The Alear030 side is automatic (only one so far has come out of an automatic proposal). When similar tasks accumulate past a threshold, the memory pipeline produces a skill candidate and interrupts the current conversation with an attachment: you've done this kind of thing several times, consider fixing it into a reusable skill. Then it goes through `create-skill` to draft, me to confirm, and landing on disk; finally `skill_finish` writes back to the task node and zeroes the accumulation counter, so it doesn't keep prompting for the same thing.
 
