@@ -83,7 +83,7 @@ Plan/Execute **必须对照**；Review **必须检查**有无违反。要点 che
 - [ ] **UI/结构契约**：砍「None 占位 / 无用别名」≠ 砍可见结构（序号、pointer、行布局）。不确定就问，不许默认删
 - [ ] **答问范围**：用户问 A 别扯 B（例：问 helper 清完没，别主动端到端汇报除非被问）
 - [ ] 验证：`$alear030-verify`；**禁止擅自 `python main.py`**（除非用户批准）
-- [ ] worktree 改生产代码后按 `$worktree-change-guard` 确认改在 worktree
+- [ ] worktree 改生产代码后按 `$alear030-worktree-change-guard` 确认改在 worktree
 - [ ] 阻塞项回 Execute 修；不凭「做好了」收口；**不 commit** 除非用户要求
 - [ ] 再跑一遍上方「Review 风格违规速查」
 

@@ -35,7 +35,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 
 - **切片化工作单元**：跨模块/大特性按「可独立提交、可运行」的切片规划，一次会话一个闭环，不留带已知缺陷的 WIP 半程提交；计划按切片呈现，用户拍板切片边界后开工
 - **验证优先**：机制级改动先明确「怎么快速验」；测试/探针尽可能固化进 `test/` 而非随用随删；交付以验证输出为准
-- **知识交接**：会话收尾更新「当前主线 + 未完成项」交接物；协作经验与用户偏好落 memory；`@claude` 标记经 scan-claude-markers 定期扫描
+- **知识交接**：会话收尾更新「当前主线 + 未完成项」交接物；协作经验与用户偏好落 memory；`@claude` 标记经 alear030-scan-claude-markers 定期扫描
 - **并行编排**：跨模块改动默认走 workflow 并行探索（Explore 子代理）与并行审查；闸门三级——纯文本直接做 / 单模块机制自验 / 跨模块完整流程
 
 **分工边界**：用户拥有方向、品味、北极星判断和“什么算够好”的最终拍板；Claude 负责读代码、查资料、铺上下文、起草方案、实现、验证并主动指出选项和风险。提出方向、上浮机制根因、指出跨模块影响是 Claude 的职责——**提出不算越界，拍板才算**；任务字面不足以达成目标时，显式提出超范围项交用户拍板。用户在监督位，Claude 在执行位。
@@ -50,7 +50,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 
 **代码里的 `@claude` 任务标记**：
 
-- 仓库没有提供自动扫描机制,`scan-claude-markers` 技能是现成的可复现入口;想要会话开始自动扫,可另行配置 SessionStart hook,是否随仓库分发取决于配置放在哪里
+- 仓库没有提供自动扫描机制,`alear030-scan-claude-markers` 技能是现成的可复现入口;想要会话开始自动扫,可另行配置 SessionStart hook,是否随仓库分发取决于配置放在哪里
 - 完成标记后将原行改写成 `# done(@claude): <做了什么>`，保留痕迹且避免下次重复扫描
 - `# @claude(ignore) ...` 是用户自己的备注，不是 Claude 任务，不要修改
 
@@ -269,4 +269,6 @@ after_session / final_memory_pipeline（后台）
 
 ## 提交规范
 
-生成 commit message 用 `commit-message` 技能——格式是「`YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文」，标题限 50 字内以保证 `git log --oneline` 可读，正文不限长。只 commit 本次改动直接相关的文件；只记改动本身，不记协作编排过程。
+生成 commit message 用 `alear030-commit-message` 技能——格式是「`YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文」，标题限 50 字内以保证 `git log --oneline` 可读，正文不限长。只 commit 本次改动直接相关的文件；只记改动本身，不记协作编排过程。
+
+commit 之后把分支发出去用 `alear030-push-merge` 技能——push → 开 PR → `gh pr merge --merge` → 清理分支/worktree → 同步本地 master。这个项目走 GitHub PR 而不是本地 merge；`master` 与 `Alear030_dev` 是常驻分支，永不删除，其余分支合并后询问再删。两个技能刻意分开：commit 到 push 之间留一个复查窗口，「commit一下」不会顺带推上去。

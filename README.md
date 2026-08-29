@@ -238,7 +238,7 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 仓库里放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
 
-完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；那十个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
+完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；那十一个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
 
 ---
 

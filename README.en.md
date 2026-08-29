@@ -238,7 +238,7 @@ It runs commands, reads and writes files, and accesses the network on your machi
 
 The repository carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, and those files record how we split the work.
 
-The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**; what each of the ten skills is: **[skills catalog](.claude/skills/README.en.md)**.
+The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**; what each of the eleven skills is: **[skills catalog](.claude/skills/README.en.md)**.
 
 ---
 

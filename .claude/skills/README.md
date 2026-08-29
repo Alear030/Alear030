@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十个技能，一共 987 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十一个技能，一共 1133 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十个里有九个的 frontmatter 就这两个字段，只有 `worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十一个里有十个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -17,15 +17,18 @@
 | 技能 | 行数 | 一句话 |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 128 | 这个项目的验证方式和常规 Python 项目不一样 |
-| [`worktree-change-guard`](worktree-change-guard/SKILL.md) | 32 | 在 worktree 改完生产代码必须回读确认 |
-| [`commit-message`](commit-message/SKILL.md) | 120 | commit message 的固定格式 |
-| [`changelog-refresh`](changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
+| [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | 在 worktree 改完生产代码必须回读确认 |
+| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 131 | commit 之后 push、开 PR、合并、清理分支 |
+| [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
-| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 80 | 技术债 issue 的标签与正文规范 |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 65 | 从看板认领一个 issue 到收尾的完整流程 |
-| [`scan-claude-markers`](scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
+| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | 技术债 issue 的标签与正文规范 |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
+| [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | 四角色并行改动的派发协议 |
 | [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | 改生产代码的三段纪律 |
+
+名字全部带 `alear030-` 前缀。早期只有项目特有的几个带，`commit-message` 这类「格式规范」没带——但它们同样只在这个项目里成立，前缀的有无并不表示任何区别，反而会让人以为有。所以后来统一加上了，规则变成一条没有例外的规则。
 
 按它们编码的知识类型，可以分成四组。
 
@@ -51,7 +54,7 @@
 
 这是被引用最多的一个技能，另外三个（`alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline`）都在自己的验证环节指向它。
 
-### `worktree-change-guard`（32 行）
+### `alear030-worktree-change-guard`（34 行）
 
 最短的一个，也是唯一一个标了 `user-invocable: false` 的——意思是它不出现在我的手动菜单里，指望 agent 改完代码之后自己想起来用。
 
@@ -67,7 +70,7 @@
 
 这一组约束的是产出物长什么样。它们存在的理由都一样：**通用做法在这个项目里会丢掉某种我需要的东西。**
 
-### `commit-message`（120 行）
+### `alear030-commit-message`（131 行）
 
 格式是 `YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文，正文分「当前进度 / 后续计划」。标题限 50 字内。
 
@@ -79,7 +82,7 @@
 
 技能里还有一条分界线：**只记改动本身，不记协作编排过程。**「派了几个子代理」「先探索再规划」属于生产过程，不属于改动内容。commit 的署名是我，不该出现 agent 的自述。
 
-### `changelog-refresh`（120 行）
+### `alear030-changelog-refresh`（120 行）
 
 版本块的固定格式（标题 / 契机 / 变更 / 验证 / 对应提交 / 后续计划）加 7 种中文类型标签，不用通用的 Keep a Changelog 英文分类。
 
@@ -93,7 +96,7 @@
 
 还有三条是关于改我的代码的：保留我原有的标识符命名、优先用同文件里已有的 helper、先讲清楚再改。最后一条尤其重要——我需要知道改了什么、为什么改，不然这段代码就从「我的」变成「不知道谁的」了。
 
-### `alear030-issue-techdebt`（80 行）
+### `alear030-issue-techdebt`（81 行）
 
 技术债 issue 的规范：统一用 `tech-debt` 标签（不用 GitHub 默认的 bug/enhancement），严重度写成标题前缀 `[高]`/`[中]`/`[低]`，正文走三段式——issue背景（现状+风险）/ issue功能（目标+建议方案）/ issue检查（验收标准）。证据必须给到 `文件:行号`。
 
@@ -105,13 +108,27 @@
 
 这一组是流程编排：步骤多、有先后依赖、中间有需要我拍板的闸门。
 
-### `alear030-issue-pretodoHandle`（65 行）
+### `alear030-issue-pretodoHandle`（66 行）
 
-从 GitHub Projects 看板的 `pre-todo` 列认领一个 issue，然后：开分支 → 规划（**停下来等我确认**）→ 开发 → 验证 → 自检 → 合并到本地 master → 删分支 → 把看板推到 done → 问我要不要接下一个。
+从 GitHub Projects 看板的 `pre-todo` 列认领一个 issue，然后：开分支 → 规划（**停下来等我确认**）→ 开发 → 验证 → 自检 → 合并（交给 `alear030-push-merge`）→ 把看板推到 done → 问我要不要接下一个。
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
-### `scan-claude-markers`（52 行）
+### `alear030-push-merge`（131 行）
+
+commit 之后的收尾：push → 开 PR → `gh pr merge --merge` → 清理分支和 worktree → 同步本地 master。
+
+它和 `alear030-commit-message` 分开是有意的：**中间要留一个复查窗口**。commit 完再读一遍改动、发现问题还能改，合并进 master 之后再改就得多绕一圈。所以「commit一下」不会顺带把东西推上去。
+
+里面写死了三件不能靠推断的事：
+
+- **常驻分支名单**（`master`、`Alear030_dev`）永不删除。不靠「看起来像不像长期分支」判断——判断错了就是一次不可逆的删除。名单外的一律当临时分支，而临时分支还要再问一次才删。
+- **走 GitHub PR，不走本地 merge。** 这条是从矛盾里长出来的：`alear030-issue-pretodoHandle` 原先写的是 `git checkout master && git merge`，而实际上每次都是开 PR 合的。规矩和习惯对不上，规矩就是废的。顺带说，squash 也被明确禁掉了——它会把一批 commit 压成一条，那些 message 里的「当前进度/后续计划」就此消失，而它们是这个项目的开发日志。
+- **清理要三样一起做**：本地分支、远端分支、worktree。漏一样就留残留。分支上有不打算合并的提交时，删之前得先说清楚哪些东西会跟着消失。
+
+还有一条是被 worktree 坑出来的：PR 在 GitHub 上合并之后，主仓库那个 checkout 的本地 `master` 仍然停在旧提交，**而它看起来一切正常**。下次在主仓库做事就是从一个落后的 master 出发。所以同步本地 master 被写成了收尾的固定动作，不靠记性。
+
+### `alear030-scan-claude-markers`（52 行）
 
 扫描我留在代码注释里的待办标记。三种语义要分清：`@claude` 是给它的任务、`done(@claude): 做了什么` 是已完成的痕迹（保留但不再捡起）、`@claude(ignore)` 是我给自己的备注不许动。
 
@@ -141,16 +158,17 @@
 
 ---
 
-## 它们不是十个孤立的文件
+## 它们不是十一个孤立的文件
 
-这十个技能之间有引用关系：
+这十一个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，被 `alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline` 三个反向引用——凡是走到「验证」这一步的都指向它
-- `commit-message` 和 `changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
+- `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
+- `alear030-commit-message` → `alear030-push-merge` 是一条单向交接：前者到 commit 为止，后者从 commit 之后接手。`alear030-issue-pretodoHandle` 的合并步骤直接引用后者，不自己再写一套
 - `alear030-multitask-code` 与 `alear030-multitask-pipeline` 明确声明互补，各自不复述对方的内容
 - `alear030-style-notes` 和 `alear030-multitask-code` 都指向 `.cursor/rules/coding-conventions.mdc`，避免同一套写法纪律被抄成三份
 
-所以真正被沉淀下来的不只是十条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十一条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: worktree-change-guard
+name: alear030-worktree-change-guard
 description: worktree 改非 test/ 文件(生产代码)后,Read worktree 绝对路径确认改动落地并核对 diff。有过 Edit 的改动落到主仓库、worktree 没改的先例,根因未追溯到,所以一律回读核对。在 worktree 改 memory/loop/session/agent/tool/hook/prompt/config 等生产代码后必须使用,不要跳过。
 user-invocable: false
 ---

@@ -1,5 +1,5 @@
 ---
-name: scan-claude-markers
+name: alear030-scan-claude-markers
 description: "扫描 Alear030 仓库里用户留在代码注释中的 @claude / @claudecode 任务标记，列出待办并可选地逐个执行。当用户说'扫一下我的 @claude 标记'、'看看有哪些待办'、'我在代码里留了任务给你'、'处理一下 @claude'、'checkclaude marker'之类时使用。仓库本身没有提供自动扫描机制，这个 skill 就是现成的可复现入口；用户想在任意时刻触发一次标记扫描（比如刚埋完新标记、或做完一批想复查还剩哪些）就用它，别自己 grep。"
 ---
 
