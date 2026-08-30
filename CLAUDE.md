@@ -38,7 +38,13 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 - **知识交接**：会话收尾更新「当前主线 + 未完成项」交接物；协作经验与用户偏好落 memory；`@claude` 标记经 alear030-scan-claude-markers 定期扫描
 - **并行编排**：跨模块改动默认走 workflow 并行探索（Explore 子代理）与并行审查；闸门三级——纯文本直接做 / 单模块机制自验 / 跨模块完整流程
 
-**分工边界**：用户拥有方向、品味、北极星判断和“什么算够好”的最终拍板；Claude 负责读代码、查资料、铺上下文、起草方案、实现、验证并主动指出选项和风险。提出方向、上浮机制根因、指出跨模块影响是 Claude 的职责——**提出不算越界，拍板才算**；任务字面不足以达成目标时，显式提出超范围项交用户拍板。用户在监督位，Claude 在执行位。
+**分工边界**：用户拥有方向、品味、北极星判断和“什么算够好”的最终拍板；Claude 负责读代码、查资料、铺上下文、起草方案、实现、验证并主动指出选项和风险。提出方向、上浮机制根因、指出跨模块影响是 Claude 的职责——**提出不算越界，拍板才算**；任务字面不足以达成目标时，显式提出超范围项交用户拍板。**用户在驾驶位做判断，Claude 在副驾辅助思考、研究与决策——不是想法的执行者。**
+
+由此推出一条自检：**如果某一轮只是把用户说的话变成了代码或文档，没有为他的判断补充任何他自己不会想到的东西，那这一轮就不合格，哪怕执行得完全正确。**
+
+**防锚定**：接到具体产物（已写的骨架、已定的结构、已给的方案）时，容易滑进「在既有框架内做局部优化」，从而丢掉纠正全局的能力——这种锚定在纯讨论阶段同样发生，不限于写代码。动手前须把模糊需求撑开成架构问题交回用户：为什么做、归属哪个模块、数据流的生产者与消费者与生命周期、扩既有路径还是新增，**以及至少一个不在用户框架内的替代方案**。最后一项是唯一有强制力的部分——前几项在用户的框架内部也答得出来，只有被要求给出框架外的选项，视角才会真正拉出来。
+
+**「帮我写一下」不解除规划闸门**：任务看起来像「把这个文件收个尾」时最容易跳过规划直接执行，但文件小不等于决策小。
 
 **反馈文化**：
 
@@ -54,7 +60,7 @@ python main.py    # TUI 事件循环；Ctrl+C 由 TUI 收口退出手势，main.
 - 完成标记后将原行改写成 `# done(@claude): <做了什么>`，保留痕迹且避免下次重复扫描
 - `# @claude(ignore) ...` 是用户自己的备注，不是 Claude 任务，不要修改
 
-**协作经验落盘**：协作中形成的长期工作方式写入用户 memory（feedback 类），不要让它随会话消失。
+**协作经验落盘**：制度性的关系定义与流程约定写进本文件（仓库公开，任何 agent 与协作者都读得到）；个别的行为校准、踩过的坑与临时偏好写入用户 memory（feedback 类），不要让它随会话消失。
 
 **Claude Code 执行子代理**：仅在当前会话实际提供 `alear-executor` 类型时可用。它用 Sonnet 承接上下文可自包含、会产生大量一次性噪音的执行任务。节奏是 **Opus 主对话规划与拍板 → 主动推荐派发 → 用户拍板 → Sonnet 执行**；不得自动委派。派发指令必须自包含，它不适合需要边写边理解模块耦合的模糊实现。
 
@@ -126,12 +132,12 @@ loop.emit (Alear030TUI.__init__ 里 self.loop.emit = self.receive_loop_emit；ma
   -> 进入 TUI 事件循环（Textual）
 
 一次用户输入：Input.Submitted → do_work 线程 → _run_round()
-  → trigger('before_round')
+  → trigger('before_loop')
   → loop.loop_run('main', message)
   → run_turn()
   → PlanRunner.run()（仅 plan 模式执行，可能再调用多个 run_turn）
   → loop_run 返回
-  → _run_round 内 trigger('after_round')
+  → _run_round 内 trigger('after_loop')
   → finally 解锁输入，回 TUI 事件循环
 
 退出（finally）：trigger('after_session')
@@ -141,7 +147,7 @@ loop.emit (Alear030TUI.__init__ 里 self.loop.emit = self.receive_loop_emit；ma
   → shutdown_embedding_worker()
 ```
 
-`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_round` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后触发一次（`tui/tui_core.py`）；memory 入库开关收拢为 `Memory.pipeline_enabled` 实例属性（`main.py` 创建时统一传入），hook 不再各自传参。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。`HookManager.collect()` 当前没有接入主循环，不要把它写入实际生命周期。session 切片如何流入 Memory，见"架构核心 > Session 与 Memory"。
+`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后触发一次（`tui/tui_core.py`）；memory 入库开关收拢为 `Memory.pipeline_enabled` 实例属性（`main.py` 创建时统一传入），hook 不再各自传参。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。`HookManager.collect()` 当前没有接入主循环，不要把它写入实际生命周期。session 切片如何流入 Memory，见"架构核心 > Session 与 Memory"。`loop/loop_core.py::_chat` 内部另有 `before_round`/`after_round` 两个 hook_point，每次单个 LLM API 调用（一次 `run_turn` 内可能因工具调用循环多次触发）触发一次，粒度比 `before_loop`/`after_loop` 更细，两者不要混淆。
 
 ### Prompt 快照、派生存储与主动召回
 
@@ -192,12 +198,12 @@ MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_client/mcp
 | Hook | hook point | 模式 | 职责 |
 |------|------------|------|------|
 | `inject_import_args` | `pre_toolUse` | 同步 | 给工具调用注入 `agents/session/hooks/Loop/memory` |
-| `memory_pipeline` | `after_round` | 后台 | 切片、摘要并把已定型且 worthy 的 slices 交给 Memory |
-| `session_compress` | `after_round` | 同步 | Token 超限时执行 session 压缩 |
+| `memory_pipeline` | `after_loop` | 后台 | 切片、摘要并把已定型且 worthy 的 slices 交给 Memory |
+| `session_compress` | `after_loop` | 同步 | Token 超限时执行 session 压缩 |
 | `final_memory_pipeline` | `after_session` | 后台 | 会话退出时处理最终定型尾片 |
 | `session_timeline` | `after_session` | 后台 | 会话结束时把全部 worthy slice 提炼成一条跨会话时间线事件,写 `timeline.json` |
 
-`after_round`/`after_session` 参数由触发方（TUI 的 `_run_round`/`main.py` 的 finally）在 `hooks.trigger(...)` 时显式传入；工具运行时对象则由上表的 `inject_import_args`（`pre_toolUse`）注入，这两条注入路径不要混淆。
+`after_loop`/`after_session` 参数由触发方（TUI 的 `_run_round`/`main.py` 的 finally）在 `hooks.trigger(...)` 时显式传入；工具运行时对象则由上表的 `inject_import_args`（`pre_toolUse`）注入，这两条注入路径不要混淆。
 
 ### MCP 客户端
 
@@ -221,7 +227,7 @@ Memory 当前实际主线位于 `memory/memory_core.py`：负责 slice 分类、
 Session 切片流入 Memory 的路径：
 
 ```text
-after_round / memory_pipeline（后台）
+after_loop / memory_pipeline（后台）
   → session._session_slice()
   → session._session_summary()
   → 从定型片 session_slice[:-1] 中筛选 worthy_summary
@@ -232,9 +238,9 @@ after_session / final_memory_pipeline（后台）
   → Memory.slices_pipeline()
 ```
 
-`after_round` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口只过滤传给 Memory 的 `worthy_summary=False`，session JSON 仍保留完整、无缝的原始 slices。历史 slice 缺少该字段时用 `slice.get('worthy_summary', True)` 保守兼容。这两个 hook 的触发时机见"Hook 系统"表。
+`after_loop` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口只过滤传给 Memory 的 `worthy_summary=False`，session JSON 仍保留完整、无缝的原始 slices。历史 slice 缺少该字段时用 `slice.get('worthy_summary', True)` 保守兼容。这两个 hook 的触发时机见"Hook 系统"表。
 
-`memory.slices_pipeline` 是管线入库总闸，开关收拢为 `Memory.pipeline_enabled`（`main.py` 创建 Memory 时统一传入）：`False` 时切片/摘要与 slice 分类/user_info/task 落盘全部短路——`memory_pipeline`/`final_memory_pipeline` 两个 hook 的 `memory is None or not memory.pipeline_enabled` 判空检查在切片之前，pipeline 关闭时切片摘要也不跑。曾因 `after_round` 触发传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 产生不对称，收拢为单一实例属性后由构造处统一控制，杜绝分散传参。
+`memory.slices_pipeline` 是管线入库总闸，开关收拢为 `Memory.pipeline_enabled`（`main.py` 创建 Memory 时统一传入）：`False` 时切片/摘要与 slice 分类/user_info/task 落盘全部短路——`memory_pipeline`/`final_memory_pipeline` 两个 hook 的 `memory is None or not memory.pipeline_enabled` 判空检查在切片之前，pipeline 关闭时切片摘要也不跑。曾因 `after_loop` 触发传 `pipeline_enabled=False` 而 `final_memory_pipeline` 漏传走默认 `True` 产生不对称，收拢为单一实例属性后由构造处统一控制，杜绝分散传参。
 
 ## 数据与版本控制安全
 
