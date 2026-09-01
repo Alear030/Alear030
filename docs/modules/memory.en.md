@@ -34,7 +34,7 @@ This document covers the mechanism. **Why it looks this way** is in [Memory idea
 
 In `config.py`, `MEMORY_PIPELINE_ENABLED = False`. **With the default after a clone, nothing described in this document runs.**
 
-And it turns off more than "ingestion" — the guard in `hook/hooks/after_loop/memory_pipeline/hook.py` sits **before** `session._session_slice()`:
+And it turns off more than "ingestion" — the guard in `hook/hook_point/after_loop/memory_pipeline/hook.py` sits **before** `session._session_slice()`:
 
 ```python
 if memory is None or not memory.pipeline_enabled:
@@ -228,7 +228,7 @@ On the memory side there is only one `memory_agent` instance. It adapts to sub-t
 
 Code comments state the motive: avoid configuration sprawl from too many subagents.
 
-> Thread safety for this "in-place shared mutable state" depends on `HookManager`'s background pool `max_workers=1` — all background hooks run strictly serial. That is an **implicit convention**; `Memory` itself has no lock for it. See [Known Limitations](#known-limitations).
+> Thread safety for this "in-place shared mutable state" depends on `Hooks`' background pool `max_workers=1` — all background hooks run strictly serial. That is an **implicit convention**; `Memory` itself has no lock for it. See [Known Limitations](#known-limitations).
 
 ---
 

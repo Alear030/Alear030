@@ -120,9 +120,9 @@ Alear030/
 │   └── session_plan/           # plan files written by plan_design (not version-controlled)
 │
 ├── hook/                       # event-driven Hook system
-│   ├── hook_core.py            # HookManager: register / trigger / match filter / background thread pool
-│   ├── __init__.py             # recursively discover hook/hooks/**/hook.py
-│   └── hooks/                  # layered by hook point
+│   ├── hook_core.py            # Hooks: register / trigger / match filter / background thread pool
+│   ├── __init__.py             # recursively discover hook/hook_point/**/hook.py
+│   └── hook_point/             # layered by hook point
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # sync: inject agents/session/hooks/Loop/memory into all tools
 │       ├── after_loop/
@@ -295,7 +295,7 @@ Hook, Prompt, and Tool all depend on the side effect of "import runs decorator r
 
 | System | Discovery rule | Requirements for new modules |
 |---|---|---|
-| Hook | Recursively discover `hook/hooks/**/hook.py` | Place under the corresponding hook-point directory and use `@hooks.register`; any path segment starting with underscore is skipped |
+| Hook | Recursively discover `hook/hook_point/**/hook.py` | Place under the corresponding hook-point directory and use `@hooks.register`; any path segment starting with underscore is skipped |
 | Prompt | Scan only **first-level directories** under `prompt/prompts/`, load fixed `prompt.py` | Use `prompt/prompts/<name>/prompt.py` + `@register_prompt`; arbitrary-depth recursion is not supported |
 | Tool | Import only **first-level packages** under `tool/tools/` | The package `__init__.py` must explicitly import concrete implementations; a nested `tool.py` is not registered merely because the file exists |
 

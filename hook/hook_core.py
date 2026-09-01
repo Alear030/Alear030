@@ -20,7 +20,7 @@ class HookDef:
     enabled: bool = True # 整体开关，False时该钩子仍注册但永不触发（对应tool的tool_enabled、prompt的enabled）
 
 
-class HookManager:
+class Hooks:
     def __init__(self,max_workers:int = 1):
         # 所有注册的钩子，按 hook_point 分组
         # {
@@ -121,4 +121,4 @@ class HookManager:
 
 
 # 创建全局hook实例
-hooks = HookManager()
+hooks = Hooks()

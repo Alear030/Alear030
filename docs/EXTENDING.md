@@ -27,7 +27,7 @@ Hook、Prompt、Tool 都靠「import 执行装饰器注册」这个副作用工�
 
 | 系统 | 扫描什么 | 意味着 |
 |---|---|---|
-| Hook | 递归 `hook/hooks/**/hook.py` | 放多深都能被找到，但文件名必须叫 `hook.py` |
+| Hook | 递归 `hook/hook_point/**/hook.py` | 放多深都能被找到，但文件名必须叫 `hook.py` |
 | Prompt | 只扫 `prompt/prompts/` 的**一级目录**，加载固定的 `prompt.py` | 不支持嵌套，`prompt/prompts/a/b/prompt.py` 不会被发现 |
 | Tool | 只导入 `tool/tools/` 下的**一级 package** | 嵌套的 `tool.py` 不会仅因文件存在就注册，package 的 `__init__.py` 必须显式 import |
 
@@ -115,7 +115,7 @@ if session is None:
 ### 目录骨架
 
 ```text
-hook/hooks/<hook_point>/my_hook/
+hook/hook_point/<hook_point>/my_hook/
 ├── __init__.py     # 可以是空文件
 └── hook.py         # 文件名必须是 hook.py
 ```

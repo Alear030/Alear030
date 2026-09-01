@@ -27,7 +27,7 @@ Hook, Prompt, and Tool all rely on the side effect of "import runs decorator reg
 
 | System | What it scans | Meaning |
 |---|---|---|
-| Hook | Recursive `hook/hooks/**/hook.py` | Any nesting depth works, but the file must be named `hook.py` |
+| Hook | Recursive `hook/hook_point/**/hook.py` | Any nesting depth works, but the file must be named `hook.py` |
 | Prompt | Only **one-level directories** under `prompt/prompts/`, loading fixed `prompt.py` | No nesting; `prompt/prompts/a/b/prompt.py` is not discovered |
 | Tool | Only **one-level packages** under `tool/tools/` | A nested `tool.py` is not registered just by existing; the package `__init__.py` must explicitly import it |
 
@@ -115,7 +115,7 @@ if session is None:
 ### Directory skeleton
 
 ```text
-hook/hooks/<hook_point>/my_hook/
+hook/hook_point/<hook_point>/my_hook/
 ├── __init__.py     # may be empty
 └── hook.py         # filename must be hook.py
 ```

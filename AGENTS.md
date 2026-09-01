@@ -46,13 +46,13 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 
 - 高层对象装配集中在 `main.py`，常驻 Agent 配置入口是 `agent/agents.yaml`。
 - 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_register.py` 及对应目录的加载代码。
-- 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hooks/pre_toolUse/` 和 `tool/tool_core.py`。
+- 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hook_point/pre_toolUse/` 和 `tool/tool_core.py`。
 - Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。入口见 `prompt/prompt_core.py` 和 `prompt/prompt_register.py`。
 
 ### Session 与 Memory
 
 - 原始 Session 消息和 `session_slice` 是事实源；`slice_node`、`user_info`、`timeline` 等均是可追溯、可重建的派生物，不得反写派生结果替代原文。
-- Session 读写、切片和压缩入口在 `session/session_core.py`；Memory 摄入与提炼由 `hook/hooks/after_loop/`、`hook/hooks/after_session/` 和 `memory/memory_core.py` 协作完成。
+- Session 读写、切片和压缩入口在 `session/session_core.py`；Memory 摄入与提炼由 `hook/hook_point/after_loop/`、`hook/hook_point/after_session/` 和 `memory/memory_core.py` 协作完成。
 - `json_lock` 只保护短时读取、合并和写入。持锁期间禁止调用模型或 embedding；耗时处理必须在锁外完成，再在锁内按身份或坐标合并。
 - Memory 存储入口在 `memory/memory_storage/memory_storage_core.py`。修改派生数据结构时必须保留来源坐标和可追溯性，并检查所有生产者与消费者。
 - 任何真实历史数据 replay 都必须在执行前后比对相关文件哈希并报告证据。

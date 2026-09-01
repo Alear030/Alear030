@@ -120,9 +120,9 @@ Alear030/
 │   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
 │
 ├── hook/                       # 事件驱动 Hook 系统
-│   ├── hook_core.py            # HookManager：注册 / 触发 / match 过滤 / 后台线程池
-│   ├── __init__.py             # 递归发现 hook/hooks/**/hook.py
-│   └── hooks/                  # 按 hook point 分层
+│   ├── hook_core.py            # Hooks：注册 / 触发 / match 过滤 / 后台线程池
+│   ├── __init__.py             # 递归发现 hook/hook_point/**/hook.py
+│   └── hook_point/             # 按 hook point 分层
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # 同步：给全部工具注入 agents/session/hooks/Loop/memory
 │       ├── after_loop/
@@ -295,7 +295,7 @@ Hook、Prompt、Tool 都依赖「import 执行装饰器注册」的副作用，�
 
 | 系统 | 发现规则 | 新增模块的要求 |
 |---|---|---|
-| Hook | 递归发现 `hook/hooks/**/hook.py` | 放在对应 hook point 目录下并用 `@hooks.register`；路径中任一段以下划线开头会被跳过 |
+| Hook | 递归发现 `hook/hook_point/**/hook.py` | 放在对应 hook point 目录下并用 `@hooks.register`；路径中任一段以下划线开头会被跳过 |
 | Prompt | 只扫 `prompt/prompts/` 的**一级目录**，加载固定的 `prompt.py` | 用 `prompt/prompts/<name>/prompt.py` + `@register_prompt`，不支持任意深度递归 |
 | Tool | 只导入 `tool/tools/` 下的**一级 package** | package 的 `__init__.py` 必须显式 import 具体实现；嵌套的 `tool.py` 不会仅因文件存在就被注册 |
 
