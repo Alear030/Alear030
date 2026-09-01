@@ -29,10 +29,13 @@
 ## 模块机制
 
 - [记忆系统](modules/memory.md) —— 切片、分类、去重、画像、跨会话时间线、语义召回的完整机制
+- [MCP 客户端](modules/mcp_client.md) —— 四层结构、asyncio 隔离与 cancel scope 约束、工具表运行时刷新、凭证占位符
+- [TUI](modules/tui.md) —— 事件流、线程模型、widget 与事件的两套注册体系、Textual 踩坑
 
 ## 设计叙事
 
 - [记忆的想法&构思](design/memory.md) —— 记忆系统为什么长成现在这样
+- [Loop 的想法&取舍](design/loop.md) —— 为什么 Loop 不知道 plan 存在，以及强制收尾、mode diff、错误边界、流式累积四个决定
 
 ## 研究
 
