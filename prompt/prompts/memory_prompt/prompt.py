@@ -10,14 +10,18 @@ def memory_prompt(agent)->str:
     
     # 得到user.json的信息
     user_path = MEMORY_STORAGE_PATH/'user.json'
-    if user_path.exists():
-        user_json = user_path.read_text(encoding='utf-8').strip()
-    else:
-        return
-    # 解析userjson
-    if user_json:
-        user_content = json.loads(user_json)
-    else:
+    try:
+        if user_path.exists():
+            user_json = user_path.read_text(encoding='utf-8').strip()
+        else:
+            return
+        # 解析userjson
+        if user_json:
+            user_content = json.loads(user_json)
+        else:
+            return
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # user.json 语法/编码损坏时跳过分块，不让单文件故障炸掉 Agent 构造
         return
 
     # 空画像不注入(避免空标题污染 system prompt)
