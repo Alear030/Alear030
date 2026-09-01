@@ -11,7 +11,7 @@ This is the entry page for `docs/`, not the repo homepage — the project intro 
 Documents under `docs/` are organized into four tiers by content type; new documents should fit one of them:
 
 - **Overview docs** (`docs/` root): cross-module explanations, for someone reading the project for the first time
-- **Module mechanism docs** (`docs/modules/<module>.md`): what a single module looks like right now, named after the module in [CLAUDE.md](../CLAUDE.md)'s stable module map
+- **Module mechanism docs** (`docs/modules/<module>.md`): what a single module looks like right now, named after the module in the [architecture doc](ARCHITECTURE.en.md)'s directory structure
 - **Design narrative docs** (`docs/design/<topic>.md`): why a single mechanism ended up shaped this way, decoupled from the mechanism doc
 - **Research docs** (`docs/research/<topic>.md`): a question that is **not settled yet** — hypotheses, measured data, conclusions, plus the hypotheses that got falsified and the conclusions that got retracted
 
@@ -30,10 +30,13 @@ Only documents with actual content are listed below; modules that don't have a w
 ## Module mechanisms
 
 - [Memory system](modules/memory.en.md) — the full mechanism: slicing, classification, dedup, profiling, cross-session timeline, semantic recall
+- [MCP client](modules/mcp_client.md) — *Chinese only* · the four layers, the asyncio isolation and its cancel-scope constraint, runtime tool-table refresh, credential placeholders
+- [TUI](modules/tui.md) — *Chinese only* · event flow, threading model, the two registries (widgets and events), Textual pitfalls
 
 ## Design narratives
 
 - [Memory ideas & design](design/memory.en.md) — why the memory system ended up shaped this way
+- [Loop ideas & trade-offs](design/loop.md) — *Chinese only* · why Loop knows nothing about plan, plus four decisions: forced wrap-up by withholding tools, mode detection by diff, one error boundary, streaming accumulation
 
 ## Research
 

@@ -32,7 +32,11 @@ plan_result = PlanRunner(loop=self, session=self.session).run(agent=agent)
 
 **决策收在 `PlanRunner.run()` 内部**——非 plan 模式直接返回 `None`，调用方无条件调即可，不必在 Loop 里写 `if session.mode == 'plan'`。用一次空调用换 Loop 对 plan 的零感知。
 
+同一条思路还体现在依赖上：**`session` 和 `hooks` 都是可选的**。不传就是无持久化模式——不落盘、不触发生命周期钩子，但 ReAct 循环照跑。代码里十余处 `if self.session:` 判空守卫就是这条的代价。收益是 memory 管线能复用同一个 `Loop` 跑后台任务而不污染真实会话，测试也能不带 session 直接构造。
+
 `PlanRunner` 自己也做了一个取舍：**无进展熔断**。连续 `PLAN_STALL_LIMIT` 轮拿到同一个 `step_number`，说明模型没把 step 标 done，直接退出循环。不做这件事的话，一个不肯收尾的模型能把 plan 跑成死循环。
+
+熔断挡的是「不往前走」，另一头「一次往前走太多」由 `Plan.advance()` 挡：它把当前 step 记进 `active_step_number`，**限制本轮唯一允许更新的 step**。没有这条，模型可以在一轮里连续调 `plan_update` 把后面几个 step 一起标成 done——计划就成了摆设。两者是同一个判断的两个方向：**step 的推进权归代码，不归模型。**
 
 ---
 
@@ -104,6 +108,6 @@ if with_tools:
 
 两者没有独立开关。想单独关掉某次调用的 thinking（比如高频调用的性能优化）又要保留 tools，必须先解耦这个方法——而那会影响 main agent 的真实运行时行为。
 
-**不带 tools 的独立直调不受这条约束**，各自直接传 `extra_body` 即可：`session/session_core.py::_session_slice` 已经传 `disabled`；`memory/memory_core.py::slice_type_define` 目前仍传 `enabled`，等待收进结构化直调的统一边界。
+**不带 tools 的独立直调不受这条约束**，各自直接传 `extra_body` 即可：`session/session_core.py::_structured_chat` 已经固定传 `disabled`（`_session_slice` 与 `_session_summary` 都经它发起，本身不碰 `extra_body`）；`memory/memory_core.py::slice_type_define` 目前仍传 `enabled`，等待收进结构化直调的统一边界。
 
 这条留在这里不是因为想不清楚，是因为改它的收益（省一点 thinking token）和风险（动 main agent 的运行时行为）目前不成比例。

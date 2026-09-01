@@ -129,6 +129,5 @@ def event_register(event: str): ...        # 装饰器
 ## 已知的粗糙处
 
 - **channel 表当前只登记 `main`。** `TuiChannel` 按 `agent_name` 路由的结构已经铺好，运行时临时构造的 subagent 也已写入 agents 容器供按名路由，但 `_channel_init()` 目前只建一条 main channel——subagent 的输出没有独立频道。
-- **thinking 已在 Loop 侧累积但 TUI 尚未完整消费**，`loop/loop_core.py` 留了 `@claude` 标记。
 - `tui_core.py` 里输入锁有一条 `@claude` 备注：中途打断能力做出来之后，这套 lock 要重看。
 - **DOM 窗口化已于 20260825 回退**，完整实现存档在本地分支 `tui-channel-window`。回退不是因为没跑通，是代价错位——重建要求 channel 侧长期维护一份与 widget 平行的 `restore_content`，每新增一种流式 widget 都要回 channel 补一条合并规则，widget 注册体系「加 widget 只碰自己目录」的局部性被打破。当时踩出来的五条坑记在 `tui_channel_core.py` 顶部注释里，下次真要做直接看那里。
