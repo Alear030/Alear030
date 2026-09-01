@@ -120,7 +120,7 @@ hook/hooks/<hook_point>/my_hook/
 └── hook.py         # filename must be hook.py
 ```
 
-Current hook points: `before_session`, `pre_toolUse`, `after_round`, `after_session`.
+Current hook points: `before_session`, `pre_toolUse`, `after_loop`, `after_session`.
 
 > The `before_session` directory exists and `main.py` triggers it, but no hook is registered there today — the trigger is a no-op.
 
@@ -130,7 +130,7 @@ Current hook points: `before_session`, `pre_toolUse`, `after_round`, `after_sess
 from hook.hook_core import hooks
 
 
-@hooks.register(hook_point='after_round', background=True, enabled=True)
+@hooks.register(hook_point='after_loop', background=True, enabled=True)
 def my_hook(session=None, memory=None, hooks=None, **kwargs):
     # Declare parameters as needed with defaults: what the trigger passes is decided by hooks.trigger(...) call sites;
     # declaring a parameter the other side does not pass yields TypeError immediately

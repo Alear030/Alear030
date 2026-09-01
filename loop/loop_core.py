@@ -1,5 +1,7 @@
 import json
 
+from time import perf_counter
+
 from openai.types.chat import ChatCompletionMessage
 
 from .orchestrator import PlanRunner
@@ -13,11 +15,13 @@ class LoopAPIError(Exception):
 # 纯 ReAct 推理引擎：main agent 与 subagent 共用，对 plan 编排零感知
 class Loop:
 
-    def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None,emit=None):
+    def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None,emit=None,trace=None):
         self.agents = agents
         self.session = session
         self.hooks = hooks
         self.memory = memory
+        # eval 观测实例：attachment 这类没有独立存在理由的点位在 Loop 内直调它，不为观测另开 hook 点
+        self.trace = trace
         # 控制 thinking 类内容是否打印到终端；memory 等后台管线复用的 Loop 可传 False 静音
         self.verbose = verbose
 
@@ -151,11 +155,29 @@ class Loop:
             if AssistantUsage is not None:#判断是否返回了CompletionUsage pydantic 对象
                 complete_message.usage = AssistantUsage
 
+            # 一次调用记一条：thinking/content/tool_calls/usage 同源同时刻,拆开就得靠伪造时间戳才关联得回来
+            # tool_calls 原样存不 parse：arguments 是模型吐的 JSON 字符串,畸形参数本身就是 eval 要看的证据
+            if self.trace:
+                loop_round=self.session.round if self.session else ''
+                self.trace.trace_record(
+                    trace_type="assistant_output",
+                    source=agent.agent_name,
+                    loop_round=loop_round,
+                    stream_key=stream_key,
+                    trace_detail={
+                        "assistant_reasoning":AssistantThinking or None,
+                        "assistant_content":AssistantMessage or None,
+                        "assistant_toolcalls":AssistantToolCalls or None,
+                        "assistant_usage":AssistantUsage.model_dump() if AssistantUsage is not None else None
+                    }
+                )
+
             return complete_message
 
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
             raise
+
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
             # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败未开流则跳过
@@ -168,14 +190,27 @@ class Loop:
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
     # attachment 只拼进模型可见的 message_list，不落盘、不还原：一旦发出去的历史字节
     # 改动会破坏 provider 的 prompt cache 前缀，所以宁可让它留在历史里，也不事后改写
-    def _sent_message_api(self,agent,message_content:str=None)->ChatCompletionMessage:
+    def _sent_message_api(self,agent,message_content:str=None,source:str='user')->ChatCompletionMessage:
         if message_content:
             model_content = message_content
+            attachment_content = ''
             if self.session and self.session.attachment.attachment_list:
-                model_content = f'{self.session.attachment.attachment_render()}\n\n{message_content}'
+                # 渲染结果先接成变量：clear 之后取不到，且拼接与 trace 两个消费者不该各渲染一次
+                attachment_content = self.session.attachment.attachment_render()
+                model_content = f'{attachment_content}\n\n{message_content}'
                 self.session.attachment.attachment_clear()
 
             agent.message_list.append({'role':'user','content':model_content})
+
+            # trace_record 集中记录每轮给模型的输入；attachment 在 model_content 里排在正文之前，
+            # 故先记 attachment 再记正文——行序即拼接序，读 jsonl 能还原出模型实际看到的完整消息
+            # round 是借 session 的,trace 自己没有轮次概念,只拿它当对回 session JSON 的关联键
+            if self.trace:
+                session_round = self.session.round if self.session else ''
+                if attachment_content:
+                    self.trace.trace_record(trace_type="input",source="attachment",loop_round=session_round,trace_detail={"input_message":attachment_content})
+                self.trace.trace_record(trace_type="input",source=source,loop_round=session_round,trace_detail={"input_message":message_content})
+
             if self.session:
                 self.session.session_message_insert(role='user',content=message_content)
 
@@ -218,12 +253,39 @@ class Loop:
         for func in tool_calls:
             # 调用前记 mode，回来 diff 是否真的切换（不信任提示词自觉性）
             mode_before = self.session.mode if self.session else None
+            # 耗时从外面量：match_tool 永不抛异常,成败全收敛进 tcr,出参就够观测,不必让 trace 渗进工具层
+            tool_call_start = perf_counter()
             # match_tool 接管 mode 旁路、参数解析/校验、hooks、执行、异常、生命周期 emit
             tcr = agent.match_tool(func,verbose=self.verbose,mode_switched=mode_switched,
                                    runtime={'session':self.session,'agents':self.agents,'hooks':self.hooks,'memory':self.memory,'Loop':Loop},
                                    emit=emit_wrapper)
+            tool_call_duration = perf_counter() - tool_call_start
             if self.session and self.session.mode != mode_before:
                 mode_switched = True
+
+            # args/return 存原样不 parse：invalid_tool_arguments 那条路径上参数本就不是合法 JSON,
+            # 解析一道要么让 trace 自己成崩溃点,要么把畸形证据抹掉
+            # 挑字段不用 asdict(tcr)：tool_call_extra_info 是 TUI 渲染树,展示层结构不进 eval 数据
+            # 不带 stream_key,靠 tool_call_id 对回 assistant_output 里的 assistant_toolcalls
+            if self.trace:
+                self.trace.trace_record(
+                    trace_type="tool_call",
+                    source=agent.agent_name,
+                    loop_round=self.session.round if self.session else '',
+                    trace_detail={
+                        "tool_call_id":func.id,
+                        "tool_call_name":func.function.name,
+                        "tool_call_args":func.function.arguments,
+                        "tool_call_state":tcr.tool_call_state.get('tool_call_state'),
+                        "tool_call_error":tcr.tool_call_error or None,
+                        "tool_call_return":tcr.tool_call_result.get('content'),
+                        # duration_ms 是 match_tool 整段,tool_func_ms 是工具本体；相减即 harness 开销
+                        # 只存两个事实不存差值：派生量交给读的人算,免得三个数长成两个真相
+                        "duration_ms":round(tool_call_duration*1000,3),
+                        "tool_func_ms":tcr.tool_call_duration_ms
+                    }
+                )
+
             # 分发：协议消息 + 落盘
             agent.message_list.append(tcr.tool_call_result)
             if self.session:
@@ -237,12 +299,19 @@ class Loop:
             agent.message_list.pop()
 
         agent.message_list.append({'role':'user','content':notice})
+
+        # 强制收尾的提示不经 _sent_message_api,单独记：否则 trace 里会出现一条没有输入的模型回复
+        # source 用 attachment 不用 system：system 已归 trace 设施自身的生命周期,
+        # 而这条和 attachment 同类——都是系统注入进模型可见消息流的内容,只是投递方式不同
+        if self.trace:
+            self.trace.trace_record(trace_type="input",source="attachment",loop_round=self.session.round if self.session else '',trace_detail={"input_message":notice})
+
         if self.session:
             self.session.session_message_insert(role='user',content=notice)
         try:
             final_rq = self._chat(agent,with_tools=False)
         except LoopAPIError:
-            # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息
+            # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息 @claude实际上后续应该想办法将error变成类似attachment的内容和下一轮user消息拼接在一起，避免丢失上下文
             agent.message_list.pop()
             raise
         agent.message_list.append(final_rq)
@@ -259,8 +328,9 @@ class Loop:
 
 
     # 引擎入口：发首条消息，进入 ReAct 工具循环直到出结果或达上限
-    def run_turn(self,agent,message:str=None)->str:
-        agent_rq = self._sent_message_api(agent=agent,message_content=message)
+    # source 只随首条消息下传给 trace；循环里那次 _sent_message_api 无 message_content,不产生记录
+    def run_turn(self,agent,message:str=None,source:str='user')->str:
+        agent_rq = self._sent_message_api(agent=agent,message_content=message,source=source)
         tool_call = 0
 
         while tool_call < agent.max_toolcalls:
@@ -288,15 +358,17 @@ class Loop:
         return self._force_final_reply(agent=agent,notice='系统提示：已达到工具调用次数上限，请根据已有信息进行回复',drop_last_toolcalls=True)
 
 
-    # 对外入口：解析 agent（agent 实例或 agent_name 二选一）→跑一轮→plan 编排→触发 after_round hook
+    # 跑一次 agent 会话：解析 agent（agent 实例或 agent_name 二选一）→跑一轮→plan 编排
+    # memory 管线、subagent、plan_design 都直调这里，不带 hook；顶层轮次的 hook 边界在 run_loop
     # 模型 API 失败在此统一兜底：本轮提前结束，不炸穿 main.py 的顶层循环
-    def loop_run(self,agent = None,agent_name:str=None,message:str=None):
+    def loop_run(self,agent = None,agent_name:str=None,message:str=None,source:str='user'):
         agent = agent if not agent_name else self._get_agent(agent_name=agent_name)
+
         try:
             if self.emit:
                 self.emit(event='LoopStart',agent_name=agent.agent_name)
-            result = self.run_turn(agent=agent,message=message)
-            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_round 之前完成以保原切片时机
+            result = self.run_turn(agent=agent,message=message,source=source)
+            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_loop 之前完成以保原切片时机
             plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
             if plan_result is not None:
                 result = plan_result
@@ -312,5 +384,28 @@ class Loop:
         finally:
             if self.emit:
                 self.emit(event='LoopEnd',content={},agent_name=agent.agent_name)
-                
+
         return result
+
+
+    # 顶层入口：一次外部输入的完整轮次，hook 边界收在这里；loop_run 只管跑一次 agent 会话
+    # source 记谁把消息送进来的（user/attachment/各agent名），与 trace 的 source 同一套词汇，A2A 时原样可用
+    # try/finally：异常路径也跑 after_loop。工具内部异常已被 match_tool 收口成 _error_result、
+    # 模型 API 异常已被 loop_run 的 LoopAPIError 分支吃掉，真正能穿透到这里的是
+    # Plan.advance() 的 ValueError（此时本轮消息完整，该跑）与 session 落盘失败（此时磁盘已不可信，跳过也挽回不了）
+    def run_loop(self,source:str,message:str=None,agent_name:str=None):
+        if not message:
+            return
+
+        # 无 hooks 的 Loop（memory 管线、subagent、plan_design）直调 loop_run，走不到这里，判空仍保留兜底
+        if self.hooks:
+            self.hooks.trigger(hook_point='before_loop',session=self.session,agents=self.agents,
+                               memory=self.memory,hooks=self.hooks,
+                               source=source,user_message=message)
+        try:
+            return self.loop_run(agent_name=agent_name,message=message,source=source)
+        finally:
+            # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置)，触发时不再传
+            if self.hooks:
+                self.hooks.trigger(hook_point='after_loop',session=self.session,agents=self.agents,
+                                   memory=self.memory,hooks=self.hooks)

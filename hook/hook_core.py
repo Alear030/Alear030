@@ -48,7 +48,7 @@ class HookManager:
         return add_hook
 
 
-    # 主循环在某个时机点（如 after_round、pre_toolUse）调这个方法，
+    # 主循环在某个时机点（如 after_loop、pre_toolUse）调这个方法，
     # 意思是"通知所有挂在这个点上的钩子：这件事发生了"。
     # match_ctx 是这次事件的上下文，比如 pre_toolUse 时传 {"tool": "write_file"}，
     # 用来筛选出真正关心这次事件的钩子（见 _match）。

@@ -874,7 +874,7 @@ class Memory:
         # 切片分类(只分新片)
         slices_type_results = self.slices_type_define(slices=new_slices,messages=messages)
 
-        # 锁内二次去重再入库:防两个 after_round 后台钩子并发时都判定同一片为新片导致重复 extend。
+        # 锁内二次去重再入库:防两个 after_loop 后台钩子并发时都判定同一片为新片导致重复 extend。
         # actually_new 记录本次锁内确认真正入库的片,下面 user_info 提取严格基于它,并发也不重复提取。
         actually_new = []
         def _dedup_extend(node):

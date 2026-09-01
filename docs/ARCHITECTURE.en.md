@@ -43,16 +43,16 @@ The embedding model is prewarmed in a separate process because loading is slow (
 
 ```text
 Input.Submitted
-  → do_work thread → _run_round()
-  → hooks.trigger('before_round')
-  → loop.loop_run('main', message)
-      → run_turn()                  # ReAct: model → tools → model → …
-      → PlanRunner.run()            # plan mode only; may call run_turn multiple times inside
-  → hooks.trigger('after_round')
+  → do_work thread → loop.run_loop('main', message)
+      → hooks.trigger('before_loop')
+      → loop_run()
+          → run_turn()                  # ReAct: model → tools → model → …
+          → PlanRunner.run()            # plan mode only; may call run_turn multiple times inside
+      → finally: hooks.trigger('after_loop')
   → finally unlock input
 ```
 
-`session.round` increments at the end of every `run_turn()` that has a session; `after_round` is triggered **once** by the TUI's `_run_round()` after the entire top-level `loop_run()` returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
+`session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `Loop.run_loop()` after the entire top-level `loop_run()` returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
 
 While reasoning runs, streaming events are emitted back to the TUI:
 
@@ -125,7 +125,7 @@ Alear030/
 │   └── hooks/                  # layered by hook point
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # sync: inject agents/session/hooks/Loop/memory into all tools
-│       ├── after_round/
+│       ├── after_loop/
 │       │   ├── memory_pipeline/       # background: slice + summary; hand worthy slices to Memory
 │       │   └── session_compress/      # sync: compress session when tokens exceed limit
 │       └── after_session/
@@ -181,7 +181,7 @@ Alear030/
 │                               # weights not version-controlled; first run auto-downloads from ModelScope (~195MB)
 │
 ├── tui/                        # Textual TUI
-│   ├── tui_core.py             # entry: App assembly, do_work worker thread, _run_round
+│   ├── tui_core.py             # entry: App assembly, do_work worker thread calls run_loop directly
 │   ├── tui_style.tcss          # global styles
 │   ├── tui_channel/
 │   │   └── tui_channel_core.py # channel routed by agent_name: append_stream / build_widget
@@ -236,8 +236,8 @@ Five are currently registered:
 | Hook | hook point | Mode | Role |
 |---|---|---|---|
 | `inject_import_args` | `pre_toolUse` | sync | Inject `agents`/`session`/`hooks`/`Loop`/`memory` into **all** tools uniformly; each tool decides whether to use them — no per-tool-name registration matching |
-| `memory_pipeline` | `after_round` | background | Slice + summary; hand settled and worthy slices to Memory |
-| `session_compress` | `after_round` | sync | Compress session when tokens exceed the limit |
+| `memory_pipeline` | `after_loop` | background | Slice + summary; hand settled and worthy slices to Memory |
+| `session_compress` | `after_loop` | sync | Compress session when tokens exceed the limit |
 | `final_memory_pipeline` | `after_session` | background | Handle the final settled trailing slice on session exit |
 | `session_timeline` | `after_session` | background | Distill worthy slices into one cross-session timeline event |
 
@@ -314,7 +314,7 @@ Constructing a `Session` creates the current session's JSON file immediately, pr
 Two paths for slices flowing into Memory:
 
 ```text
-after_round / memory_pipeline (background)
+after_loop / memory_pipeline (background)
   → session._session_slice()
   → session._session_summary()
   → from settled slices session_slice[:-1], filter worthy_summary
@@ -325,7 +325,7 @@ after_session / final_memory_pipeline (background)
   → Memory.slices_pipeline()
 ```
 
-`after_round` only temporarily withholds the last slice (which may still grow) from Memory; it does not delete it from the session. `after_session` is responsible for admitting the final trailing slice. Both entry points only filter what is **passed to Memory**; the session JSON always keeps complete, seamless original slices.
+`after_loop` only temporarily withholds the last slice (which may still grow) from Memory; it does not delete it from the session. `after_session` is responsible for admitting the final trailing slice. Both entry points only filter what is **passed to Memory**; the session JSON always keeps complete, seamless original slices.
 
 The following directories are real runtime data, not disposable temporary files (all gitignored):
 

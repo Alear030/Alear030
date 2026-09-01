@@ -120,7 +120,7 @@ hook/hooks/<hook_point>/my_hook/
 └── hook.py         # 文件名必须是 hook.py
 ```
 
-当前可用的 hook point：`before_session`、`pre_toolUse`、`after_round`、`after_session`。
+当前可用的 hook point：`before_session`、`pre_toolUse`、`after_loop`、`after_session`。
 
 > `before_session` 目录存在且 `main.py` 会触发它，但当前没有任何 hook 注册在上面，触发是空操作。
 
@@ -130,7 +130,7 @@ hook/hooks/<hook_point>/my_hook/
 from hook.hook_core import hooks
 
 
-@hooks.register(hook_point='after_round', background=True, enabled=True)
+@hooks.register(hook_point='after_loop', background=True, enabled=True)
 def my_hook(session=None, memory=None, hooks=None, **kwargs):
     # 参数按需声明并给默认值:触发方传什么由 hooks.trigger(...) 的调用点决定,
     # 声明了对方没传的参数会直接 TypeError

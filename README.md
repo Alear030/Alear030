@@ -103,7 +103,7 @@ flowchart TB
     TL -. pre_toolUse .-> INJ[注入运行时对象]
     TL --> MCP[MCP 远端工具]
     LOOP --> SE[(Session<br/>消息 · 切片 · 摘要)]
-    SE -. after_round .-> H1[memory_pipeline<br/>session_compress]
+    SE -. after_loop .-> H1[memory_pipeline<br/>session_compress]
     SE -. after_session .-> H2[final_memory_pipeline<br/>session_timeline]
     H1 --> MEM[Memory 管线<br/>分类 · 去重 · 画像]
     H2 --> MEM

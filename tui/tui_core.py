@@ -101,7 +101,10 @@ class Alear030TUI(App,inherit_bindings=False):
     @work(thread=True, exit_on_error=False)
     def do_work(self,user_input:str=None):
         try:
-            self._run_round(user_input=user_input)
+            # 走 now_channel 绑定的 loop：hook 边界与轮次编排都收在 Loop.run_loop 内
+            self.now_channel.channel_loop.run_loop(
+                source='user',message=user_input,agent_name=self.now_channel.agent_name
+            )
         except Exception as ee:
             self.call_from_thread(
                 self.now_channel.append_once,
@@ -112,21 +115,6 @@ class Alear030TUI(App,inherit_bindings=False):
         finally:
             self.call_from_thread(self.bottom_bar.UserInput_set_disabled,False)
             self.call_from_thread(self.bottom_bar.UserInput_set_focus)
-
-    # 跑一轮：before_round → 当前 channel 的 loop → after_round
-    def _run_round(self,user_input:str=None):
-        # 空输入直接丢
-        if not user_input:
-            return
-        
-        agent_name = self.now_channel.agent_name
-        # 触发 before_round 钩子
-        self.hooks.trigger(hook_point='before_round',session=self.session,agents=self.agents,memory=self.memory,hooks=self.hooks,user_message=user_input)
-        # 走 now_channel 绑定的 loop，按 agent_name 派发
-        self.now_channel.channel_loop.loop_run(agent_name = agent_name,message = user_input)
-        # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置),触发时不再传
-        self.hooks.trigger(hook_point='after_round',session=self.session,agents=self.agents,memory = self.memory,hooks=self.hooks)
-
 
     # loop 外发入口：未知 agent 兜底；底栏 event 先截；其余丢给对应 channel
     def receive_loop_emit(self,event:str=None,content:dict=None,agent_name:str=None,stream_id:str=None):

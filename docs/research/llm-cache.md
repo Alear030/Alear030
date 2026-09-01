@@ -37,6 +37,8 @@ main agent 单轮 `prompt_tokens` 动辄一万五，其中 system prompt 和工�
 
 值得强调的一点：**落盘的是 provider 返回的原始对象，不做任何归一化**。不同 provider 的 usage 字段名和口径都不一样（`cached_tokens` / `prompt_cache_hit_tokens` / ...），现在就统一反而会丢信息。这个决定在后面「自我更正」那一节救了一次场。
 
+> **更正（后续）**：`message_usage` 这个落盘埋点后来迁到了 `eval/trace`。assistant usage 现在记在 trace 的 `assistant_output` 事件的 `assistant_usage` 字段里，session 侧不再落 `message_usage`。本节记录的测量方式和下面的实测数据不受影响，仍然成立。
+
 ## 观察到的现象
 
 一段真实多轮对话的实测：

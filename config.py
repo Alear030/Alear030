@@ -67,7 +67,6 @@ MAX_SESSION_TOKEN = 250000
 # 切片、摘要、slice 分类、user_info 画像、task 节点、timeline 全都不会发生。
 # 想体验完整的记忆能力就改成 True(会对每轮对话额外产生若干次模型调用)。
 MEMORY_PIPELINE_ENABLED = False
-
 MEMORY_STORAGE_PATH = Path(__file__).parent/'memory'/'memory_storage'/'memory_storages'
 
 
@@ -85,3 +84,7 @@ LOCAL_MODEL_PATH = Path(__file__).parent/'local_model'
 LOCAL_EMBEDDING_MODEL = Path(__file__).parent/'local_model/iic/nlp_gte_sentence-embedding_chinese-base'
 # 权重不进版本控制,缺失时按此 id 从 ModelScope 自动下载到 LOCAL_MODEL_PATH(下载后路径即 LOCAL_EMBEDDING_MODEL)
 MODELSCOPE_EMBEDDING_ID = 'iic/nlp_gte_sentence-embedding_chinese-base'
+
+# Eval&Trace config
+TRACE_ENABLE = True
+TRACE_LOG_FILE_PATH = Path(__file__).parent/"eval/trace/trace_log"

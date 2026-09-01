@@ -43,16 +43,16 @@ prewarm_embedding_model()        # spawn 独立 worker 进程加载嵌入模型�
 
 ```text
 Input.Submitted
-  → do_work 线程 → _run_round()
-  → hooks.trigger('before_round')
-  → loop.loop_run('main', message)
-      → run_turn()                  # ReAct：模型 → 工具 → 模型 → …
-      → PlanRunner.run()            # 仅 plan 模式执行，内部可能再调多次 run_turn
-  → hooks.trigger('after_round')
+  → do_work 线程 → loop.run_loop('main', message)
+      → hooks.trigger('before_loop')
+      → loop_run()
+          → run_turn()                  # ReAct：模型 → 工具 → 模型 → …
+          → PlanRunner.run()            # 仅 plan 模式执行，内部可能再调多次 run_turn
+      → finally: hooks.trigger('after_loop')
   → finally 解锁输入
 ```
 
-`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_round` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
+`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `Loop.run_loop()` 的 `finally` 块在整个顶层 `loop_run()` 返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
 
 推理过程边跑边发流式事件回 TUI：
 
@@ -125,7 +125,7 @@ Alear030/
 │   └── hooks/                  # 按 hook point 分层
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # 同步：给全部工具注入 agents/session/hooks/Loop/memory
-│       ├── after_round/
+│       ├── after_loop/
 │       │   ├── memory_pipeline/       # 后台：切片 + 摘要，把 worthy slice 交给 Memory
 │       │   └── session_compress/      # 同步：Token 超限时压缩 session
 │       └── after_session/
@@ -181,7 +181,7 @@ Alear030/
 │                               # 权重不纳入版本控制，首次运行自动从 ModelScope 下载（约 195MB）
 │
 ├── tui/                        # Textual TUI
-│   ├── tui_core.py             # 入口：App 装配、do_work 工作线程、_run_round
+│   ├── tui_core.py             # 入口：App 装配、do_work 工作线程直调 run_loop
 │   ├── tui_style.tcss          # 全局样式
 │   ├── tui_channel/
 │   │   └── tui_channel_core.py # 按 agent_name 路由的 channel：append_stream / build_widget
@@ -236,8 +236,8 @@ Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → 
 | Hook | hook point | 模式 | 职责 |
 |---|---|---|---|
 | `inject_import_args` | `pre_toolUse` | 同步 | 给**全部**工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配 |
-| `memory_pipeline` | `after_round` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
-| `session_compress` | `after_round` | 同步 | Token 超限时压缩 session |
+| `memory_pipeline` | `after_loop` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
+| `session_compress` | `after_loop` | 同步 | Token 超限时压缩 session |
 | `final_memory_pipeline` | `after_session` | 后台 | 会话退出时处理最终定型尾片 |
 | `session_timeline` | `after_session` | 后台 | 把 worthy slice 提炼成一条跨会话时间线事件 |
 
@@ -314,7 +314,7 @@ MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_bridge.py`
 切片流入 Memory 的两条路径：
 
 ```text
-after_round / memory_pipeline（后台）
+after_loop / memory_pipeline（后台）
   → session._session_slice()
   → session._session_summary()
   → 从已定型片 session_slice[:-1] 中筛出 worthy_summary
@@ -325,7 +325,7 @@ after_session / final_memory_pipeline（后台）
   → Memory.slices_pipeline()
 ```
 
-`after_round` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口都只过滤**传给 Memory** 的内容，session JSON 始终保留完整、无缝的原始 slices。
+`after_loop` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口都只过滤**传给 Memory** 的内容，session JSON 始终保留完整、无缝的原始 slices。
 
 以下目录都是真实运行数据，不是可随意重建的临时文件（均已 gitignore）：
 

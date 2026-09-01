@@ -103,7 +103,7 @@ flowchart TB
     TL -. pre_toolUse .-> INJ[Inject runtime objects]
     TL --> MCP[MCP remote tools]
     LOOP --> SE[(Session<br/>messages · slices · summaries)]
-    SE -. after_round .-> H1[memory_pipeline<br/>session_compress]
+    SE -. after_loop .-> H1[memory_pipeline<br/>session_compress]
     SE -. after_session .-> H2[final_memory_pipeline<br/>session_timeline]
     H1 --> MEM[Memory pipeline<br/>classify · dedupe · profile]
     H2 --> MEM

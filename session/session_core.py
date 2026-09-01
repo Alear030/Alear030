@@ -142,7 +142,7 @@ class Session:
         # attachment：当前 session 内、仅供 main agent 本轮消费的运行时提示；纯内存态，不持久化
         self.attachment = Attachment()
 
-        # 上下文 token 用量缓存(内存态);启动与每轮 after_round/compress 时由 _session_count_tokens 刷新
+        # 上下文 token 用量缓存(内存态);启动与每轮 after_loop/compress 时由 _session_count_tokens 刷新
         self.context_tokens = ContextTokens(max_tokens=self.max_tokens)
 
 
@@ -162,7 +162,7 @@ class Session:
         with self.json_lock:
             return json.loads(self.session_path.read_text(encoding='utf-8'))
 
-
+    # 创建本轮session的ID，trace复用，全局的单session过程数据如果需要有自己的存储文件需要保证file_id唯一，作为后续监测的唯一根据
     def _generate_session_id(self):
         time_now = datetime.now()
         time_part = time_now.strftime('%Y%m%d_%H%M%S')
@@ -483,14 +483,12 @@ class Session:
                 
                 # 处理Thinking数据，先判断是否返回了Thinking内容
                 assistant_thinking = getattr(content, 'reasoning_content', None)
-                assistant_usage = getattr(content,'usage',None)
 
                 msg = {
                     "message_round": self.round,
                     "message_role": "assistant",
                     "message_thinking": str(assistant_thinking) if assistant_thinking else '',
                     "message_content": content.content or '',
-                    "message_usage": assistant_usage.model_dump() if assistant_usage else ''
                 }
 
                 data['session_messages'].append(msg)

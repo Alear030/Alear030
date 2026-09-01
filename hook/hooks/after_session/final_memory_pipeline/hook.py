@@ -7,8 +7,8 @@ from config import SESSION_MEMORTY_DETAIL_PATH
 
 @hooks.register(hook_point='after_session', background=True)
 def final_memory_pipeline(session=None, memory=None, **kwargs):
-    # after_session 后台钩子:处理 after_round 每轮砍尾留下的最后一个尾片(此时会话已结束,末片已定型)。
-    # 切片+summary 在每轮 after_round 已完成,这里只读 JSON 把尾片喂给 memory 管线。
+    # after_session 后台钩子:处理 after_loop 每轮砍尾留下的最后一个尾片(此时会话已结束,末片已定型)。
+    # 切片+summary 在每轮 after_loop 已完成,这里只读 JSON 把尾片喂给 memory 管线。
     if session is None:
         return
 
