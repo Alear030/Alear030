@@ -12,6 +12,7 @@ from mcp_client import prewarm_mcp_servers, shutdown_mcp_servers
 from tui import Alear030TUI
 
 from eval import Trace
+from log import Log
 
 # 嵌入在独立 worker 进程加载:此处 spawn+后台 boot(缺权重也下载+加载),不阻塞 TUI 启动
 prewarm_embedding_model()
@@ -30,6 +31,10 @@ trace = Trace(trace_id=session.session_id,trace_enable=TRACE_ENABLE,trace_log_fi
 for agent in agents.agents.values():
     agent.trace = trace
     agent.agent_profile_trace_init()
+
+# log 与 trace 同以 session_id 归属：trace 记会话事件流,log 记进程诊断流
+# 构造期攒下的 pending 行由 Log 落地时自动吸收(pending_record 渗透机制),main 无需驱动补写
+Log(session.session_id)
 
 # MCP server 在后台逐个连接:连上一个就把它的工具注册进工具表并刷新各 agent 的 tool_list 快照。
 # 单个 server 失败只记录不影响启动。必须排在 trace 回填之后:刷新 tool_list 就是一次 profile 变更,

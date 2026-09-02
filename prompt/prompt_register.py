@@ -1,3 +1,6 @@
+from log.log_core import Log
+
+
 class _PromptRegister:
     def __init__(self):
         self.prompt_list = {}
@@ -20,14 +23,24 @@ class _PromptRegister:
         return add_prompt
 
     # 按order排序，过滤未启用/condition不满足的分块，调用function(agent)取内容，非空才拼入
+    # 单块异常只跳过该块，不让一个坏块炸掉整个 Agent 构造；走 Log.pending_record 记账：
+    # 构造期 Log 未就绪时自动暂存，Log 落地时自动吸收，本模块不感知 log 生命周期
     def build_prompt(self,agent)->str:
         parts = []
         for item in sorted(self.prompt_list.values(),key=lambda p:p['order']):
             if not item['enabled']:
                 continue
-            if item['condition'] and not item['condition'](agent):
+            try:
+                if item['condition'] and not item['condition'](agent):
+                    continue
+                content = item['function'](agent)
+            except Exception as e:
+                # condition 与 function 同为注册方传入的可调用，一并隔离
+                Log.pending_record(level='error',source='prompt_register',event='prompt_chunk_skip',detail={
+                    'prompt_name':item['name'],
+                    'error':f'{type(e).__name__}: {e}'
+                })
                 continue
-            content = item['function'](agent)
             if content:
                 parts.append(content)
         return '\n\n'.join(parts)

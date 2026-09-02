@@ -88,3 +88,7 @@ MODELSCOPE_EMBEDDING_ID = 'iic/nlp_gte_sentence-embedding_chinese-base'
 # Eval&Trace config
 TRACE_ENABLE = True
 TRACE_LOG_FILE_PATH = Path(__file__).parent/"eval/trace/trace_log"
+
+# Log config(进程级诊断日志,与 trace 同以 session_id 归属)
+LOG_ENABLE = True
+LOG_DATA_PATH = Path(__file__).parent/"log/log_data"

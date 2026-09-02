@@ -10,19 +10,17 @@ def memory_prompt(agent)->str:
     
     # 得到user.json的信息
     user_path = MEMORY_STORAGE_PATH/'user.json'
-    try:
-        if user_path.exists():
-            user_json = user_path.read_text(encoding='utf-8').strip()
-        else:
-            return
-        # 解析userjson
-        if user_json:
-            user_content = json.loads(user_json)
-        else:
-            return
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        # user.json 语法/编码损坏时跳过分块，不让单文件故障炸掉 Agent 构造
+    if user_path.exists():
+        user_json = user_path.read_text(encoding='utf-8').strip()
+    else:
         return
+    # 解析userjson
+    if user_json:
+        user_content = json.loads(user_json)
+    else:
+        return
+    # 语法/编码损坏不在此处吞：直接抛给 build_prompt 的中心化隔离统一捕获并记 log
+    # 结构层(形状)防御仍在下方,语法层防御已上移,避免双层防御各记各的
 
     # 空画像不注入(避免空标题污染 system prompt)
     # 顶层必须是 list；曾被写成 ["系统错误"] 这类 list[str] 时直接跳过，避免 dim.get 崩启动

@@ -66,3 +66,6 @@ local_model/**/*.mv
 
 # trace 运行时事件流(一个 session 一个 jsonl,属于真实会话数据,不进版本控制)
 eval/trace/trace_log/
+
+# log 进程级诊断日志(一个 session 一个 jsonl,属于运行诊断数据,不进版本控制)
+log/log_data/
