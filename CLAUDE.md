@@ -64,7 +64,7 @@ Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型�
 
 ### 收口 / 运维
 
-全部走技能，别凭通用 git/GitHub 经验直接做：`alear030-commit-message`（提交信息格式）、`alear030-changelog-refresh`（版本块）、`alear030-issue-techdebt` / `alear030-issue-pretodoHandle`（issue 规范与看板流转）、`alear030-push-merge`（**分两段：push+开 PR 后必须停下交回用户**，`master` 与 `Alear030_dev` 永不删除）。
+全部走技能，别凭通用 git/GitHub 经验直接做：`alear030-commit-message`（提交信息格式）、`alear030-changelog-refresh`（版本块）、`alear030-issue-techdebt` / `alear030-issue-pretodoHandle`（issue 规范与看板流转）、`alear030-issue-fix`（issue 从拉取定位到方案拍板、修复、测试、review、commit 的修复流水线，止于 commit）、`alear030-push-merge`（**分两段：push+开 PR 后必须停下交回用户**，`master` 与 `Alear030_dev` 永不删除）。
 
 ## 分工边界与反馈文化
 

@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十一个技能，一共 1201 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十二个技能，一共 1253 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十一个里有十个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十二个里有十一个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -24,6 +24,7 @@
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | 技术债 issue 的标签与正文规范 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | 四角色并行改动的派发协议 |
 | [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | 改生产代码的三段纪律 |
@@ -114,6 +115,12 @@
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
+### `alear030-issue-fix`（52 行）
+
+不带号时拉取 tech-debt 的 open issue 清单（时间正序）供我挑，带号直接进：定位（只读）→ 提方案（**停下来等拍板**）→ 修 → 测 → 派 review subagent → commit，**止于 commit**。
+
+它和 pretodoHandle 是显式分工：看板认领、开分支、PR 合并归那个，这个在当前 checkout 直接修、不开分支不 push。里面有一条从 #8 学来的教训进了正文：**issue 会过时**——立项时"无隔离"的前提被 #5 合入改变，差点照着过时前提再修一遍；所以定位步骤强制先复核前提还成不成立。
+
 ### `alear030-push-merge`（199 行）
 
 commit 之后的收尾，**分两段，中间必须停**：
@@ -166,17 +173,18 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ---
 
-## 它们不是十一个孤立的文件
+## 它们不是十二个孤立的文件
 
-这十一个技能之间有引用关系：
+这十二个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，被 `alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline` 三个反向引用——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
 - `alear030-commit-message` → `alear030-push-merge` 是一条单向交接：前者到 commit 为止，后者从 commit 之后接手。`alear030-issue-pretodoHandle` 的合并步骤直接引用后者，不自己再写一套
+- `alear030-issue-fix` 与 `alear030-issue-pretodoHandle` 声明分工：前者当前 checkout 修到 commit 为止，后者管看板认领、分支与 PR；修复/测试/提交环节分别指向 `alear030-multitask-code`、`alear030-verify`、`alear030-commit-message`，不复述
 - `alear030-multitask-code` 与 `alear030-multitask-pipeline` 明确声明互补，各自不复述对方的内容
 - `alear030-style-notes` 和 `alear030-multitask-code` 都指向 `.cursor/rules/coding-conventions.mdc`，避免同一套写法纪律被抄成三份
 
-所以真正被沉淀下来的不只是十一条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十二条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 

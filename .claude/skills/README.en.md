@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the eleven skills I use when working with coding agents — 1201 lines in total, all under version control, and you can open any of them directly.
+This directory holds the twelve skills I use when working with coding agents — 1253 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Ten of these eleven have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Eleven of these twelve have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -24,6 +24,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | The dispatch protocol for four-role parallel changes |
 | [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | The three-stage discipline for changing production code |
@@ -114,6 +115,12 @@ Claim an issue from the `pre-todo` column of the GitHub Projects board, then: br
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
+### `alear030-issue-fix` (52 lines)
+
+Without an issue number it pulls the open tech-debt list (oldest first) for me to pick from; with a number it goes straight in: locate (read-only) → propose a plan (**stop and wait for sign-off**) → fix → test → dispatch a review subagent → commit, **stopping at the commit**.
+
+It divides work explicitly with pretodoHandle: board claiming, branching and PR merging belong to that one; this one fixes directly in the current checkout, no branch, no push. One lesson from #8 made it into the body: **issues go stale** — the "no isolation" premise at filing time had been changed by #5 landing, and it nearly got "fixed" again against the stale premise; so the locate step mandates re-checking whether the premise still holds.
+
 ### `alear030-push-merge` (199 lines)
 
 The wrap-up after a commit, **in two stages with a mandatory stop between them**:
@@ -166,17 +173,18 @@ Three stages of discipline: Plan (plan first, **nothing lands on disk**) → Exe
 
 ---
 
-## They Aren't Eleven Isolated Files
+## They Aren't Twelve Isolated Files
 
-There are reference relationships among these eleven skills:
+There are reference relationships among these twelve skills:
 
 - `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle`, `alear030-multitask-code`, and `alear030-multitask-pipeline` — anything that reaches a "verification" step points at it
 - `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
 - `alear030-commit-message` → `alear030-push-merge` is a one-way handoff: the first stops at the commit, the second takes over from there. `alear030-issue-pretodoHandle` points its merge step straight at the latter instead of writing its own
+- `alear030-issue-fix` declares its division of work with `alear030-issue-pretodoHandle`: the former fixes to commit in the current checkout, the latter owns board claiming, branching and PRs; its fix/test/commit stages point at `alear030-multitask-code`, `alear030-verify` and `alear030-commit-message` respectively without restating them
 - `alear030-multitask-code` and `alear030-multitask-pipeline` explicitly declare themselves complementary and don't restate each other's content
 - `alear030-style-notes` and `alear030-multitask-code` both point at `.cursor/rules/coding-conventions.mdc`, so the same set of writing discipline doesn't get copied into three places
 
-So what actually got distilled isn't just eleven rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just twelve rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 

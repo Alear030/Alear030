@@ -92,6 +92,7 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - `$alear030-worktree-change-guard`：在 worktree 修改非 `test/` 生产代码后核对改动确实落在目标 checkout。
 - `$alear030-scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
 - `$alear030-issue-pretodoHandle`：从 GitHub Projects 的 pre-todo 列处理下一个 issue。
+- `$alear030-issue-fix`：把单个 issue 从拉取、定位、方案拍板到修复、测试、review、commit 的流水线；止于 commit，关 issue 与 push 另行指令，分支/PR 场景仍走 pretodoHandle。
 - `$alear030-issue-techdebt`：按项目格式记录审查或复盘发现的技术债。
 - `$alear030-commit-message`：生成符合项目规范的提交信息。
 - `$alear030-changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。
