@@ -6,13 +6,22 @@ from pathlib import Path
 
 from prompt.prompt_register import register_prompt
 from config import MEMORY_STORAGE_PATH
+from log.log_core import Log
 
 timeline_path = MEMORY_STORAGE_PATH/'timeline.json'
 timeline = None
 if timeline_path.exists():
-    timeline_content_raw = timeline_path.read_text(encoding='utf-8').strip()
-    if timeline_content_raw:
-        timeline = json.loads(timeline_content_raw)
+    # 导入期单点:语法/编码损坏会炸穿启动,build_prompt 隔离够不到模块级,只能就地降级
+    # 损坏 → 无时间线分块,pending 记账由 main 构造 Log 时吸收,修复文件重启即恢复
+    try:
+        timeline_content_raw = timeline_path.read_text(encoding='utf-8').strip()
+        if timeline_content_raw:
+            timeline = json.loads(timeline_content_raw)
+    except Exception as e:
+        timeline = None
+        Log.pending_record(level='high',source='timeline_prompt',event='timeline_load_skip',detail={
+            'error':f'{type(e).__name__}: {e}'
+        })
 
 if timeline:
     timeline_enable = True

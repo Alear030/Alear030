@@ -103,7 +103,7 @@ class Log:
                 })
 
     # 唯一log_file写入，log对外暴露唯一写入方法
-    # 本函数签名即事件契约；level答「多严重」，source答「谁产生的」，event答「发生了什么」
+    # 本函数签名即事件契约；level答「多严重」(low/medium/high)，source答「谁产生的」，event答「发生了什么」
     def log_record(self,level:str,source:str,event:str,detail:dict=None):
         # 没有log_file说明config中的路径配置失效，或者没有启用log
         if not self.log_file_path or not self.log_enable:
