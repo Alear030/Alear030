@@ -59,9 +59,22 @@ def timeline_prompt(agent)->str:
     timeline_token = 0
     timeline_info = None
     for timeline_index, entry in enumerate(historical_timeline):
-        tl_content = render_timeline_entry(entry=entry, timeline_token=timeline_token, timeline_index=timeline_index)
+        # 内网兜单个条目:一条形状坏只丢这条并带坐标记账,其余时间线照常注入
+        try:
+            tl_content = render_timeline_entry(entry=entry, timeline_token=timeline_token, timeline_index=timeline_index)
+        except Exception as e:
+            # timeline_index 换算回 timeline.json 文件序:渲染序是 reverse 后的,直接记账会数错位置
+            Log.pending_record(level='medium',source='timeline_prompt',event='timeline_entry_skip',detail={
+                'timeline_index':len(historical_timeline)-1-timeline_index,
+                'session_id':entry.get('session_id') if isinstance(entry,dict) else None,
+                'error':f'{type(e).__name__}: {e}'})
+            continue
         timeline_info = timeline_info + '\n\n' + tl_content if timeline_info else tl_content
         timeline_token += count_token(text=tl_content)
+
+    # 全部条目被跳过时干净返回空,build_prompt 过滤空块;不补这行会 str+None 抛 TypeError
+    if timeline_info is None:
+        return None
 
     return (
         "以下是历史会话的时间线概览(按发生顺序,近段最详含叙事线索、远段保留关键词与一句话概括锚定 session_id,"
