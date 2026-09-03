@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十二个技能，一共 1253 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十三个技能，一共 1294 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十二个里有十一个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十三个里有十二个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -23,6 +23,7 @@
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | 技术债 issue 的标签与正文规范 |
+| [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 41 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
@@ -151,6 +152,10 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 用技能而不是让 agent 自己去 grep，是因为自己 grep 的结果每次都不一样：漏目录、把 `done(@claude)` 当成待办、或者去动了 `@claude(ignore)`。
 
+### `alear030-doc-drift-check`（41 行）
+
+每天早上九点的定时任务沉淀成的技能：逐篇核对核心文档与代码现场，三种口径——结构性漂移（引用的文件/入口/计数已不存在）、行为描述漂移（断言与代码矛盾）、笔误过期。两条铁律：先机械核对再下结论（压误报）；判定依赖未提交代码的一律跳过进警示区，不猜。全程只读，报告完把决定权交回。
+
 ---
 
 ## 四、派发协议
@@ -173,9 +178,9 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ---
 
-## 它们不是十二个孤立的文件
+## 它们不是十三个孤立的文件
 
-这十二个技能之间有引用关系：
+这十三个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，被 `alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline` 三个反向引用——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
@@ -184,7 +189,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 - `alear030-multitask-code` 与 `alear030-multitask-pipeline` 明确声明互补，各自不复述对方的内容
 - `alear030-style-notes` 和 `alear030-multitask-code` 都指向 `.cursor/rules/coding-conventions.mdc`，避免同一套写法纪律被抄成三份
 
-所以真正被沉淀下来的不只是十二条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十三条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 

@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the twelve skills I use when working with coding agents — 1253 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1294 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Eleven of these twelve have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Twelve of these thirteen have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -23,6 +23,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
 | [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
+| [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 41 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
@@ -151,6 +152,10 @@ The repo provides no automatic scanning mechanism, so this skill is the ready-ma
 
 Using a skill rather than letting the agent grep for itself is because self-grepping gives a different result every time: directories missed, `done(@claude)` treated as a to-do, or `@claude(ignore)` getting touched.
 
+### `alear030-doc-drift-check` (41 lines)
+
+Sedimented from the scheduled task that fires at nine every morning: it checks the core docs one by one against the live code, through three lenses — structural drift (referenced files/entry points/counts that no longer exist), behavioural drift (assertions contradicting the code), and typos or stale wording. Two iron rules: verify mechanically before concluding (to keep false positives down); any judgement that depends on uncommitted code is skipped into the warning section, no guessing. Strictly read-only throughout — once the report is out, the decision returns to me.
+
 ---
 
 ## 4. Dispatch Protocols
@@ -173,9 +178,9 @@ Three stages of discipline: Plan (plan first, **nothing lands on disk**) → Exe
 
 ---
 
-## They Aren't Twelve Isolated Files
+## They Aren't Thirteen Isolated Files
 
-There are reference relationships among these twelve skills:
+There are reference relationships among these thirteen skills:
 
 - `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle`, `alear030-multitask-code`, and `alear030-multitask-pipeline` — anything that reaches a "verification" step points at it
 - `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
@@ -184,7 +189,7 @@ There are reference relationships among these twelve skills:
 - `alear030-multitask-code` and `alear030-multitask-pipeline` explicitly declare themselves complementary and don't restate each other's content
 - `alear030-style-notes` and `alear030-multitask-code` both point at `.cursor/rules/coding-conventions.mdc`, so the same set of writing discipline doesn't get copied into three places
 
-So what actually got distilled isn't just twelve rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just thirteen rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 
