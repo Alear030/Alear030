@@ -41,7 +41,7 @@ class Prompt:
                 content = item['function'](agent)
             except Exception as e:
                 # condition 与 function 同为注册方传入的可调用，一并隔离
-                Log.pending_record(level='high',source='prompt_register',event='prompt_chunk_skip',detail={
+                Log.pending_record(level='high',source='build_prompt',event='prompt_chunk_skip',detail={
                     'prompt_name':item['name'],
                     'error':f'{type(e).__name__}: {e}'
                 })

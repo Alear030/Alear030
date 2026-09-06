@@ -68,7 +68,7 @@ gh issue create --repo Alear030/Alear030 --title "[高] <一句话描述>" --bod
 ## issue背景（现状 + 风险）
 启动单点故障：build_prompt 对每个分块函数无任何隔离，任一 function 抛异常即炸整个 Agent 构造，且无日志可定位。
 **存在风险**：一条坏数据（timeline.json/user.json/skill frontmatter）即可杀全启动。
-证据：prompt/prompt_register.py:34
+证据：prompt/prompt_core.py:35
 
 ## issue功能（目标 + 建议方案）
 - 目标：单块异常不拖垮启动
