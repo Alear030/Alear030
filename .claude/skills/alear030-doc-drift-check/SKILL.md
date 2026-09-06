@@ -10,10 +10,12 @@ description: "检查 Alear030 项目文档与代码现场是否漂移时使用�
 ## 检查范围（默认核心文档）
 
 - 顶层 12 篇:README(.en)、AGENTS.md、CLAUDE.md、CHANGELOG.md、COLLABORATION(.en)、CONTRIBUTING(.en)、SECURITY(.en)、THIRD_PARTY_NOTICES.md
-- docs/ 全部(index、ARCHITECTURE、CONFIGURATION、EXTENDING 及 design/、modules/、research/)
+- docs/ 全部(index、ARCHITECTURE、CONFIGURATION、EXTENDING 及 design/、modules/、research/、observations/)
 - .cursor/rules/ 全部 .mdc
 
 范围可按用户指令增减;prompt/tool 提示词 md 和 SKILL.md 默认不查(体量大)。
+
+**docs/observations/ 只查结构性漂移,不进行为描述漂移口径。** 观察文描述的是外部系统,拿本仓代码去校验它的断言必然全是假阳性。对观察文只做两件事:相对链接可达性,以及「观察日期 + 证据等级标注」这两个体裁必填项在不在。文里的技术断言一律不判、不列问题。
 
 ## 流程
 

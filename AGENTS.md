@@ -2,6 +2,8 @@
 
 > 权威关系：本文件是 `CLAUDE.md` 的压缩派生，供 Codex/Cursor 等宿主工具读取，不单独维护第二套说法；协作、安全、写入和验证约束以 `CLAUDE.md` 为源，两者出现分歧时以 `CLAUDE.md` 为准并需要同步修订本文件。运行行为与架构事实始终以现场代码、注册器和配置为准，不以任何文档（包括 `CLAUDE.md`）为准。
 >
+> 例外：下面「技能入口」一节逐项列出的技能名和触发时机，覆盖范围比 `CLAUDE.md` 正文广。`CLAUDE.md` 那边靠 `.claude/skills/` 的 `description` 自动触发，不需要逐项列出；但 Codex/Cursor 没有这套机制，这里必须替它们把索引摆全。这不算独立判断，只要索引内容不引入 `CLAUDE.md` 未认可的新规则。
+>
 > 维护原则：这里只保留无法通过常规探索自发现的长期规则、稳定不变量和源码入口。工具、Hook、Prompt、Widget 等易变清单以目录现状为准，不在本文件逐项枚举。
 
 ## 项目定位
@@ -45,9 +47,9 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 ### 装配与扩展
 
 - 高层对象装配集中在 `main.py`，常驻 Agent 配置入口是 `agent/agents.yaml`。
-- 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_register.py` 及对应目录的加载代码。
+- 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_core.py` 及对应目录的加载代码。
 - 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hook_point/pre_toolUse/` 和 `tool/tool_core.py`。
-- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。入口见 `prompt/prompt_core.py` 和 `prompt/prompt_register.py`。
+- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。分块注册时必须声明 `type`：`static` 进 system prompt，`notification` 由 `before_session` 钩子投成 attachment，漏写的分块两边都不收、会被静默丢弃。入口见 `prompt/prompt_core.py`。
 
 ### Session 与 Memory
 
@@ -93,7 +95,7 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - `$alear030-scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
 - `$alear030-issue-pretodoHandle`：从 GitHub Projects 的 pre-todo 列处理下一个 issue。
 - `$alear030-issue-fix`：把单个 issue 从拉取、定位、方案拍板到修复、测试、review、commit 的流水线；止于 commit，关 issue 与 push 另行指令，分支/PR 场景仍走 pretodoHandle。
-- `$alear030-issue-techdebt`：按项目格式记录审查或复盘发现的技术债。
+- `$alear030-issue-mark`：按项目标签体系（tech-debt/boundary-violation/eval-require 等）记录审查或复盘发现的问题。
 - `$alear030-doc-drift-check`：按结构性/行为/笔误三种口径检查项目文档与代码现场的漂移；严格只读、只汇报不修复，依赖未提交代码的判定跳过并警示。
 - `$alear030-commit-message`：生成符合项目规范的提交信息。
 - `$alear030-changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。

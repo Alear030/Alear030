@@ -22,7 +22,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
-| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | Label and body conventions for tech-debt issues |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 81 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 41 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
@@ -98,7 +98,7 @@ The taste for writing comments in my code: Chinese, minimal, verb- or action-ori
 
 There are three more about changing my code: keep my existing identifier naming, prefer helpers that already exist in the same file, and explain before changing. That last one matters most — I need to know what changed and why, otherwise that stretch of code goes from "mine" to "no idea whose."
 
-### `alear030-issue-techdebt` (81 lines)
+### `alear030-issue-mark` (81 lines)
 
 Conventions for tech-debt issues: always the `tech-debt` label (not GitHub's default bug/enhancement), severity as a title prefix `[高]`/`[中]`/`[低]`, and a three-part body — background (current state + risk) / what to do (goal + proposed approach) / checks (acceptance criteria). Evidence has to go down to `file:line`.
 

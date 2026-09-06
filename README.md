@@ -13,7 +13,7 @@
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#定位)
 
-[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [研究](docs/index.md#研究) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
+[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [研究](docs/index.md#研究) · [观察](docs/index.md#观察) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
 
 **中文** · [English](README.en.md)
 
@@ -60,8 +60,8 @@ Alear030 不是一个「Python Agent 框架」，是一套完整的 Agent 基础
 - **Multi-Agent 集群** —— 5 个常驻 Agent，身份、模型等级与工具授权由 YAML 驱动；可在运行时按任务临时构造 subagent
 - **会话切片 + 本地嵌入召回** —— LLM 切话题边界，本地中文 GTE 算向量，不依赖任何外部向量库
 - **跨会话记忆** —— 后台管线做切片分类、去重、用户画像提炼与跨会话时间线
-- **事件驱动 Hook** —— 4 个事件点，同步/后台两种模式，新增 Hook 只需在对应目录建一个 `hook.py`
-- **工具零样板注册** —— `@register_tool` + `inspect.signature` 自动生成 function-calling schema
+- **事件驱动 Hook** —— 5 个事件点，同步/后台两种模式，新增 Hook 只需在对应目录建一个 `hook.py`
+- **工具零样板注册** —— `@tool.tool_register` + `inspect.signature` 自动生成 function-calling schema
 - **MCP 客户端** —— stdio 与 Streamable HTTP 双传输，远端工具在 server 连上后运行时注册进工具表
 - **Textual TUI** —— 流式渲染 thinking / tool call / 回复，按 agent 分 channel
 
@@ -171,11 +171,13 @@ flowchart LR
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
-`@register_tool` + `inspect.signature` 自动生成 function-calling 参数 schema，新增工具零样板代码。函数签名是模型可见参数契约的唯一真相源，不为单个工具另维护平行 schema。
+`@tool.tool_register` + `inspect.signature` 自动生成 function-calling 参数 schema，新增工具零样板代码。函数签名是模型可见参数契约的唯一真相源，不为单个工具另维护平行 schema。
 
 ### 5. Prompt 分层组合
 
-9 个分块各自用 `@register_prompt(order, condition, enabled)` 独立注册，`build_prompt(agent)` 排序过滤后拼成最终 system prompt。新增分块建个目录写 `prompt.py` 即可，不改其他分块。注意 `session_recent` / `memory_prompt` / `timeline_prompt` 是**启动快照**，同进程后续写入不会自动刷新。
+9 个分块各自用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定它走哪条路：`static` 由 `build_prompt(agent)` 排序过滤后拼成 system prompt；`notification` 不进 system prompt，改由 `before_session` 钩子按 `target` 投成 attachment 随用户输入送达。
+
+这条分流是缓存驱动的——会变的内容留在 system prompt 里，会让排在它前面的工具 schema 整块失去前缀缓存。新增分块建个目录写 `prompt.py` 即可，不改其他分块。注意 `session_recent` / `memory_prompt` / `timeline_prompt` 仍是**启动快照**，同进程后续写入不会自动刷新。
 
 ### 6. 模块解耦
 
@@ -203,11 +205,27 @@ agent、session、tool、hook 等模块彼此不直接引用，而是通过 `mai
 
 工具 schema 占了整个请求的 83%，全量 miss。而它自己的内容跨进程是逐字节稳定的（工具发现显式 `sorted()`，schema 由 `inspect.signature` 推导，不含任何运行时状态）——**它是被排在它前面的那句时间戳连累作废的**。
 
-一句「当前系统时间是……」，作废掉后面 12709 个 token（额的钱包！！！！！！两个多月的对话算什么？！算我赞助模型厂商嘛！！！可恶啊！）
+一句「当前系统时间是……」，作废掉后面 12709 个 token（额的钱包！！！！！！两个多月的对话算什么？！算我赞助模型厂商嘛！！！可恶啊！）。后来把这句时间戳整块挪出 system prompt，又补上两个配套的排序/拼接修复，命中率从 14% 提到了 99.3%——总算不用继续倒贴给厂商了。
 
 这条排查里我还撤回过一个结论：曾经用 `tiktoken` 量出「共享前缀应该有 2579 token，但只命中 2176，缺口 400」，后来发现 tiktoken 和 provider 自己的分词器对中文的偏差能到 ±30%，方向还相反——**拿一把尺子的读数减另一把尺子的读数，差值没有意义**。那 400 token 是测量误差，不是缓存现象。撤回过程和残留的开放问题都留在文里。
 
 完整排查过程见 **[LLM Cache 方向研究&现象观察](docs/research/llm-cache.md)**。
+
+---
+
+## 观察
+
+除了研究自己项目里的问题，我平时也喜欢观察一些有意思的东西——尤其是**别人家的系统怎么解一个我也在解的问题**。这类内容不讲 Alear030 是怎么做的，所以单独开了一类观察文档放。
+
+它有一条别的文档没有的约束：**没有「以代码为准」可以兜底**，被观察方的源码我看不到、而且它会自己改。所以每篇都要标观察日期，并给每条断言标注证据等级——一手（本机可复现）、二手（被观察系统自己的说法，不构成验证）、三手（推断）。
+
+第一篇是拿自己造记忆系统的经验，去逆向另一个 AI 助手的记忆机制。它跨会话记住了我上个会话的结论，我好奇它把我记成了什么样，点开文件看到 frontmatter 的那一刻就基本明白了——**一堆带头信息的 Markdown、一个自动加载的索引、几条写在系统提示里的纪律，零基础设施**。这跟我给 `memory_storage` 做的是同一个赌法：拒绝向量库，赌表示和纪律比机器更重要。
+
+有意思的是接下来找到的缺口。它的记忆之间有 `[[链接]]`，但**没有反向索引也没有触发器**——一条记忆被推翻时，引用它的地方不会有任何反应。而真正的污染主通道还不是链接，是那个**每次会话无条件注入的索引**：索引行为了有召回价值塞满了实质结论，却是全系统最少被复核的一层。观察当天就抓到了现场——索引里有一条断言某篇文档已经落盘，而那个文件在磁盘上并不存在。
+
+还有一条我猜错两次才对的：它的记忆桶不按项目分，**按工作目录分**。同一个仓库开了 git worktree，记忆就裂成互不可见的两半。
+
+完整观察见 **[ZCode 的记忆系统观察](docs/observations/zcode-memory.md)**。文里给出了我用的审计三问——分层模型、生成路径、纠正传播——问完任何一套记忆系统，它的上下文预算、记东西的口味、烂掉的方式都会露出来。
 
 ---
 

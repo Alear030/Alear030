@@ -1,11 +1,11 @@
 ---
-name: alear030-issue-techdebt
-description: "把 Alear030 审查/复盘发现的待优化问题记录成 GitHub issue。当用户说'记一下这个问题'、'把问题清单传上去'、'创建/上传 tech-debt issue'、'整理成 issue' 时使用。项目有固定的 tech-debt 标签 + 严重度标题前缀 + 三段式正文（issue背景/issue功能/issue检查）规范，不要用 GitHub 默认标签（bug/enhancement 等）或自由发挥的格式。"
+name: alear030-issue-mark
+description: "把 Alear030 审查/复盘发现的待优化问题按规范标签和格式记录成 GitHub issue。当用户说'记一下这个问题'、'把问题清单传上去'、'创建/上传 tech-debt issue'、'整理成 issue' 时使用。项目有固定的标签体系（tech-debt/boundary-violation/eval-require 等）+ 严重度标题前缀 + 三段式正文（issue背景/issue功能/issue检查）规范，不要用 GitHub 默认标签（bug/enhancement 等）或自由发挥的格式。"
 ---
 
-# Alear030 技术债 issue 上传
+# Alear030 issue 标记与上传
 
-把审查/复盘/日常发现的「当前看可能有问题，后续需要修改优化」的技术债记录到 GitHub 仓库 `Alear030/Alear030`。固定规范：`tech-debt` 专属标签 + 严重度标题前缀 + 三段式正文，与仓库已建的 issue 模板保持风格统一。
+把审查/复盘/日常发现的问题按项目固定的标签体系和格式记录到 GitHub 仓库 `Alear030/Alear030`。核心是**打对标签**——`tech-debt`/`boundary-violation`/`eval-require` 等标签各自的判据和叠加规则，加上严重度标题前缀 + 三段式正文，与仓库已建的 issue 模板保持风格统一。
 
 ## 生成前先做的事
 
@@ -16,6 +16,8 @@ description: "把 Alear030 审查/复盘发现的待优化问题记录成 GitHub
 ## 标签与严重度规范
 
 - **统一用 `tech-debt` 标签**（仓库已建，紫灰色 `#d4c5f9`）。**不要**用 GitHub 默认标签（bug/enhancement/question 等）。
+- **`boundary-violation` 是叠加标签，不是替代 `tech-debt`**（仓库已建，红色 `#b60205`，定义："对象跨越自身接口直接读写另一对象内部状态，模块/实例边界被打穿的一类问题"）。问题的本质是"外部代码绕过对象自己的方法，直接摸/改另一个对象的内部字段"（迪米特法则违规）时，`tech-debt` + `boundary-violation` 两个标签一起打；如果只是逻辑/健壮性/命名/schema 这类问题，不涉及跨对象摸内部状态，只打 `tech-debt`。例：#123（`Loop._close_round` 直接改 `session.round`）、#124（`Agent` 不该持有的 `tool_list`/`match_tool`）两个都打了双标签；#125（`agent_profile_update` 的裸字符串 key 打错静默变新增）不涉及跨对象摸内部状态，只打了 `tech-debt`。
+- **`eval-require` 也是叠加标签**（仓库已建，定义："结论目前只靠代码审查或理论推导得出，需要用 trace/eval 实测数据验证效果与影响的问题"），可以叠在 `tech-debt` 或 `research` 任一主标签上（不像 `boundary-violation` 目前只依附 `tech-debt`）。判据：这条结论/改动目前只是"看代码/推理出来应该是这样"，还没有真实 trace/eval 数据支撑，需要后续跑数据验证才能确认。例：#129（attachment 拼接顺序改成前置后，是否真的提升了 prompt 缓存命中率——目前只有前缀缓存分叉点的理论推导，需要跑真实 session 的 trace 数据对比验证）。
 - 严重度用**标题前缀**区分：`[高]` / `[中]` / `[低]`。
 - 策略可配置：如果用户指定不同的标签名或严重度标记，按用户要求执行。
 
@@ -46,6 +48,9 @@ description: "把 Alear030 审查/复盘发现的待优化问题记录成 GitHub
 ```powershell
 # 单条创建
 gh issue create --repo Alear030/Alear030 --title "[高] <一句话描述>" --body-file <临时文件> --label tech-debt
+
+# 涉及边界违规（外部代码直接摸另一对象内部状态）时叠加 boundary-violation
+gh issue create --repo Alear030/Alear030 --title "[高] <一句话描述>" --body-file <临时文件> --label tech-debt --label boundary-violation
 
 # 批量时逐条执行，单条失败单独重试，不中断其余
 ```

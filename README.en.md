@@ -13,7 +13,7 @@ A self-built agent harness with long-term memory
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#what-this-is)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#what-this-is)
 
-[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Research](docs/index.en.md#research) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
+[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Research](docs/index.en.md#research) · [Observations](docs/index.en.md#observations) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
 
 [中文](README.md) · **English**
 
@@ -60,8 +60,8 @@ What the memory system looks like today is in **[the memory documentation](docs/
 - **Multi-agent cluster** — five resident agents whose identity, model tier and tool authorization are driven by YAML; subagents can be constructed at runtime per task
 - **Session slicing + local embedding recall** — an LLM cuts topic boundaries, a local Chinese GTE model computes the vectors; no external vector database involved
 - **Cross-session memory** — a background pipeline classifies slices, deduplicates them, distills a user profile and builds a cross-session timeline
-- **Event-driven hooks** — four event points, synchronous or background, and adding a hook means dropping one `hook.py` into the right directory
-- **Zero-boilerplate tool registration** — `@register_tool` plus `inspect.signature` generates the function-calling schema automatically
+- **Event-driven hooks** — five event points, synchronous or background, and adding a hook means dropping one `hook.py` into the right directory
+- **Zero-boilerplate tool registration** — `@tool.tool_register` plus `inspect.signature` generates the function-calling schema automatically
 - **MCP client** — both stdio and Streamable HTTP; remote tools register into the tool table at runtime once a server connects
 - **Textual TUI** — streams thinking, tool calls and replies, with one channel per agent
 
@@ -171,11 +171,13 @@ Auto-discovery → registration → triggering at multiple event points → sync
 
 ### 4. Tool registration with automatic OpenAI schema generation
 
-`@register_tool` plus `inspect.signature` generates the function-calling parameter schema, so a new tool needs no boilerplate. The function signature is the single source of truth for the contract the model sees; no parallel schema is maintained per tool.
+`@tool.tool_register` plus `inspect.signature` generates the function-calling parameter schema, so a new tool needs no boilerplate. The function signature is the single source of truth for the contract the model sees; no parallel schema is maintained per tool.
 
 ### 5. Layered prompt composition
 
-Nine blocks each register independently via `@register_prompt(order, condition, enabled)`; `build_prompt(agent)` sorts and filters them into the final system prompt. Adding a block means creating a directory with a `prompt.py` — no other block changes. Note that `session_recent`, `memory_prompt` and `timeline_prompt` are **startup snapshots**: later writes in the same process do not refresh them.
+Nine blocks each register independently via `@prompt.register_prompt(order, condition, enabled, type, target)`. `type` decides the path a block takes: `static` is sorted and filtered by `build_prompt(agent)` into the system prompt; `notification` never enters the system prompt and is delivered instead as an attachment by the `before_session` hook to the agents named in `target`, arriving with the user's input.
+
+The split is cache-driven — content that changes while sitting in the system prompt costs the tool schema in front of it its entire prefix cache. Adding a block means creating a directory with a `prompt.py` — no other block changes. Note that `session_recent`, `memory_prompt` and `timeline_prompt` remain **startup snapshots**: later writes in the same process do not refresh them.
 
 ### 6. Module decoupling
 
@@ -203,11 +205,27 @@ Breaking that request's tokens apart is where the numbers finally add up:
 
 The tool schema is 83% of the entire request and misses completely. Its own content is byte-stable across process restarts — tool discovery is explicitly `sorted()`, schemas are derived from `inspect.signature`, nothing runtime-dependent gets in. **It is invalidated by the timestamp sitting in front of it.**
 
-One line of "the current system time is ..." throws away the 12709 tokens behind it — on every single new session, for the entire time this project has been running.
+One line of "the current system time is ..." throws away the 12709 tokens behind it — on every single new session, for the entire time this project has been running. I've since moved that timestamp out of the system prompt entirely and fixed two follow-on ordering/splicing bugs in the same delivery path — hit rate went from 14% to 99.3%.
 
 I also retracted a conclusion during this. I had measured the shared prefix at 2579 tokens with `tiktoken` against 2176 reported cached, and called the 400-token gap a real cache phenomenon. It wasn't: tiktoken and the provider's own tokenizer diverge by up to ±30% on Chinese text, in *both* directions. **Subtracting one ruler's reading from another ruler's reading gives you nothing.** Those 400 tokens were measurement error, not a cache behaviour. The retraction and the questions still open are kept in the doc rather than edited away.
 
 Full write-up: **[LLM cache research notes](docs/research/llm-cache.md)** (Chinese).
+
+---
+
+## Observations
+
+Besides digging into problems inside my own project, I like watching interesting things elsewhere — especially **how someone else's system solves a problem I am also solving**. That kind of write-up says nothing about how Alear030 works, so it gets its own genre.
+
+It carries one constraint the other docs don't: **there is no "the code is the source of truth" fallback.** I cannot read the observed system's source, and it changes on its own. So every piece states its observation date and grades each claim — first-hand (reproducible on my machine), second-hand (the system's own account of itself, which is not verification), or inferred.
+
+The first one turns the experience of building a memory system onto another assistant's memory mechanism. It remembered conclusions from my previous session; I was curious what it had recorded about me, and one look at the frontmatter gave most of it away — **a pile of Markdown files with headers, one auto-loaded index, a few disciplines written into the system prompt, and zero infrastructure.** That is the same bet I made for `memory_storage`: refuse the vector database, wager that representation and discipline matter more than machinery.
+
+The interesting part came next. Its memories link to each other with `[[wiki links]]`, but there is **no back-index and no trigger** — when one memory is overturned, nothing that cites it reacts. And the main pollution channel is not the links at all; it is the **index that gets injected unconditionally into every session**. To be useful as recall hooks, those index lines are packed with hard conclusions, while being the least re-verified layer in the system. I caught a live specimen the same day: an index line asserting a document had been written, when no such file existed on disk.
+
+One more I had to guess twice to get right: its memory buckets are not keyed by project but **by working directory**. Open a git worktree on the same repository and the memory splits into two halves that cannot see each other.
+
+Full write-up: **[Observing ZCode's memory system](docs/observations/zcode-memory.md)** (Chinese). It hands over the three audit questions I used — layering model, creation path, correction propagation — which between them expose any memory system's context budget, its taste in what to record, and the way it will eventually rot.
 
 ---
 

@@ -22,7 +22,7 @@
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
-| [`alear030-issue-techdebt`](alear030-issue-techdebt/SKILL.md) | 81 | 技术债 issue 的标签与正文规范 |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 81 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 41 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
@@ -98,7 +98,7 @@
 
 还有三条是关于改我的代码的：保留我原有的标识符命名、优先用同文件里已有的 helper、先讲清楚再改。最后一条尤其重要——我需要知道改了什么、为什么改，不然这段代码就从「我的」变成「不知道谁的」了。
 
-### `alear030-issue-techdebt`（81 行）
+### `alear030-issue-mark`（81 行）
 
 技术债 issue 的规范：统一用 `tech-debt` 标签（不用 GitHub 默认的 bug/enhancement），严重度写成标题前缀 `[高]`/`[中]`/`[低]`，正文走三段式——issue背景（现状+风险）/ issue功能（目标+建议方案）/ issue检查（验收标准）。证据必须给到 `文件:行号`。
 
