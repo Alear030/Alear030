@@ -28,31 +28,40 @@ Alear030 is not a "Python Agent framework". It is a complete Agent infrastructur
 
 ```text
 prewarm_embedding_model()        # spawn independent worker to load embedding; does not block TUI startup
+  → prompt.build_prompt(agent)   # assemble static blocks per agent into agent.message_list[0]
   → prewarm_mcp_servers(agents)  # background thread connects MCP servers one by one; single failure is logged only
-  → Memory(memory agent, independent Loop())
   → Session(slice_agent, summary_agent, main system prompt)
+  → Log(session_id) / Trace(session_id)
+  → Memory(memory agent, independent Loop())
   → Loop(agents, session, hooks, memory)
   → Alear030TUI assembly (TUI hangs its receive_loop_emit on loop.emit)
-  → hooks.trigger('before_session')
+  → hooks.trigger('before_session')   # game_begin turns notification blocks into attachments here
   → AlearTui.run()               # enter Textual event loop
 ```
 
 The embedding model is prewarmed in a separate process because loading is slow (on first run it also downloads ~195MB of weights from ModelScope); putting that in the main process would delay TUI startup. MCP servers follow the same idea via a background thread: once a server connects, its tools are registered into the tool table and each agent's `tool_list` is refreshed.
 
+System prompt assembly lives in the composition root rather than in `Agent.__init__`: `agents` is fully constructed at module import time, when no session exists yet, while the runtime facts prompt blocks need (session, memory) all come later. `Log` and `Trace` are the same story — both are anchored on `session_id` and can only follow `Session`. Both carry a pending buffer, so records emitted before they are constructed are absorbed rather than lost.
+
 ### One User Input
 
 ```text
 Input.Submitted
-  → do_work thread → loop.run_loop('main', message)
-      → hooks.trigger('before_loop')
-      → loop_run()
-          → run_turn()                  # ReAct: model → tools → model → …
-          → PlanRunner.run()            # plan mode only; may call run_turn multiple times inside
-      → finally: hooks.trigger('after_loop')
+  → do_work thread → loop.run_loop(source='user', agent_name='main', message)
+      → hooks.trigger('before_loop')    # the loop_run hook renders attachments for the target agent
+      → message = attachment + '\n' + message   # attachments go in front of the user's text
+      → run_turn()                      # ReAct: model → tools → model → …
+      → PlanRunner.run()                # plan mode only; may call run_turn multiple times inside
+      → attachment_round_finish()       # success path only: processing → finished
+      → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
   → finally unlock input
 ```
 
-`session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `Loop.run_loop()` after the entire top-level `loop_run()` returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
+`run_loop` is the single top-level entry. Internal callers — the memory pipeline, subagents, `plan_design` — go through it too, simply without passing session/hooks, so the corresponding branches skip hook triggering and session persistence. The `source` argument records who sent the message in (`user` / `memory_pipeline` / `subagent_dispatch` / `plan_design`) and shares one vocabulary with trace's `source`.
+
+`session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `run_loop` after the round returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
+
+Attachments are placed **before** the user's own text, not after. The cache fork point is wherever new content first appears, and what the user just typed is almost always the one thing that changed; an attachment placed after it sits inside the already-broken cache, and no amount of internal ordering can recover that.
 
 While reasoning runs, streaming events are emitted back to the TUI:
 
@@ -98,19 +107,18 @@ Alear030/
 │   └── agents.yaml             # 5 resident Agents: main/slice/summary/plan/memory
 │
 ├── prompt/                     # layered Prompt composition (decorator + directory auto-discovery registration)
-│   ├── prompt_core.py          # Prompt class: thin wrapper calling build_prompt(agent)
-│   ├── prompt_register.py      # @register_prompt + build_prompt (order sort / condition filter / enabled switch)
+│   ├── prompt_core.py          # Prompt class and the prompt singleton: @prompt.register_prompt + build_prompt (order sort / condition filter / static only)
 │   ├── __init__.py             # auto-discover and import prompt/prompts/*/prompt.py
-│   └── prompts/                # each block registers independently; concatenated by order
-│       ├── system_prompt/      # cognitive architecture (order 0, main only)
-│       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (order 5, main only)
-│       ├── tool_prompt/        # tool-use principles + name and short desc of held tools (order 10)
-│       ├── skill_prompt/       # skill principles + registered skill list (order 20, skill_tool auth only)
-│       ├── session_recent/     # slice summaries of last 3 sessions (order 30, main only, currently enabled=False)
-│       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (order 30, main only)
-│       ├── memory_prompt/      # user-profile injection; reads user.json (order 35, main only)
-│       ├── agent_prompt/       # {agent_name}_agent.md identity (order 40, covers main/slice/summary/plan)
-│       └── basic_prompt/       # current timestamp (order 50)
+│   └── prompts/                # static goes into the system prompt; notification is delivered as attachments by game_begin
+│       ├── system_prompt/      # cognitive architecture (static, order 0, main only)
+│       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (static, order 5, main and plan)
+│       ├── tool_prompt/        # tool-use principles + name and short desc of held tools (static, order 10)
+│       ├── skill_prompt/       # skill principles + registered skill list (notification, order 20, to main and plan)
+│       ├── session_recent/     # slice summaries of last 3 sessions (notification, order 30, to main, currently enabled=False)
+│       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (notification, order 30, to main)
+│       ├── memory_prompt/      # user-profile injection; reads user.json (notification, order 35, to main)
+│       ├── agent_prompt/       # {agent_name}_agent.md identity (static, order 40, covers main/slice/summary/plan)
+│       └── basic_prompt/       # current timestamp (notification, order 50, to every agent)
 │
 ├── session/                    # session lifecycle
 │   ├── session_core.py         # Session class (persist / slice / summary / compress / rebuild message_list)
@@ -123,6 +131,10 @@ Alear030/
 │   ├── hook_core.py            # Hooks: register / trigger / match filter / background thread pool
 │   ├── __init__.py             # recursively discover hook/hook_point/**/hook.py
 │   └── hook_point/             # layered by hook point
+│       ├── before_session/
+│       │   └── game_begin/            # sync: turn notification prompt blocks into attachments per target
+│       ├── before_loop/
+│       │   └── loop_run/              # sync: render attachments for the target agent, hand back to Loop
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # sync: inject agents/session/hooks/Loop/memory into all tools
 │       ├── after_loop/
@@ -165,7 +177,7 @@ Alear030/
 │   ├── mcp_core.py             # public facade: prewarm_mcp_servers / shutdown_mcp_servers
 │   ├── mcp_config.py           # read mcp.json, expand ${VAR} placeholders, filter by enabled
 │   ├── mcp_supervisor.py       # asyncio isolation: daemon thread + single resident supervisor task
-│   ├── mcp_bridge.py           # runtime register_tool / unregister_tool for remote tools
+│   ├── mcp_bridge.py           # runtime tool.tool_register / unregister_tool for remote tools
 │   ├── mcp.json.example        # config template
 │   └── mcp.json                # local actual config (not version-controlled)
 │
@@ -244,7 +256,7 @@ The master gate for Memory ingestion is `Memory.pipeline_enabled` (passed once w
 
 ### 4. Tool registration + automatic OpenAI Schema generation
 
-Decorator `@register_tool` + `inspect.signature` → automatically generate function-calling parameter schemas; adding a tool needs zero boilerplate.
+Decorator `@tool.tool_register` + `inspect.signature` → automatically generate function-calling parameter schemas; adding a tool needs zero boilerplate.
 
 The function signature is the **sole source of truth** for the model-visible parameter contract. Schema derivation excludes `self`, `agents`, `session`, `memory`, and `**kwargs`; every tool function uniformly keeps `**kwargs` to absorb runtime objects that `pre_toolUse` injects unconditionally but this tool does not use.
 
@@ -252,7 +264,11 @@ MCP tools are the only exception: the remote server's self-reported `inputSchema
 
 ### 5. Layered Prompt composition
 
-Each block under `prompt/prompts/` registers independently with `@register_prompt(order, condition, enabled)`; `build_prompt(agent)` sorts by order, filters by condition / enabled, then concatenates into the final system prompt. Adding a block only requires creating a directory and writing `prompt.py` — auto-discovered and registered, without editing other blocks.
+Each block under `prompt/prompts/` registers independently with `@prompt.register_prompt(order, condition, enabled, type, target)`. `type` decides which path a block takes: `static` is sorted by order, filtered by condition / enabled, and concatenated into the system prompt by `build_prompt(agent)`; `notification` never enters the system prompt and is instead delivered as an attachment by the `before_session/game_begin` hook to the agents named in `target`, arriving alongside each user input.
+
+This split is cache-driven: content that changes while sitting in the system prompt costs the entire tool schema in front of it its prefix cache. **A block that forgets `type` is silently dropped** — `build_prompt` accepts only `static`, `game_begin` accepts only non-`static`, so neither side takes it.
+
+Adding a block only requires creating a directory and writing `prompt.py` — auto-discovered and registered, without editing other blocks.
 
 Order and conditions for the current nine blocks are in the directory structure above. A few notable points:
 
@@ -295,10 +311,10 @@ Hook, Prompt, and Tool all depend on the side effect of "import runs decorator r
 | System | Discovery rule | Requirements for new modules |
 |---|---|---|
 | Hook | Recursively discover `hook/hook_point/**/hook.py` | Place under the corresponding hook-point directory and use `@hooks.register`; any path segment starting with underscore is skipped |
-| Prompt | Scan only **first-level directories** under `prompt/prompts/`, load fixed `prompt.py` | Use `prompt/prompts/<name>/prompt.py` + `@register_prompt`; arbitrary-depth recursion is not supported |
+| Prompt | Scan only **first-level directories** under `prompt/prompts/`, load fixed `prompt.py` | Use `prompt/prompts/<name>/prompt.py` + `@prompt.register_prompt`; arbitrary-depth recursion is not supported |
 | Tool | Import only **first-level packages** under `tool/tools/` | The package `__init__.py` must explicitly import concrete implementations; a nested `tool.py` is not registered merely because the file exists |
 
-MCP tools **do not use this table**: after a server connects, `mcp_bridge.py` calls `register_tool(...)` at runtime and `unregister_tool(...)` on disconnect — unrelated to import-time auto-discovery.
+MCP tools **do not use this table**: after a server connects, `mcp_bridge.py` calls `tool.tool_register(...)` at runtime and `unregister_tool(...)` on disconnect — unrelated to import-time auto-discovery. They also never enter the system prompt: `get_tool_briefs` explicitly skips `mcp_tool`, otherwise the prompt would come and go with connection timing and break the cross-session prefix cache intermittently.
 
 For how to write them, see [Extending](EXTENDING.en.md).
 

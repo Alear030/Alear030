@@ -59,7 +59,7 @@ from .tool import my_tool
 ```python
 from pathlib import Path
 
-from tool.tool_core import register_tool, tool_call_processing
+from tool.tool_core import tool, tool_call_processing
 
 tool_desc = 'One-line description of what this tool does; goes into the tool_prompt tool list'
 
@@ -72,7 +72,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(
+@tool.tool_register(
     tool_name='my_tool',
     tool_desc=tool_desc,
     tool_prompt=tool_prompt,
@@ -182,14 +182,15 @@ No `__init__.py` needed.
 ### Implementation
 
 ```python
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
-@register_prompt(
+@prompt.register_prompt(
     prompt_name='my_prompt',
     order=25,
     condition=lambda agent: agent.agent_name == 'main',
     enabled=True,
+    type='static',
 )
 def build(agent) -> str:
     return '#我的分块' + '\n\n' + '正文内容'
@@ -197,21 +198,38 @@ def build(agent) -> str:
 
 `build_prompt(agent)` concatenates by ascending `order`, filters out `enabled=False` and blocks whose `condition` is false, and **also skips blocks whose content is the empty string** — so "do not inject this time" can simply return `''` without an extra switch.
 
+**`type` must be written explicitly.** Only `static` reaches the system prompt. Content that changes every round or every session must be declared `notification` with a `target`, and the `before_session/game_begin` hook delivers it as an attachment alongside the user's input:
+
+```python
+@prompt.register_prompt(
+    prompt_name='my_notice',
+    order=45,
+    type='notification',
+    target=['main'],          # ['all'] delivers to every agent
+)
+def build() -> str:           # notification blocks take no agent argument
+    return '#content that may change every round'
+```
+
+Neither path accepts a block without `type` — `build_prompt` takes only `static`, `game_begin` takes only non-`static`, so an omitted `type` makes the block vanish without an error. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the whole tool schema in front of it its prefix cache.
+
 ### Current order layout
 
 When picking an order, use this table and insert into a gap:
 
 ```text
-system_prompt      0
-attachment_prompt  5
-tool_prompt       10
-skill_prompt      20
-session_recent    30
-timeline_prompt   30
-memory_prompt     35
-agent_prompt      40
-basic_prompt      50
+system_prompt      0   static
+attachment_prompt  5   static
+tool_prompt       10   static
+skill_prompt      20   notification → main, plan
+session_recent    30   notification → main (enabled=False)
+timeline_prompt   30   notification → main
+memory_prompt     35   notification → main
+agent_prompt      40   static
+basic_prompt      50   notification → all
 ```
+
+Both kinds share one order axis: it sequences `static` blocks within the system prompt and `notification` blocks within attachment delivery. Both run stable-to-volatile — the later a block sits, the later the cache breaks.
 
 ### Two constraints
 
@@ -267,7 +285,7 @@ If something new does not take effect after startup, debug in this order:
 > `python main.py` really calls the model API and writes session files — it is not a side-effect-free smoke test. To only confirm "did it register?", querying the registry is much faster than a full run:
 
 ```bash
-python -c "import tool; from tool.tool_core import _register; print(sorted(_register.tool_list))"
+python -c "import tool; from tool.tool_core import tool; print(sorted(tool.tool_list))"
 ```
 
-Same idea for Hook and Prompt: inspect `hook.hook_core.hooks._hooks` and `prompt.prompt_register._register.prompt_list`.
+Same idea for Hook and Prompt: inspect `hook.hook_core.hooks._hooks` and `prompt.prompt_core.prompt.prompt_list`.

@@ -43,7 +43,7 @@ main.py: prewarm_mcp_servers(agents=agents)
   → _connect_entry(server_key, entry)
       → mcp_config.build_params()       展开 ${VAR}，构造 SDK 参数对象
       → supervisor.connect()            命令入队 → supervisor task 串行执行
-      → mcp_bridge.register_server_tools()  逐个 register_tool(...)
+      → mcp_bridge.register_server_tools()  逐个 tool.tool_register(...)
       → mcp_bridge.refresh_agent_tools()    agents.refresh_all_tool_list()
 ```
 
@@ -80,7 +80,7 @@ _supervise()  ← 唯一常驻 task
 
 ### 4. schema 不走 `inspect.signature`
 
-内置工具的参数契约由 `inspect.signature` 从函数签名推导。MCP 工具走不通这条：闭包签名是 `**kwargs`，推导不出任何契约。所以 `register_server_tools` 把 MCP 自己的 `inputSchema`（本身就是 JSON Schema）经 `register_tool(tool_parameters=...)` 直接采用。
+内置工具的参数契约由 `inspect.signature` 从函数签名推导。MCP 工具走不通这条：闭包签名是 `**kwargs`，推导不出任何契约。所以 `register_server_tools` 把 MCP 自己的 `inputSchema`（本身就是 JSON Schema）经 `tool.tool_register(tool_parameters=...)` 直接采用。
 
 **由此产生 MCP 工具与内置工具唯一的行为差异**：内置工具靠 `**kwargs` 自然吞掉 `pre_toolUse` 注入的运行时对象，而 `_make_proxy` 的闭包要把参数原样转发给远端，所以必须显式剔除注入项——`mcp_bridge.py` 里的 `_INJECTED_KEYS = {'agents','session','hooks','Loop','memory','tcr','emit'}`。
 

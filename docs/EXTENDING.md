@@ -59,7 +59,7 @@ from .tool import my_tool
 ```python
 from pathlib import Path
 
-from tool.tool_core import register_tool, tool_call_processing
+from tool.tool_core import tool, tool_call_processing
 
 tool_desc = '一句话描述这个工具做什么，会进 tool_prompt 的工具清单'
 
@@ -72,7 +72,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(
+@tool.tool_register(
     tool_name='my_tool',
     tool_desc=tool_desc,
     tool_prompt=tool_prompt,
@@ -182,14 +182,15 @@ prompt/prompts/my_prompt/
 ### 实现
 
 ```python
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
-@register_prompt(
+@prompt.register_prompt(
     prompt_name='my_prompt',
     order=25,
     condition=lambda agent: agent.agent_name == 'main',
     enabled=True,
+    type='static',
 )
 def build(agent) -> str:
     return '#我的分块' + '\n\n' + '正文内容'
@@ -197,21 +198,38 @@ def build(agent) -> str:
 
 `build_prompt(agent)` 按 `order` 升序拼接，过滤掉 `enabled=False` 和 `condition` 返回假的分块，**内容为空字符串的分块也会被跳过**——所以「这次不注入」直接返回 `''` 即可，不用额外开关。
 
+**`type` 必须显式写**。`static` 才进 system prompt；每轮或每 session 会变的内容要写 `notification` 并声明 `target`，由 `before_session/game_begin` 投成 attachment 随用户输入送达：
+
+```python
+@prompt.register_prompt(
+    prompt_name='my_notice',
+    order=45,
+    type='notification',
+    target=['main'],          # ['all'] 表示投给全部 agent
+)
+def build() -> str:           # notification 类不收 agent 参数
+    return '#每轮都可能变的内容'
+```
+
+两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 只收非 `static`，漏写的块会静默消失且不报错。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它前面的工具 schema 整块失去前缀缓存。
+
 ### 当前 order 分布
 
 选 order 时对照这张表，插空即可：
 
 ```text
-system_prompt      0
-attachment_prompt  5
-tool_prompt       10
-skill_prompt      20
-session_recent    30
-timeline_prompt   30
-memory_prompt     35
-agent_prompt      40
-basic_prompt      50
+system_prompt      0   static
+attachment_prompt  5   static
+tool_prompt       10   static
+skill_prompt      20   notification → main, plan
+session_recent    30   notification → main（enabled=False）
+timeline_prompt   30   notification → main
+memory_prompt     35   notification → main
+agent_prompt      40   static
+basic_prompt      50   notification → all
 ```
+
+两类分块共用同一条 order 轴：`static` 之间按它排系统提示词的顺序，`notification` 之间按它排 attachment 的投递顺序。两边都是从稳定到易变——越靠后越容易变，缓存断点就越晚出现。
 
 ### 两条约束
 
@@ -267,7 +285,7 @@ python main.py
 > `python main.py` 会真实调用模型 API 并写入 session 文件，不是无副作用的冒烟测试。只想确认「注册成功了没有」的话，直接查注册表比跑完整程序快得多：
 
 ```bash
-python -c "import tool; from tool.tool_core import _register; print(sorted(_register.tool_list))"
+python -c "import tool; from tool.tool_core import tool; print(sorted(tool.tool_list))"
 ```
 
-Hook 与 Prompt 同理，分别看 `hook.hook_core.hooks._hooks` 和 `prompt.prompt_register._register.prompt_list`。
+Hook 与 Prompt 同理，分别看 `hook.hook_core.hooks._hooks` 和 `prompt.prompt_core.prompt.prompt_list`。
