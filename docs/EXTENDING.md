@@ -120,9 +120,9 @@ hook/hook_point/<hook_point>/my_hook/
 └── hook.py         # 文件名必须是 hook.py
 ```
 
-当前可用的 hook point：`before_session`、`pre_toolUse`、`after_loop`、`after_session`。
+当前可用的 hook point：`before_session`、`before_loop`、`pre_toolUse`、`after_loop`、`after_session`。
 
-> `before_session` 目录存在且 `main.py` 会触发它，但当前没有任何 hook 注册在上面，触发是空操作。
+> `before_session` 上挂着 `game_begin`（把 notification 类 prompt 分块投成 attachment），`before_loop` 上挂着 `loop_run`（按目标 agent 渲染 attachment 交回 Loop）。这两个点位是 attachment 投递链路的两端。
 
 ### 实现
 
@@ -211,7 +211,7 @@ def build() -> str:           # notification 类不收 agent 参数
     return '#每轮都可能变的内容'
 ```
 
-两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 只收非 `static`，漏写的块会静默消失且不报错。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它前面的工具 schema 整块失去前缀缓存。
+两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 只收非 `static`，漏写的块会静默消失且不报错。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
 
 ### 当前 order 分布
 

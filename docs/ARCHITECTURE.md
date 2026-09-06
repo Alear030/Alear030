@@ -266,7 +266,7 @@ MCP 工具是唯一的例外：远端 server 自报的 `inputSchema` 本身就�
 
 `prompt/prompts/` 下每个分块用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定分块走哪条路：`static` 由 `build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成 system prompt；`notification` 不进 system prompt，由 `before_session/game_begin` 钩子按 `target` 声明的 agent 投成 attachment，每轮随用户输入送达。
 
-这条分流是缓存驱动的：会变的内容留在 system prompt 里，会让排在它前面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 会被静默丢弃**——`build_prompt` 只认 `static`，而 `game_begin` 只认非 `static`，两边都不收。
+这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 会被静默丢弃**——`build_prompt` 只认 `static`，而 `game_begin` 只认非 `static`，两边都不收。
 
 新增分块只需建目录写 `prompt.py`，自动发现注册，不改其他分块。
 

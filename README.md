@@ -177,7 +177,7 @@ flowchart LR
 
 9 个分块各自用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定它走哪条路：`static` 由 `build_prompt(agent)` 排序过滤后拼成 system prompt；`notification` 不进 system prompt，改由 `before_session` 钩子按 `target` 投成 attachment 随用户输入送达。
 
-这条分流是缓存驱动的——会变的内容留在 system prompt 里，会让排在它前面的工具 schema 整块失去前缀缓存。新增分块建个目录写 `prompt.py` 即可，不改其他分块。注意 `session_recent` / `memory_prompt` / `timeline_prompt` 仍是**启动快照**，同进程后续写入不会自动刷新。
+这条分流是缓存驱动的——system prompt 排在 tools schema 前面，所以会变的内容只要还在 system prompt 里，哪怕压到最末尾也仍在 12.7K 工具 schema 之前，它一变，后面整块工具 schema 就失去前缀缓存。新增分块建个目录写 `prompt.py` 即可，不改其他分块。注意 `session_recent` / `memory_prompt` / `timeline_prompt` 仍是**启动快照**，同进程后续写入不会自动刷新。
 
 ### 6. 模块解耦
 

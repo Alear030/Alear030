@@ -120,9 +120,9 @@ hook/hook_point/<hook_point>/my_hook/
 └── hook.py         # filename must be hook.py
 ```
 
-Current hook points: `before_session`, `pre_toolUse`, `after_loop`, `after_session`.
+Current hook points: `before_session`, `before_loop`, `pre_toolUse`, `after_loop`, `after_session`.
 
-> The `before_session` directory exists and `main.py` triggers it, but no hook is registered there today — the trigger is a no-op.
+> `before_session` carries `game_begin` (turning notification prompt blocks into attachments) and `before_loop` carries `loop_run` (rendering attachments for the target agent and handing them back to Loop). Those two points are the two ends of the attachment delivery path.
 
 ### Implementation
 
@@ -211,7 +211,7 @@ def build() -> str:           # notification blocks take no agent argument
     return '#content that may change every round'
 ```
 
-Neither path accepts a block without `type` — `build_prompt` takes only `static`, `game_begin` takes only non-`static`, so an omitted `type` makes the block vanish without an error. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the whole tool schema in front of it its prefix cache.
+Neither path accepts a block without `type` — `build_prompt` takes only `static`, `game_begin` takes only non-`static`, so an omitted `type` makes the block vanish without an error. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
 
 ### Current order layout
 

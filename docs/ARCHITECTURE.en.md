@@ -266,7 +266,7 @@ MCP tools are the only exception: the remote server's self-reported `inputSchema
 
 Each block under `prompt/prompts/` registers independently with `@prompt.register_prompt(order, condition, enabled, type, target)`. `type` decides which path a block takes: `static` is sorted by order, filtered by condition / enabled, and concatenated into the system prompt by `build_prompt(agent)`; `notification` never enters the system prompt and is instead delivered as an attachment by the `before_session/game_begin` hook to the agents named in `target`, arriving alongside each user input.
 
-This split is cache-driven: content that changes while sitting in the system prompt costs the entire tool schema in front of it its prefix cache. **A block that forgets `type` is silently dropped** — `build_prompt` accepts only `static`, `game_begin` accepts only non-`static`, so neither side takes it.
+This split is cache-driven: the system prompt as a whole sits ahead of the tools schema, so changing content left inside it — even pinned to the very end — is still ahead of 12.7K of tool schema, and when it changes everything behind it loses the prefix cache. **A block that forgets `type` is silently dropped** — `build_prompt` accepts only `static`, `game_begin` accepts only non-`static`, so neither side takes it.
 
 Adding a block only requires creating a directory and writing `prompt.py` — auto-discovered and registered, without editing other blocks.
 
