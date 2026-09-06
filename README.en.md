@@ -167,7 +167,7 @@ Each round, an LLM cuts topic boundaries, a local GTE model computes embeddings,
 
 ### 3. Event-driven hook system
 
-Auto-discovery → registration → triggering at multiple event points → synchronous or background execution → filtering by match conditions. Five hooks are registered today, covering tool argument injection, slicing and summarization, session compression, tail-slice handling and timeline generation. Extending means adding one `hook.py` under the relevant hook point.
+Auto-discovery → registration → triggering at multiple event points → synchronous or background execution → filtering by match conditions. Seven hooks are registered today, covering both ends of attachment delivery, tool argument injection, slicing and summarization, session compression, tail-slice handling and timeline generation. Extending means adding one `hook.py` under the relevant hook point.
 
 ### 4. Tool registration with automatic OpenAI schema generation
 
@@ -266,7 +266,7 @@ It runs commands, reads and writes files, and accesses the network on your machi
 
 The repository carries the working agreements and agent skills I use to build it (`CLAUDE.md`, `.cursor/rules/`, `.claude/skills/`). They are not an accessory — this project was written by me and the agents together, and those files record how we split the work.
 
-The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**; what each of the eleven skills is: **[skills catalog](.claude/skills/README.en.md)**.
+The full division of labour and how it shifted across a few phases: **[COLLABORATION.md](COLLABORATION.en.md)**; what each skill is: **[skills catalog](.claude/skills/README.en.md)**.
 
 ---
 

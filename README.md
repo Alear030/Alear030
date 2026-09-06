@@ -167,7 +167,7 @@ flowchart LR
 
 ### 3. 事件驱动 Hook 系统
 
-自动发现 → 注册 → 多事件点触发 → 同步或后台执行 → match 条件过滤。当前注册 5 个 Hook，覆盖工具入参注入、切片摘要、session 压缩、尾片处理与时间线生成。扩展只需在对应 hook point 下新建 `hook.py`。
+自动发现 → 注册 → 多事件点触发 → 同步或后台执行 → match 条件过滤。当前注册 7 个 Hook，覆盖 attachment 投递的生产与消费两端、工具入参注入、切片摘要、session 压缩、尾片处理与时间线生成。扩展只需在对应 hook point 下新建 `hook.py`。
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
@@ -266,7 +266,7 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 仓库里放着我开发这个项目时用的协作规约与 agent 技能（`CLAUDE.md`、`.cursor/rules/`、`.claude/skills/`）。它们不是附属品——这个项目本身就是我和 agent 一起写出来的，那些规约记录了我们怎么分工。
 
-完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；那十一个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
+完整的分工边界、这几个阶段是怎么变过来的，写在 **[协作说明](COLLABORATION.md)** 里；每个技能各自是什么，列在 **[技能目录](.claude/skills/README.md)**。
 
 ---
 

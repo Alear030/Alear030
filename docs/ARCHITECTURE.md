@@ -242,10 +242,12 @@ Alear030/
 
 Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需在对应 hook point 目录下新建 `hook.py`。
 
-当前注册 5 个：
+当前注册 7 个（按触发先后排）：
 
 | Hook | hook point | 模式 | 职责 |
 |---|---|---|---|
+| `game_begin` | `before_session` | 同步 | 把 `notification` 类 prompt 分块按 `order` 求值，按 `target` 逐个投成 attachment |
+| `loop_run` | `before_loop` | 同步 | 按目标 agent 渲染当轮 attachment，写回 Loop 拼在用户输入之前 |
 | `inject_import_args` | `pre_toolUse` | 同步 | 给**全部**工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配 |
 | `memory_pipeline` | `after_loop` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
 | `session_compress` | `after_loop` | 同步 | Token 超限时压缩 session |

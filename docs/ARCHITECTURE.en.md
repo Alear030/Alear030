@@ -242,10 +242,12 @@ Settled slices then go through the background Memory pipeline for classification
 
 Hook auto-discovery → registration → multi-event-point triggering → sync/async execution → match-condition filtering. Extending a Hook only requires a new `hook.py` under the corresponding hook-point directory.
 
-Five are currently registered:
+Seven are currently registered (in trigger order):
 
 | Hook | hook point | Mode | Role |
 |---|---|---|---|
+| `game_begin` | `before_session` | sync | Evaluate `notification` prompt blocks by `order` and deliver one attachment per `target` |
+| `loop_run` | `before_loop` | sync | Render this round's attachments for the target agent and write them back so Loop puts them ahead of the user's input |
 | `inject_import_args` | `pre_toolUse` | sync | Inject `agents`/`session`/`hooks`/`Loop`/`memory` into **all** tools uniformly; each tool decides whether to use them — no per-tool-name registration matching |
 | `memory_pipeline` | `after_loop` | background | Slice + summary; hand settled and worthy slices to Memory |
 | `session_compress` | `after_loop` | sync | Compress session when tokens exceed the limit |

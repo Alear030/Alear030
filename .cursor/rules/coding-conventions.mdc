@@ -26,7 +26,7 @@ alwaysApply: true
 
 ## 结构组织与扩展点
 
-- 三套自动发现：tool=`tool/tools/<name>/`+package `__init__.py` 显式导入；hook=`hook/hook_point/<hook_point>/<hook_name>/hook.py`+`@hooks.register`；prompt=`prompt/prompts/<name>/prompt.py`+`@register_prompt`
+- 三套自动发现：tool=`tool/tools/<name>/`+package `__init__.py` 显式导入；hook=`hook/hook_point/<hook_point>/<hook_name>/hook.py`+`@hooks.register`；prompt=`prompt/prompts/<name>/prompt.py`+`@prompt.register_prompt`
 - 新增功能走既有注册器，不新建平行注册表/平行存储/平行消息总线
 - 注册器通式：私有类 + 模块级单例 + 别名函数导出（`_register`/`tuiwidgets`/`hooks`），dict 查表路由
 - 唯一权威入口：`match_tool`（工具执行）、`self.emit`（外发口）、`build_widget`（widget 工厂）、`event_methods`（事件表）、`build_prompt`（prompt 组装）
