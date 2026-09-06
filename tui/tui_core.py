@@ -101,7 +101,6 @@ class Alear030TUI(App,inherit_bindings=False):
     @work(thread=True, exit_on_error=False)
     def do_work(self,user_input:str=None):
         try:
-            # 走 now_channel 绑定的 loop：hook 边界与轮次编排都收在 Loop.run_loop 内
             self.now_channel.channel_loop.run_loop(
                 source='user',message=user_input,agent_name=self.now_channel.agent_name
             )

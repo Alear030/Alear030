@@ -5,7 +5,6 @@ from openai import OpenAI
 
 from tool import get_tool,match_tool
 from config import MAX_TOOLCALLS,MODEL_LEVEL
-from prompt.prompt_core import Prompt
 
 # 得到agent_group配置文件
 agents_file = Path(__file__).parent/'agents.yaml'
@@ -32,33 +31,20 @@ class Agent:
         
         # agent tools 信息
         self.tool_autho:list[str] = self._get_tool_autho(agent_tool_autho=agent_profile['agent_tool_autho'])
-        self.tool_list:list = get_tool(self.tool_autho)
+        self.tool_list:list = get_tool(self.tool_autho)# 这个东西为啥放到agent身上啊！你咋想的，这东西真他妈的聪明啊你是
         self.max_toolcalls = MAX_TOOLCALLS
-        self.match_tool = match_tool
+        self.match_tool = match_tool# 这东西又是怎么来的啊！！
+        #@claude 这里的tool_list和match_tool后续一定记得他妈的提醒我我操了！！！！！放到别的地方去，agent不应该去持有这两个卧龙凤雏啊！！！我操！！！！！
 
-        # agent prompt&message_list 信息
-        self.system_prompt:Prompt = Prompt(self)
-        self.message_list:list = [{'role':'system','content':self.system_prompt.prompt_content}]
-
-        # eval 观测实例，由 main.py 回填：Agent 在模块 import 期就构造完了，那时 session 还不存在，
-        # 而 trace 是 per-session 实例，构造期根本拿不到
-        self.trace = None
-        # profile 快照：构造即建全，之后一律走 agent_profile_update 改，别直接写这个 dict
-        # tool_list 只留工具名不留 schema：整棵 JSON Schema 进 diff，MCP 每连上一个 server 就写一大坨
-        self.agent_profile = {
-            "model_name":self.model_name,
-            "agent_level":self.agent_level,
-            "tool_autho":self.tool_autho,
-            "tool_list":[tool['function']['name'] for tool in self.tool_list],
-            "system_prompt":self.system_prompt.prompt_content
-        }
+        # # agent prompt&message_list 信息 # 转移到main中进行装配
+        # self.system_prompt:Prompt = Prompt(self)
+        # self.message_list:list = [{'role':'system','content':self.system_prompt.prompt_content}]
 
 
     # 重新按授权取一次工具表：tool_list 是构造期快照，运行时注册的工具（MCP server 连上/断开）
     # 不刷新就永远进不了模型可见的 tools。loop._chat 每次现读 tool_list，故刷新后下一次调用即生效
     def refresh_tool_list(self):
         self.tool_list = get_tool(self.tool_autho)
-        self.agent_profile_update(target={"tool_list":[tool['function']['name'] for tool in self.tool_list]})
 
     # 得到agent的tool_autho
     def _get_tool_autho(self,agent_tool_autho:dict):
@@ -76,53 +62,6 @@ class Agent:
         self.base_url = MODEL_LEVEL[self.agent_level]['base_url']
         self.api_key = MODEL_LEVEL[self.agent_level]['api_key']
         self.model_name = MODEL_LEVEL[self.agent_level]['model_name']
-        # 一次调用带上两个字段：一次真实变更对应一条记录，拆两次调用会变成两条
-        self.agent_profile_update(target={"model_name":self.model_name,"agent_level":self.agent_level})
-
-    # trace 注入后由 main.py 调一次，把当前 profile 全量记下当基线，后续增量才有的比
-    # 形状和 update 保持一致（全量塞进 added），读 jsonl 时不用为初始记录另分一支
-    def agent_profile_trace_init(self):
-        if not self.trace:
-            return
-        self.trace.trace_record(
-            trace_type="agent_profile",
-            source=self.agent_name,
-            trace_detail={"added":self.agent_profile,"changed":{},"removed":[]}
-        )
-
-    # profile 变更唯一入口：变更方法改完自己的属性，把动了的 key/value 交给这里
-    # key 不在 profile 里就是新增；在的话值相同不记、不同才记一条——字段因此可以由任意子系统
-    # 运行时引入（slash 命令、权限 mode），不必先在某处登记
-    # remove 单列不塞进 target：拿 None 表达删除会和「值本身就是 None」撞车
-    # 快照无论有没有 trace 都要更新，否则 trace 注入之后基线是错的
-    # 未加锁：MCP 后台线程与 hook 后台线程都可能进来，落盘由 Trace 自己的锁保证，
-    # 这里只是快照读-比-写可能交错；当前各 agent 是不同对象，无实际竞争
-    def agent_profile_update(self,target:dict=None,remove:list=None):
-        added = {}
-        changed = {}
-        removed = []
-
-        for key,value in (target or {}).items():
-            if key not in self.agent_profile:
-                added[key] = value
-            elif self.agent_profile[key] != value:
-                changed[key] = {"from":self.agent_profile[key],"to":value}
-            self.agent_profile[key] = value
-
-        for key in (remove or []):
-            if key in self.agent_profile:
-                removed.append(key)
-                del self.agent_profile[key]
-
-        # 三项皆空说明这次调用没带来任何变化，不记空记录刷屏
-        if not self.trace or (not added and not changed and not removed):
-            return
-
-        self.trace.trace_record(
-            trace_type="agent_profile",
-            source=self.agent_name,
-            trace_detail={"added":added,"changed":changed,"removed":removed}
-        )
 
 
 class Agents:

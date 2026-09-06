@@ -4,7 +4,7 @@ import tiktoken
 from pathlib import Path
 
 
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 from config import MEMORY_STORAGE_PATH
 from log.log_core import Log
 
@@ -29,8 +29,8 @@ else:
     timeline_enable = False
 
 
-# 与 memory_core.py 的 timeline attachment 渲染逻辑保持一致(近段完整叙事线索、远段仅关键词+摘要，
-# 按 token 预算分层)，因为改为 system prompt 注入而非 attachment，故复制一份独立实现，不 import memory_core
+# 与 memory_core.py 的 timeline 渲染逻辑保持一致(近段完整叙事线索、远段仅关键词+摘要，
+# 按 token 预算分层)，两边各留一份独立实现，不 import memory_core
 RECENT_TIMELINE = int(2048)
 MIN_FULL_TIMELINE = int(3)
 _TOKEN_ENCODING = tiktoken.encoding_for_model(model_name='gpt-4o')
@@ -51,8 +51,9 @@ def render_timeline_entry(entry, timeline_token, timeline_index):
     return f"session{sid}:关键词:{keywords}，总结：{summary_seg}"
 
 
-@register_prompt(prompt_name='timeline',order=30,condition=lambda agent:agent.agent_name == 'main',enabled=timeline_enable)
-def timeline_prompt(agent)->str:
+# timeline.json 由 after_session 的 session_timeline hook 写入,跨 session 必变,故走 attachment
+@prompt.register_prompt(prompt_name='timeline',order=30,enabled=timeline_enable,type="notification",target=['main'])
+def timeline_prompt()->str:
     historical_timeline = list(timeline)
     historical_timeline.reverse()
 

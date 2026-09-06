@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 from config import SESSION_PLAN_FILE_PATH,WORK_SPACE
-from tool.tool_core import register_tool
+from tool.tool_core import tool
 from loop import Loop
 
 
@@ -85,7 +85,7 @@ def _extract_json(text):
     return text
 
 
-@register_tool(tool_name='plan_design', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
+@tool.tool_register(tool_name='plan_design', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
 def plan_design(plan_title: str, task_description: str, plan_file: str = None, output_file: str = None, agents=None, **kwargs):
 
     # 判断hook是否成功注入agents
@@ -122,7 +122,8 @@ def plan_design(plan_title: str, task_description: str, plan_file: str = None, o
 
         # 用 Loop 跑 plan_agent 的 ReAct 循环
         loop = Loop(agents=agents)
-        plan_content = loop.loop_run(agent_name='plan', message=user_content)
+        source = 'plan_design'
+        plan_content = loop.run_loop(agent_name='plan',source=source,message=f'<{source}>\n{user_content}\n</{source}>')
         plan_content_stripped = _extract_json(plan_content)
 
         try:

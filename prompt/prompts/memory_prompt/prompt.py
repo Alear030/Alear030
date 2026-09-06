@@ -1,12 +1,13 @@
 import json
 
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
 from config import MEMORY_STORAGE_PATH
 
-@register_prompt(prompt_name='memory_prompt',order=35,condition=lambda agent:agent.agent_name == 'main')
-def memory_prompt(agent)->str:
+# user.json 由 memory 管线持续改写,内容跨 session 就变,故走 attachment 不进 system prompt
+@prompt.register_prompt(prompt_name='memory_prompt',order=35,type="notification",target=['main'])
+def memory_prompt()->str:
     
     # 得到user.json的信息
     user_path = MEMORY_STORAGE_PATH/'user.json'

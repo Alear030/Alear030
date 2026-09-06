@@ -2,11 +2,10 @@ import importlib
 
 from pathlib import Path
 
-from .prompt_register import register_prompt,build_prompt
-from .prompt_core import Prompt
+from .prompt_core import prompt
 
 
-__all__ = ['register_prompt','build_prompt','Prompt']
+__all__ = ['prompt']
 
 prompts_dir = Path(__file__).parent/'prompts'
 for d in sorted(prompts_dir.iterdir()):

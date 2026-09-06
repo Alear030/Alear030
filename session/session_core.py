@@ -122,12 +122,11 @@ class Session:
         self.round = 1
         self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
         self.max_tokens = MAX_SESSION_TOKEN
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt # 这个地方应该持有agent的system_pompt吗？？！？！？！？@claude 这里后续记得告诉我挪出去
         self.session_path = self._generate_session_json()
 
         # session subagent 信息
         self.slice_agent = slice_agent
-
         self.summary_agent = summary_agent
 
         # session 读写锁
@@ -173,7 +172,6 @@ class Session:
 
         session_json_detail = {
             "session_id":self.session_id,
-            # "unslice_pointer":0,
             "session_slice":[],
             "session_messages":[{
                 "message_round": 0,
@@ -468,7 +466,8 @@ class Session:
                 self.attachment.attachment_add(
                     attachment_type='notification',
                     attachment_source='session_compress',
-                    attachment_content=self._build_compress_attachment(session_slices[:-1])
+                    attachment_content=self._build_compress_attachment(session_slices[:-1]),
+                    attachment_target=agent.agent_name
                 )
             # 清空历史,保留 system + 最后一片原始消息(复用 session_message_reform,不改它)
             agent.message_list = self.session_message_reform()
