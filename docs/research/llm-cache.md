@@ -4,8 +4,9 @@
 
 ← [返回 README](../../README.md) · [文档目录](../index.md)
 
-> **状态：进行中。** 已定位一个主因并验证，撤回过一条错误结论，仍有开放问题未解。
-> 对应 issue：[#38](https://github.com/Alear030/Alear030/issues/38)（跨 session 复用）· [#39](https://github.com/Alear030/Alear030/issues/39)（多 Agent 并发）· [#40](https://github.com/Alear030/Alear030/issues/40)（memory agent 模板）
+> **状态：主线结论已确定（[#38](https://github.com/Alear030/Alear030/issues/38) 已关闭），遗留子问题拆到独立 issue 各自跟踪。**
+> 时间线：8/25 立项（#38 #39）→ 8/29 本文成稿并定位根因 → 9/6 完成修复并用真实 trace 数据验证（新 session 首轮命中率 ~14% → ~99.3%）→ 9/6 稍晚收口时发现 attachment 投递链路当时其实是断的，99.3% 全部来自另一半修复，**修复后的数字待重采**。见文末[收口：主线结论与修复](#收口主线结论与修复)里的更正。
+> 派生/关联 issue：[#39](https://github.com/Alear030/Alear030/issues/39)（多 Agent 并发，仍开放）· [#40](https://github.com/Alear030/Alear030/issues/40)（memory agent 模板，仍开放）· [#45](https://github.com/Alear030/Alear030/issues/45)（subagent system_prompt，仍开放）· [#129](https://github.com/Alear030/Alear030/issues/129)（本文修复的实测验证，仍开放）
 
 main agent 单轮 `prompt_tokens` 动辄一万五，其中 system prompt 和工具 schema 占绝对大头。这部分是每轮都要重发的固定成本，能不能被 provider 的缓存摊掉，直接决定这个项目跑起来贵不贵。
 
@@ -23,6 +24,7 @@ main agent 单轮 `prompt_tokens` 动辄一万五，其中 system prompt 和工�
 - [真正的发现：12.7K 的工具 schema 全量 miss](#真正的发现127k-的工具-schema-全量-miss)
 - [一次自我更正：撤回「400 token 缺口」](#一次自我更正撤回400-token-缺口)
 - [连带发现：memory agent 的模板结构性对抗缓存](#连带发现memory-agent-的模板结构性对抗缓存)
+- [收口：主线结论与修复](#收口主线结论与修复)
 - [仍然开放的问题](#仍然开放的问题)
 
 ---
@@ -156,10 +158,35 @@ for d in sorted(tools_dir.iterdir()):   # 显式 sorted，不依赖文件系统�
 
 修正方向记在 [#40](https://github.com/Alear030/Alear030/issues/40)，需要权衡的问题是：把这些易变数据从 system prompt 挪到普通 message 里，会不会降低模型对它的遵从度——尤其 `advanced_task_node_judge` / `user_info_extract` 走的是完整 ReAct 多轮循环，本身就有注意力稀释风险，和 `memory_type` / `normal_task` 那种单次分类调用可能得区别对待。
 
+## 收口：主线结论与修复
+
+这条研究的因变量自始至终只有一个：**新 session 第一轮请求的 prompt cache 命中率**（session 内 round 2 及以后的命中率从「观察到的现象」那次测量起就一直健康，不是这条研究要解决的问题，这里不重复放）。按同一个口径（新 session、round 1）取修复前后的独立测量样本：
+
+| 测量时间 | 阶段 | `prompt_tokens` | 命中 tokens | miss tokens | 命中率 |
+|---|---|---|---|---|---|
+| 8/29（样本 1） | 修复前 | 15296 | 2176 | 13120 | 14.2% |
+| 8/29（样本 2，另一次独立 session） | 修复前 | 15295 | 2176 | 13119 | 14.2% |
+| 9/6（样本 3） | 修复后 | 14953 | 14848 | 105 | 99.3% |
+| 9/6（样本 4，另一次独立新 session） | 修复后 | 14956 | 14848 | 108 | 99.3% |
+
+修复前两个样本（不同 session）都是 ~14%，修复后两个样本（同样互相独立）都是 99.3%，不是偶然命中一次。
+
+**根因**（见上文「真正的发现」）：时间戳分块排在 `tools` schema 前面，每次新 session 时间戳一变，后面约 12709 token 的工具 schema 跟着全部失效。**修复**：把时间戳（`basic_prompt`）整块挪出 system_prompt，改走 attachment 机制单独投递；9/6 同时修了这条投递链路上的两个具体 bug（`game_begin` 注入 attachment 时按 `order` 字段排序、attachment 拼接顺序改成排在用户消息之前），两者各自的独立贡献暂未拆分验证，跟踪在 [#129](https://github.com/Alear030/Alear030/issues/129)。
+
+> **更正（9/6 当天稍晚，收口时发现）**：上面列的两个 bug 里，「attachment 拼接顺序改成排在用户消息之前」这一条**在测出 99.3% 时并没有生效**。`before_loop` 钩子读的入参键名是 `attachment_content`，而 `Loop.run_loop` 传进来的键名是 `content`（`attachment_content` 是它内部嵌的一层），钩子每次都在第一个判空处静默返回——attachment 从头到尾没有被渲染过，也没有报过任何错（同步钩子的异常在 `hook_core` 里被 print 吞掉，而这里连异常都没有）。
+>
+> 所以这张表里 99.3% 的**全部贡献来自「时间戳整块挪出 system_prompt」这一件事**，与 attachment 的投递位置无关——两个 bug 的贡献不是「暂未拆分」，是其中一个压根没参与。键名已修，但**修复后的命中率尚未重新测量**：attachment 真正开始进入首轮消息之后首轮内容就变了，表里「修复后」那两行需要重采。
+>
+> [#129](https://github.com/Alear030/Alear030/issues/129) 的验证前提也跟着变了：它原本要比「attachment 拼在用户消息前 vs 后」，而在此之前根本不存在可比的两端。
+>
+> 这件事本身值得记一笔：**「测到了预期数字」和「机制真的通了」是两回事**。数字是真的，因果链却接错了一截，而且差一点就这么提交了。
+
+**范围边界**：这个结论只覆盖"跨 session 复用"这条主线（对应 #38，已关闭）。多 Agent 并发缓存隔离（[#39](https://github.com/Alear030/Alear030/issues/39)）、memory agent 模板结构性拒绝复用（[#40](https://github.com/Alear030/Alear030/issues/40)）、subagent system_prompt 动态拼接（[#45](https://github.com/Alear030/Alear030/issues/45)）三条仍然独立开放，不随这次收口一并解决。
+
 ## 仍然开放的问题
 
 1. **provider 的缓存匹配粒度和过期策略是什么？** 精确字节前缀还是分块粒度？TTL 多长？同一前缀间隔多久重发会开始衰减？这决定了「把时间戳挪到最后」能拿回多少收益。
-2. **能不能让时间戳彻底不进 system prompt？** 如果它的作用只是让模型知道「现在几点」，或许该改成工具调用按需获取，而不是固定占据一个必然变化的位置。这需要评估对模型时间感知的影响，属于改动型议题，不在这条研究里落地。
+2. ~~**能不能让时间戳彻底不进 system prompt？**~~ **已解决**：见上文「收口」——时间戳（`basic_prompt`）已经挪出 system_prompt，改走 attachment 机制投递。
 3. **MCP 工具运行期动态刷新会不会砍断缓存链条？** `Agents.refresh_all_tool_list()` 会在 session 中途改变 `tools` 参数。实测方式：session 中途连一个 MCP server，对比连接前后几轮的 `cached_tokens` 是否断崖下跌。
 4. **多 Agent 并发时缓存怎么算、怎么隔离？** main、subagent、memory 各自的 Loop 可能同时发请求。缓存池是按 API key 还是按账号隔离？容量上限和淘汰策略是什么？更多互不相同的前缀同时挤进来，会不会让 main 那条体积最大的缓存更快被挤出去？这条独立立项在 [#39](https://github.com/Alear030/Alear030/issues/39)。
 5. **跨 Agent 缓存共享有没有可能？** 目前 `attachment_prompt` / `timeline` / `memory_prompt` 都用 `condition=lambda agent: agent.agent_name == 'main'` 锁死只给 main，subagent 和 memory 的 system prompt 结构上就不同，前缀从一开始就分叉。如果刻意让一部分静态内容在各 Agent 间共用，能不能实测到跨 Agent 命中？这决定了值不值得为省缓存去统一 prompt 结构。

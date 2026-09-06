@@ -13,7 +13,7 @@ A self-built agent harness with long-term memory
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#what-this-is)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#what-this-is)
 
-[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Research](docs/index.en.md#research) · [Observations](docs/index.en.md#observations) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
+[Docs index](docs/index.en.md) · [Architecture](docs/ARCHITECTURE.en.md) · [Memory](docs/modules/memory.en.md) · [Research](docs/index.en.md#research) · [Observations](docs/index.en.md#observations) · [Retrospectives](docs/index.en.md#retrospectives) · [Configuration](docs/CONFIGURATION.en.md) · [Extending](docs/EXTENDING.en.md) · [Collaboration](COLLABORATION.en.md) · [CHANGELOG](CHANGELOG.md) *(Chinese)*
 
 [中文](README.md) · **English**
 
@@ -226,6 +226,16 @@ The interesting part came next. Its memories link to each other with `[[wiki lin
 One more I had to guess twice to get right: its memory buckets are not keyed by project but **by working directory**. Open a git worktree on the same repository and the memory splits into two halves that cannot see each other.
 
 Full write-up: **[Observing ZCode's memory system](docs/observations/zcode-memory.md)** (Chinese). It hands over the three audit questions I used — layering model, creation path, correction propagation — which between them expose any memory system's context budget, its taste in what to record, and the way it will eventually rot.
+
+## Retrospectives
+
+One more kind of write-up belongs to neither of the above: it is not about how this project currently works, nor about someone else's system, but about **the road a single change actually travelled** — where it started, what it dragged in along the way, and what finally shipped. That information belongs to no single module, so it fits badly into any mechanism doc, and it is exactly the part that is hardest to reconstruct afterwards.
+
+The first one is **[From eval to architecture](docs/retrospective/eval-to-architecture.md)** (Chinese). It began as wanting eval, which required trustworthy process data, which meant building trace first. The first real data trace produced exposed the prompt-cache problem, and fixing that required moving where prompts belong — from that point on it was no longer "fix one metric".
+
+Everything hit along the way turned out to have a name: **Big Ball of Mud** (boundaries never actually enforced, so violations are everywhere you look), **yak shaving** (chasing one problem drags in a field of them, and it never ends), plus the remedies — **blast radius** as the stopping rule, the **Boy Scout Rule**, **Strangler Fig**, **piecemeal growth**. I made the textbook mistake in the middle: tried to fix everything I could see at once, and ended up with dozens of files half-changed and nothing able to verify anything else.
+
+The last turn is the one worth keeping: the fix measured a first-round cache hit rate of 14.2% → 99.3%, and the numbers were real — but at closing time it turned out the attachment delivery path had been dead the whole time. **Verifying the metric is not the same as verifying the mechanism.**
 
 ---
 

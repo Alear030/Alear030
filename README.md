@@ -13,7 +13,7 @@
 [![Status](https://img.shields.io/badge/status-experimental-E8A54A)](#定位)
 [![Zero-Infra](https://img.shields.io/badge/infra-zero-6E8FB2)](#定位)
 
-[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [研究](docs/index.md#研究) · [观察](docs/index.md#观察) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
+[文档目录](docs/index.md) · [架构文档](docs/ARCHITECTURE.md) · [记忆系统](docs/modules/memory.md) · [研究](docs/index.md#研究) · [观察](docs/index.md#观察) · [复盘](docs/index.md#复盘) · [配置说明](docs/CONFIGURATION.md) · [扩展指南](docs/EXTENDING.md) · [协作说明](COLLABORATION.md) · [CHANGELOG](CHANGELOG.md)
 
 **中文** · [English](README.en.md)
 
@@ -226,6 +226,16 @@ agent、session、tool、hook 等模块彼此不直接引用，而是通过 `mai
 还有一条我猜错两次才对的：它的记忆桶不按项目分，**按工作目录分**。同一个仓库开了 git worktree，记忆就裂成互不可见的两半。
 
 完整观察见 **[ZCode 的记忆系统观察](docs/observations/zcode-memory.md)**。文里给出了我用的审计三问——分层模型、生成路径、纠正传播——问完任何一套记忆系统，它的上下文预算、记东西的口味、烂掉的方式都会露出来。
+
+## 复盘
+
+还有一类内容既不讲这个项目现在是什么样，也不讲别人家的系统，而是讲**一次改动到底走过了什么路**：起点是什么、中途牵出了什么、最后落地的又是什么。这类信息不属于任何一个模块，写进谁的机制文档都不合适，但它恰恰是过后最难重新想起来的。
+
+第一篇是 **[从 eval 走到架构](docs/retrospective/eval-to-architecture.md)**。起点是想给项目做 eval，为此得先有可信的过程数据，于是搭 trace；trace 给出的第一份真实数据掀开了 prompt 缓存的问题，而修它必须动 prompt 的归属——从这里开始，事情就不再是"修一个指标"了。
+
+那条路上撞见的东西后来发现都有名字：**Big Ball of Mud**（边界从来没被强制执行过，所以往哪看都是违规）、**yak shaving**（追一个问题带出一片，永远修不完）、以及治它的那套办法——**爆破半径**当停止规则、**Boy Scout Rule**、**Strangler Fig**、**piecemeal growth**。中途我犯过一次典型错误：想把看见的问题一次全改掉，结果几十个文件同时半改，谁也验证不了谁。
+
+最后那一下最值得记：修完测出首轮缓存命中率 14.2% → 99.3%，数字是真的，但收口时才发现 attachment 那条投递链路当时根本是断的——**验证了指标，不等于验证了机制**。
 
 ---
 
