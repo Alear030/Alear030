@@ -158,7 +158,6 @@ Alear030/
 │       │   ├── skill_list/     # 扫描磁盘技能列表（当前禁用）
 │       │   ├── skill_load/     # 按目录名加载 skill.md 正文
 │       │   └── skill_finish/   # 技能创建收尾：确认后回写 skill_info
-│       ├── user_intention/     # 用户意图识别（当前禁用）
 │       └── interaction/
 │           └── askUserQuestion/# 反向提问 / 澄清
 │

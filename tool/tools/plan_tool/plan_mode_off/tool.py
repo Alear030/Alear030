@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from config import SESSION_PLAN_FILE_PATH
-from tool.tool_core import register_tool
+from tool.tool_core import tool
 
 
 tool_desc = '结束 plan 执行模式。所有 plan step 已执行完毕后调用，将 plan_status 改为 done，切换 session 回普通模式。'
@@ -15,7 +15,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='plan_mode_off', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
+@tool.tool_register(tool_name='plan_mode_off', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
 def plan_mode_off(plan_file: str, session=None, **kwargs):
     plan_path: Path = SESSION_PLAN_FILE_PATH / f'{plan_file}.json'
 

@@ -25,7 +25,7 @@ def tool_call_processing(tcr,emit):
         emit(content=asdict(tcr))
     return
 
-class _ToolRegister:
+class Tool:
 
     #初始化ToolRegister类的技能列表，后续需要增加role、subagent区分
     def __init__(self,role:str='main'):
@@ -222,11 +222,13 @@ class _ToolRegister:
 
 
     # 只返回name+简短description，不含tool_prompt全文，用于system prompt里罗列工具时避免和function-calling schema里的完整description重复
+    # mcp_tool 显式剔除:MCP 是 server 连上之后运行时注册的,放它进来会让 system prompt 随连接快慢
+    # 时有时无,跨 session 的前缀缓存跟着间歇性失效且不报错。MCP 工具只活在 function-calling schema 里
     def get_tool_briefs(self,tool_autho:list=None)->list:
         briefs = []
 
         for tool in self.tool_list.values():
-            if not tool['enabled']:
+            if not tool['enabled'] or tool['tool_autho'] == 'mcp_tool':
                 continue
 
             if tool['tool_autho'] in tool_autho:
@@ -267,10 +269,9 @@ def _pre_tool_use_hooks(tool_name:str,tool_args:dict,runtime:dict)->dict:
     return extra_args
 
 
-_register = _ToolRegister()
+tool = Tool()
 
-register_tool = _register.tool_register
-unregister_tool = _register.tool_unregister
-get_tool = _register.get_tools
-get_tool_brief = _register.get_tool_briefs
-match_tool = _register.match_tool
+unregister_tool = tool.tool_unregister
+get_tool = tool.get_tools
+get_tool_brief = tool.get_tool_briefs # 这个东西直接被prompt中的一个prompt直接import了！！！！@claude整体重构的时候别忘了提醒我
+match_tool = tool.match_tool

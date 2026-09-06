@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import asdict
 import queue
 
-from tool.tool_core import register_tool,ToolCallResult
+from tool.tool_core import tool,ToolCallResult
 
 
 tool_prompt_file = Path(__file__).parent / 'tool_prompt.md'
@@ -102,7 +102,7 @@ def _question_check(tcr,emit,question_info)->bool:
 
 
 # done(@claude): 重写 tool_prompt（硬契约+场景教导）并同步 tool_desc 支持多题
-@register_tool(
+@tool.tool_register(
     tool_name='ask_user_question',
     tool_desc='当任务缺少会实质改变后续路径的用户目标、偏好或取舍时，向用户发起一个或多个问题并等待结构化回答。',
     tool_prompt=tool_prompt,

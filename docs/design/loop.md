@@ -82,7 +82,7 @@ if self.session and self.session.mode != mode_before:
 
 流式中途失败时还要**补发 `StreamEnd`**——否则 TUI 侧那条流永远悬挂着，widget 不会 finalize。建连失败还没开流，则跳过这一步。
 
-**这条边界目前没有覆盖全部路径**：`_tool_calls_api` 的参数解析、`match_tool` 内部的工具异常，以及工具内直调（如 `user_intention`）仍在边界之外。这是 20260702 那版方案里暂缓的两部分，不是遗漏。
+**这条边界目前没有覆盖全部路径**：`_tool_calls_api` 的参数解析、`match_tool` 内部的工具异常，以及工具内绕开 `Loop` 直调模型的情况，仍在边界之外。这是 20260702 那版方案里暂缓的两部分，不是遗漏。
 
 ### 4. 流式累积替代整块返回
 

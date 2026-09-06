@@ -4,7 +4,7 @@ import requests
 
 from dataclasses import asdict
 from bs4 import BeautifulSoup
-from tool.tool_core import register_tool,ToolCallResult
+from tool.tool_core import tool,ToolCallResult
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from loop import *
@@ -47,7 +47,7 @@ def _fetch_one(url:str)->dict:
     return {'url':url,'content':f'web_fetch 失败: {error}','success':False}
 
 
-@register_tool(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
+@tool.tool_register(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
 
     emit = kwargs.get('emit',None)

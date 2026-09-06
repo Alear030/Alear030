@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 
 
 from ..subagent_core import Subagent
-from tool.tool_core import register_tool
+from tool.tool_core import tool
 
 
 # tool描述信息
@@ -18,7 +18,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='subagent_create',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='subagent_tool')
+@tool.tool_register(tool_name='subagent_create',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='subagent_tool')
 def subagent_create(subagent_files:list[dict],max_subagent:int = 5,**kwargs)->str:
     if len(subagent_files) > max_subagent:
         return json.dumps({"error": f"subagent 数量({len(subagent_files)})超出上限 max_subagent={max_subagent}"}, ensure_ascii=False)

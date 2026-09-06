@@ -4,7 +4,7 @@ import json
 
 from dataclasses import asdict
 from dotenv import load_dotenv
-from tool.tool_core import register_tool,ToolCallResult
+from tool.tool_core import tool,ToolCallResult
 from ddgs import DDGS
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
@@ -26,7 +26,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
+@tool.tool_register(tool_name='web_search',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
 def web_search(key_words:list[str],**kwargs)->ToolCallResult:
 
     emit = kwargs.get('emit',None)

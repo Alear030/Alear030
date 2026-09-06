@@ -2,11 +2,11 @@ import importlib
 
 from pathlib import Path
 
+from .tool_core import tool
+from .tool_core import unregister_tool,get_tool,get_tool_brief,match_tool
 
-from .tool_core import register_tool,unregister_tool,get_tool,get_tool_brief,match_tool
 
-
-__all__ = ['register_tool','unregister_tool','get_tool','get_tool_brief','match_tool']
+__all__ = ['tool','unregister_tool','get_tool','get_tool_brief','match_tool']
 
 tools_dir = Path(__file__).parent/'tools'
 for d in sorted(tools_dir.iterdir()):

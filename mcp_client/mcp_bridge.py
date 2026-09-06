@@ -7,7 +7,7 @@ import json
 
 from dataclasses import asdict
 
-from tool.tool_core import register_tool,unregister_tool,tool_call_processing,ToolCallResult
+from tool.tool_core import tool,unregister_tool,tool_call_processing,ToolCallResult
 from config import MCP_TOOL_RESULT_MAX_CHARS
 
 from .mcp_supervisor import get_supervisor,tool_name_prefix
@@ -112,16 +112,16 @@ def register_server_tools(server_key:str,tools:list)->list[str]:
     prefix = tool_name_prefix(server_key)
     registered = []
 
-    for tool in tools:
-        mcp_name = tool.name if tool.name.startswith(prefix) else f'{prefix}{tool.name}'
-        description = (tool.description or '').strip() or f'{server_key} 提供的 MCP 工具 {tool.name}'
-        register_tool(
+    for mcp_tool in tools:
+        mcp_name = mcp_tool.name if mcp_tool.name.startswith(prefix) else f'{prefix}{mcp_tool.name}'
+        description = (mcp_tool.description or '').strip() or f'{server_key} 提供的 MCP 工具 {mcp_tool.name}'
+        tool.tool_register(
             tool_name=mcp_name,
             tool_desc=description,
             tool_prompt='',
             tool_enabled=True,
             tool_autho='mcp_tool',
-            tool_parameters=tool.inputSchema,
+            tool_parameters=mcp_tool.inputSchema,
         )(_make_proxy(mcp_name))
         registered.append(mcp_name)
 

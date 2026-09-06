@@ -69,3 +69,11 @@ eval/trace/trace_log/
 
 # log 进程级诊断日志(一个 session 一个 jsonl,属于运行诊断数据,不进版本控制)
 log/log_data/
+
+/.zcode
+
+# Local developer inspection tools and generated data
+.local/
+
+# 改造过程中留下的对照草稿(main copy.py / trace_core copy.py 之类),不随仓库分发
+* copy.py

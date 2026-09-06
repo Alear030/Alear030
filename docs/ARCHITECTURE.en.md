@@ -158,7 +158,6 @@ Alear030/
 │       │   ├── skill_list/     # scan on-disk skill list (currently disabled)
 │       │   ├── skill_load/     # load skill.md body by directory name
 │       │   └── skill_finish/   # skill-creation finish: write back skill_info after confirmation
-│       ├── user_intention/     # user-intention recognition (currently disabled)
 │       └── interaction/
 │           └── askUserQuestion/# ask back / clarify
 │
