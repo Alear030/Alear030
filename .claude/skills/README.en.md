@@ -16,12 +16,12 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 
 | Skill | Lines | In one line |
 |------|------|--------|
-| [`alear030-verify`](alear030-verify/SKILL.md) | 128 | This project's verification doesn't work like a normal Python project's |
+| [`alear030-verify`](alear030-verify/SKILL.md) | 152 | This project's verification doesn't work like a normal Python project's |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
-| [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | The taste for writing comments in my code |
+| [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | The taste for writing comments in my code |
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 105 | Read-only pre-merge review of an open PR: three reconciliation passes and one exit criterion |
@@ -41,7 +41,7 @@ By the kind of knowledge they encode, they fall into four groups.
 
 What this group has in common: **doing it the way general experience says will go wrong**, and once it goes wrong the cause isn't easy to see.
 
-### `alear030-verify` (128 lines)
+### `alear030-verify` (152 lines)
 
 Verification in this project has several counterintuitive spots, and applying general Python-project experience directly will trip you:
 
@@ -93,7 +93,7 @@ One of the pitfalls it records is particularly nasty: **the em dash trap**. The 
 
 The other one is duplicate recording: a commit belongs to exactly one version block, and there was a real case of a patch fix being recorded into two versions at once.
 
-### `alear030-style-notes` (72 lines)
+### `alear030-style-notes` (74 lines)
 
 The taste for writing comments in my code: Chinese, minimal, verb- or action-oriented, and no empty-label comments (the kind that just restate the function name).
 

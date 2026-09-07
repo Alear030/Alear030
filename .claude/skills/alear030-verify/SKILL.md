@@ -108,6 +108,26 @@ agents.agents['main'].agent_ai.chat.completions.create(
 
 **在开发 worktree(判断 0 的宽松档),上面第三条不成立**——`pipeline_enabled=False` 让 memory 落盘短路,只剩 session 文件和 API 调用两项开销,想跑就跑,不用先权衡。
 
+### 真装配、假模型：不碰真实数据的端到端探针
+
+想验的是「整条链路装配起来之后行为对不对」,而不是「模型答得好不好」时,不必真跑 `main.py`——它要交互、要 API、要落盘。把落盘出口改指到 `test/` 下,就能用**真的 agents、真的 hooks、真的 prompt 注册表**跑完整装配,只替换模型调用。
+
+关键是三个落盘路径常量都由各模块 `from config import` 进自己的命名空间,所以要改**模块上的那份**,而且必须在构造实例之前:
+
+```python
+import session.session_core as session_core
+import eval.trace.trace_core as trace_core
+import log.log_core as log_core
+
+session_core.SESSION_MEMORTY_DETAIL_PATH = PROBE_ROOT/'session_detail'
+trace_core.TRACE_LOG_FILE_PATH = PROBE_ROOT/'trace_log'
+log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
+```
+
+改完再按 `main.py` 的顺序装配(build_prompt → Session → Log/Trace → Loop),把 `loop._chat` 换成返回固定回复的假件,然后正常触发 `before_session` 与 `run_loop`。
+
+这样拿到的证据比单元探针硬:落盘内容、trace 记录、attachment 生命周期都是真链路跑出来的,而不是假件之间对话的结果。收尾 `shutil.rmtree` 掉探针目录,主仓库的真实数据 MD5 前后不变——这一条顺手就能验，把「测试没有意外写入」从承诺变成证据。
+
 当前已有局部 `unittest`,但没有覆盖运行主流程的成体系测试套件。**按改动位置运行对应测试,不要假设 `test/` 中每一项都能直接执行**——有些是 backfill/diagnose 类一次性脚本,不是常规单测。
 
 ## 5. 排查失败与编码坑点
@@ -115,6 +135,10 @@ agents.agents['main'].agent_ai.chat.completions.create(
 `unittest discover` 跑出失败时，先用 `git stash` 回退到改动前的代码重跑一次：如果失败照样复现，说明是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只有 stash 前不失败、stash 后（=当前改动下）才失败的才是本次改动引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
 
 在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
+
+**打屏是另一个方向的同款坑**：本机 stdout 是 cp1252，验证脚本 `print` 中文会 `UnicodeEncodeError`，而且它炸在输出那一行，看起来像逻辑错，实际跟被验证的代码毫无关系。所以脚本的结论行、进度行一律走纯 ASCII；中文留在 `assert` 的失败消息里——那些只在失败时才需要编码，通过时不打印。
+
+读 `trace_log/` 与 `log_data/` 的 jsonl 时，**按 `split('\n')` 切，不要用 `splitlines()`**。写入端的 `json.dumps(ensure_ascii=False)` 不转义 U+0085 / U+2028 / U+2029，而 `splitlines()` 会在这三个字符上断行——工具返回的网页正文里就可能带着它们。症状是同一个完好的文件，`splitlines()` 读出几十行「解析失败」，看起来像并发写撕裂，实际写入端是对的。
 
 ## 处理运行数据时的额外红线(主仓库适用)
 
