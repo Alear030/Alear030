@@ -10,9 +10,9 @@ PROMPT_DIR = Path(__file__).parent
 
 
 # 技能使用原则 + 全部已注册技能的名称和描述
-# create-skill 技能会在运行时往 skill/ 写新技能,内容 session 内就可能变,故走 attachment
-# target 手工对齐 agents.yaml 里 skill_tool: true 的 agent,改授权时这里要跟着改
-@prompt.register_prompt(prompt_name='skill_prompt',order=20,type="notification",target=['main','plan'])
+# 进程启动时快照一次,放 system prompt 会把它之后的工具 schema 一起顶出缓存,故走 attachment
+# target 只写 main:投递管线只有主 Loop 挂着,plan 跑在无 hooks 的 Loop 上收不到
+@prompt.register_prompt(prompt_name='skill_prompt',order=20,type="notification",target=['main'])
 def build()->str:
     skill_prompt = ''
     skill_prompt_file = PROMPT_DIR/'skill_prompt.md'
