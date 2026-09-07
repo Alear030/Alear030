@@ -49,8 +49,8 @@ system prompt 的装配之所以在组合根而不在 `Agent.__init__` 里：`ag
 Input.Submitted
   → do_work 线程 → loop.run_loop(source='user', agent_name='main', message)
       → hooks.trigger('before_loop')    # loop_run 钩子按 target 渲染 attachment
-      → message = attachment + '\n' + message   # attachment 拼在用户输入之前
-      → run_turn()                      # ReAct：模型 → 工具 → 模型 → …
+      → run_turn(message, attachment)   # 记一条 input trace，再进 ReAct：模型 → 工具 → 模型 → …
+          → _sent_message_api()         # attachment 拼在用户输入之前发出，落盘只写用户原话
       → PlanRunner.run()                # 仅 plan 模式执行，内部可能再调多次 run_turn
       → attachment_round_finish()       # 仅成功路径：processing → finished
       → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
@@ -62,6 +62,8 @@ Input.Submitted
 `session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `run_loop` 的 `finally` 块在整轮返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
 
 attachment 拼在用户输入**之前**而不是之后：前缀缓存的分叉点在新内容第一次出现的位置，用户这轮打的字几乎必然是唯一变化的部分，attachment 排在它后面就落在已经断掉的缓存里，内部再怎么按 order 排都追不回来。
+
+一轮输入的三个真相分开归属，拼接与落盘都收在 `_sent_message_api`：`agent.message_list` 是模型看到的（attachment + 用户原话），`session_detail` 是对话事实（只写用户原话），trace 是发送事实（`source='user'` 那条记原话，`source='attachment'` 那条单独记注入内容，相加即模型看到的全文）。这条分家目前**只覆盖 attachment 这一条注入路径**。`_force_final_reply` 的系统提示与 PlanRunner 的 step prompt 仍旧经同一个 writer 落成 `role='user'`，切片、summary、memory 管线读到它们时还是会当成用户说的话——收口没做完，见 issue。
 
 推理过程边跑边发流式事件回 TUI：
 
@@ -111,14 +113,14 @@ Alear030/
 │   ├── __init__.py             # 自动发现并 import prompt/prompts/*/prompt.py
 │   └── prompts/                # static 拼进 system prompt；notification 由 game_begin 按 target 投成 attachment
 │       ├── system_prompt/      # 认知架构（static，order 0，仅 main）
-│       ├── attachment_prompt/  # 运行时通知/中断处理协议（static，order 5，main 与 plan）
+│       ├── attachment_prompt/  # 运行时通知/中断处理协议（static，order 5，仅 main）
 │       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name 与简短描述（static，order 10）
-│       ├── skill_prompt/       # 技能原则 + 已注册技能列表（notification，order 20，投 main 与 plan）
+│       ├── skill_prompt/       # 技能原则 + 已注册技能列表（notification，order 20，投 main）
 │       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（notification，order 30，投 main，当前 enabled=False）
 │       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（notification，order 30，投 main）
 │       ├── memory_prompt/      # 用户画像注入，读 user.json（notification，order 35，投 main）
 │       ├── agent_prompt/       # {agent_name}_agent.md 身份（static，order 40，覆盖 main/slice/summary/plan）
-│       └── basic_prompt/       # 当前时间戳（notification，order 50，投全部 agent）
+│       └── basic_prompt/       # 当前时间戳（notification，order 50，投 main）
 │
 ├── session/                    # 会话生命周期
 │   ├── session_core.py         # Session 类（持久化 / 切片 / 摘要 / 压缩 / message_list 重建）
@@ -134,7 +136,7 @@ Alear030/
 │       ├── before_session/
 │       │   └── game_begin/            # 同步：把 notification 类 prompt 分块按 target 投成 attachment
 │       ├── before_loop/
-│       │   └── loop_run/              # 同步：按目标 agent 渲染 attachment，交回 Loop 拼在用户输入之前
+│       │   └── loop_run/              # 同步：按目标 agent 渲染 attachment，交回 Loop 转给发送层
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # 同步：给全部工具注入 agents/session/hooks/Loop/memory
 │       ├── after_loop/
@@ -247,7 +249,7 @@ Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → 
 | Hook | hook point | 模式 | 职责 |
 |---|---|---|---|
 | `game_begin` | `before_session` | 同步 | 把 `notification` 类 prompt 分块按 `order` 求值，按 `target` 逐个投成 attachment |
-| `loop_run` | `before_loop` | 同步 | 按目标 agent 渲染当轮 attachment，写回 Loop 拼在用户输入之前 |
+| `loop_run` | `before_loop` | 同步 | 按目标 agent 渲染当轮 attachment，写回 Loop 转给 `_sent_message_api` 拼发 |
 | `inject_import_args` | `pre_toolUse` | 同步 | 给**全部**工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配 |
 | `memory_pipeline` | `after_loop` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
 | `session_compress` | `after_loop` | 同步 | Token 超限时压缩 session |
@@ -266,9 +268,9 @@ MCP 工具是唯一的例外：远端 server 自报的 `inputSchema` 本身就�
 
 ### 5. Prompt 分层组合
 
-`prompt/prompts/` 下每个分块用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定分块走哪条路：`static` 由 `build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成 system prompt；`notification` 不进 system prompt，由 `before_session/game_begin` 钩子按 `target` 声明的 agent 投成 attachment，每轮随用户输入送达。
+`prompt/prompts/` 下每个分块用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定分块走哪条路：`static` 由 `build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成 system prompt；`notification` 不进 system prompt，由 `before_session/game_begin` 钩子按 `target` 声明的 agent 投成 attachment。**投递只发生一次**——`game_begin` 挂在 `before_session` 上，一个进程只触发一次，节点在首轮渲染后走 `processing` → `finished` 被回收，不会每轮重投。所以 notification 分块拿到的是**进程启动时的快照**，session 内的后续变化感知不到。
 
-这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 会被静默丢弃**——`build_prompt` 只认 `static`，而 `game_begin` 只认非 `static`，两边都不收。
+这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 两边都不收**——`build_prompt` 只认 `static`，`game_begin` 走白名单只认 `notification` / `interrupt`，漏写或拼错的会记一条 `prompt_block_skip` 后跳过，不再兜底投出。
 
 新增分块只需建目录写 `prompt.py`，自动发现注册，不改其他分块。
 

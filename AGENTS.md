@@ -49,7 +49,7 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - 高层对象装配集中在 `main.py`，常驻 Agent 配置入口是 `agent/agents.yaml`。
 - 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_core.py` 及对应目录的加载代码。
 - 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hook_point/pre_toolUse/` 和 `tool/tool_core.py`。
-- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。分块注册时必须声明 `type`：`static` 进 system prompt，`notification` 由 `before_session` 钩子投成 attachment，漏写的分块两边都不收、会被静默丢弃。入口见 `prompt/prompt_core.py`。
+- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。分块注册时必须声明 `type`：`static` 进 system prompt，`notification` 由 `before_session` 钩子按 `target` 投成 attachment，漏写 `type` 或 `target` 的分块两边都不收，会记一条 `prompt_block_skip` 后跳过。`target` 只能写真的挂着投递管线的 agent，目前仅 `main`。入口见 `prompt/prompt_core.py`。
 
 ### Session 与 Memory
 

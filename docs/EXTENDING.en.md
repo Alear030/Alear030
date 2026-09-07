@@ -205,13 +205,13 @@ def build(agent) -> str:
     prompt_name='my_notice',
     order=45,
     type='notification',
-    target=['main'],          # ['all'] delivers to every agent
+    target=['main'],          # only agents that actually have an attachment delivery pipeline; see the constraint below
 )
 def build() -> str:           # notification blocks take no agent argument
     return '#content that may change every round'
 ```
 
-Neither path accepts a block without `type` — `build_prompt` takes only `static`, `game_begin` takes only non-`static`, so an omitted `type` makes the block vanish without an error. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
+Neither path accepts a block without `type` — `build_prompt` takes only `static`, and `game_begin` whitelists `notification` / `interrupt`, logging a `prompt_block_skip` and skipping anything omitted or misspelled rather than delivering it as a notification by default. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
 
 ### Current order layout
 
@@ -221,13 +221,15 @@ When picking an order, use this table and insert into a gap:
 system_prompt      0   static
 attachment_prompt  5   static
 tool_prompt       10   static
-skill_prompt      20   notification → main, plan
+skill_prompt      20   notification → main
 session_recent    30   notification → main (enabled=False)
 timeline_prompt   30   notification → main
 memory_prompt     35   notification → main
 agent_prompt      40   static
-basic_prompt      50   notification → all
+basic_prompt      50   notification → main
 ```
+
+`target` may only name agents that **actually carry an attachment delivery pipeline**. The pipeline's two ends are `before_session/game_begin` and `before_loop/loop_run`, and only a Loop constructed with both `hooks` and `session` reaches them — today that is the main Loop alone. The memory pipeline, subagents and `plan_design` all run on bare Loops they build themselves, so an attachment addressed to them stays `waiting` forever, walked every round and never delivered. The `['all']` sentinel expands to every registered agent, so no block should use it right now.
 
 Both kinds share one order axis: it sequences `static` blocks within the system prompt and `notification` blocks within attachment delivery. Both run stable-to-volatile — the later a block sits, the later the cache breaks.
 

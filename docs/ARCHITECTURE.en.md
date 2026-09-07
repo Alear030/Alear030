@@ -49,8 +49,8 @@ System prompt assembly lives in the composition root rather than in `Agent.__ini
 Input.Submitted
   → do_work thread → loop.run_loop(source='user', agent_name='main', message)
       → hooks.trigger('before_loop')    # the loop_run hook renders attachments for the target agent
-      → message = attachment + '\n' + message   # attachments go in front of the user's text
-      → run_turn()                      # ReAct: model → tools → model → …
+      → run_turn(message, attachment)   # records one input trace, then ReAct: model → tools → model → …
+          → _sent_message_api()         # attachments go ahead of the user's text on the wire; only the raw words are persisted
       → PlanRunner.run()                # plan mode only; may call run_turn multiple times inside
       → attachment_round_finish()       # success path only: processing → finished
       → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
@@ -62,6 +62,8 @@ Input.Submitted
 `session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `run_loop` after the round returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
 
 Attachments are placed **before** the user's own text, not after. The cache fork point is wherever new content first appears, and what the user just typed is almost always the one thing that changed; an attachment placed after it sits inside the already-broken cache, and no amount of internal ordering can recover that.
+
+The three truths about one round of input are kept apart, with both concatenation and persistence collapsed into `_sent_message_api`: `agent.message_list` is what the model saw (attachment + the user's raw words), `session_detail` is the conversational fact (raw words only), and trace is the wire fact (the `source='user'` line holds the raw words, the `source='attachment'` line holds the injected content, and the two together reconstruct what the model saw). This separation currently covers **only the attachment injection path**. The system notices written by `_force_final_reply` and the step prompts issued by `PlanRunner` still go through the same writer and land as `role='user'`, so slicing, summary and the memory pipeline still read those as things the user said. The collapse is unfinished — see the tracking issue.
 
 While reasoning runs, streaming events are emitted back to the TUI:
 
@@ -111,14 +113,14 @@ Alear030/
 │   ├── __init__.py             # auto-discover and import prompt/prompts/*/prompt.py
 │   └── prompts/                # static goes into the system prompt; notification is delivered as attachments by game_begin
 │       ├── system_prompt/      # cognitive architecture (static, order 0, main only)
-│       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (static, order 5, main and plan)
+│       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (static, order 5, main only)
 │       ├── tool_prompt/        # tool-use principles + name and short desc of held tools (static, order 10)
-│       ├── skill_prompt/       # skill principles + registered skill list (notification, order 20, to main and plan)
+│       ├── skill_prompt/       # skill principles + registered skill list (notification, order 20, to main)
 │       ├── session_recent/     # slice summaries of last 3 sessions (notification, order 30, to main, currently enabled=False)
 │       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (notification, order 30, to main)
 │       ├── memory_prompt/      # user-profile injection; reads user.json (notification, order 35, to main)
 │       ├── agent_prompt/       # {agent_name}_agent.md identity (static, order 40, covers main/slice/summary/plan)
-│       └── basic_prompt/       # current timestamp (notification, order 50, to every agent)
+│       └── basic_prompt/       # current timestamp (notification, order 50, to main)
 │
 ├── session/                    # session lifecycle
 │   ├── session_core.py         # Session class (persist / slice / summary / compress / rebuild message_list)
@@ -247,7 +249,7 @@ Seven are currently registered (in trigger order):
 | Hook | hook point | Mode | Role |
 |---|---|---|---|
 | `game_begin` | `before_session` | sync | Evaluate `notification` prompt blocks by `order` and deliver one attachment per `target` |
-| `loop_run` | `before_loop` | sync | Render this round's attachments for the target agent and write them back so Loop puts them ahead of the user's input |
+| `loop_run` | `before_loop` | sync | Render this round's attachments for the target agent and write them back for `_sent_message_api` to send ahead of the user's input |
 | `inject_import_args` | `pre_toolUse` | sync | Inject `agents`/`session`/`hooks`/`Loop`/`memory` into **all** tools uniformly; each tool decides whether to use them — no per-tool-name registration matching |
 | `memory_pipeline` | `after_loop` | background | Slice + summary; hand settled and worthy slices to Memory |
 | `session_compress` | `after_loop` | sync | Compress session when tokens exceed the limit |
@@ -266,9 +268,9 @@ MCP tools are the only exception: the remote server's self-reported `inputSchema
 
 ### 5. Layered Prompt composition
 
-Each block under `prompt/prompts/` registers independently with `@prompt.register_prompt(order, condition, enabled, type, target)`. `type` decides which path a block takes: `static` is sorted by order, filtered by condition / enabled, and concatenated into the system prompt by `build_prompt(agent)`; `notification` never enters the system prompt and is instead delivered as an attachment by the `before_session/game_begin` hook to the agents named in `target`, arriving alongside each user input.
+Each block under `prompt/prompts/` registers independently with `@prompt.register_prompt(order, condition, enabled, type, target)`. `type` decides which path a block takes: `static` is sorted by order, filtered by condition / enabled, and concatenated into the system prompt by `build_prompt(agent)`; `notification` never enters the system prompt and is instead delivered as an attachment by the `before_session/game_begin` hook to the agents named in `target`. **Delivery happens exactly once** — `game_begin` hangs off `before_session`, which fires once per process, and a node is recycled through `processing` → `finished` after the first round renders it. A `notification` block therefore carries a snapshot taken at process start; changes later in the session are not picked up.
 
-This split is cache-driven: the system prompt as a whole sits ahead of the tools schema, so changing content left inside it — even pinned to the very end — is still ahead of 12.7K of tool schema, and when it changes everything behind it loses the prefix cache. **A block that forgets `type` is silently dropped** — `build_prompt` accepts only `static`, `game_begin` accepts only non-`static`, so neither side takes it.
+This split is cache-driven: the system prompt as a whole sits ahead of the tools schema, so changing content left inside it — even pinned to the very end — is still ahead of 12.7K of tool schema, and when it changes everything behind it loses the prefix cache. **A block that forgets `type` is taken by neither side** — `build_prompt` accepts only `static`, and `game_begin` whitelists `notification` / `interrupt`, logging a `prompt_block_skip` for anything missing or misspelled instead of delivering it by default.
 
 Adding a block only requires creating a directory and writing `prompt.py` — auto-discovered and registered, without editing other blocks.
 

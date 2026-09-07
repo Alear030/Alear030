@@ -205,13 +205,13 @@ def build(agent) -> str:
     prompt_name='my_notice',
     order=45,
     type='notification',
-    target=['main'],          # ['all'] 表示投给全部 agent
+    target=['main'],          # 只能写有 attachment 投递管线的 agent，见下方约束
 )
 def build() -> str:           # notification 类不收 agent 参数
     return '#每轮都可能变的内容'
 ```
 
-两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 只收非 `static`，漏写的块会静默消失且不报错。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
+两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 走白名单只收 `notification` / `interrupt`，漏写或拼错的块会记一条 `prompt_block_skip` 后跳过，不会被当成 notification 兜底投出。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
 
 ### 当前 order 分布
 
@@ -221,13 +221,15 @@ def build() -> str:           # notification 类不收 agent 参数
 system_prompt      0   static
 attachment_prompt  5   static
 tool_prompt       10   static
-skill_prompt      20   notification → main, plan
+skill_prompt      20   notification → main
 session_recent    30   notification → main（enabled=False）
 timeline_prompt   30   notification → main
 memory_prompt     35   notification → main
 agent_prompt      40   static
-basic_prompt      50   notification → all
+basic_prompt      50   notification → main
 ```
+
+`target` 里只能写**真的挂着 attachment 投递管线**的 agent。管线的两端是 `before_session/game_begin` 与 `before_loop/loop_run`，只有带 `hooks` 与 `session` 构造出来的那个 Loop 才跑得到——目前只有主 Loop 是这样。memory 管线、subagent、`plan_design` 都在自建的裸 Loop 上跑，投给它们的 attachment 会一直停在 `waiting`，每轮被遍历却永远送不出去。哨兵 `['all']` 会展开成当前全部 agent，因此现在没有分块该用它。
 
 两类分块共用同一条 order 轴：`static` 之间按它排系统提示词的顺序，`notification` 之间按它排 attachment 的投递顺序。两边都是从稳定到易变——越靠后越容易变，缓存断点就越晚出现。
 
