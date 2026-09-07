@@ -7,6 +7,7 @@ from openai.types.chat import ChatCompletionMessage
 from .orchestrator import PlanRunner
 
 from eval import Trace
+from log import Log
 
 
 # 模型 API 调用失败（网络、限流、余额不足等），由 run_loop 统一兜底，不炸穿 main.py
@@ -187,14 +188,24 @@ class Loop:
 
 
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
-    # attachment 只拼进模型可见的 message_list，不落盘、不还原：一旦发出去的历史字节
-    # 改动会破坏 provider 的 prompt cache 前缀，所以宁可让它留在历史里，也不事后改写
-    def _sent_message_api(self,agent,message_content:str=None,source:str='user')->ChatCompletionMessage:
+    # attachment 只拼进 message_list 不落盘、不还原：改发出去的历史字节会破坏 provider 的 prompt cache 前缀
+    # 落盘只写用户原话，session_detail 答「对话里发生了什么」；实际发出去什么归 trace
+    # 只覆盖 attachment：_force_final_reply 与 PlanRunner 的 step prompt 仍落成 role='user'，收口未完
+    def _sent_message_api(self,agent,message_content:str=None,attachment_content:str=None)->ChatCompletionMessage:
 
         if message_content:
-            agent.message_list.append({'role':'user','content':message_content})
+            # attachment 放前面：用户这轮输入几乎必然是唯一变化的部分，排它后面就落进已经断掉的缓存
+            sent_content = f'{attachment_content}\n{message_content}' if attachment_content else message_content
+            agent.message_list.append({'role':'user','content':sent_content})
             if self.session:
                 self.session.session_message_insert(role='user',content=message_content)
+
+        # 无正文可拼时 attachment 是净丢失:before_loop 已把节点翻成 processing,本轮结束就被回收
+        elif attachment_content:
+            Log.pending_record(level="high",source="loop",event="attachment_dropped",detail={
+                "agent_name":agent.agent_name,
+                "attachment_content":attachment_content
+            })
 
         try:
             agent_rq = self._chat(agent,with_tools=True)
@@ -308,9 +319,12 @@ class Loop:
 
 
     # 引擎入口：发首条消息，进入 ReAct 工具循环直到出结果或达上限
-    # source 只随首条消息下传给 trace；循环里那次 _sent_message_api 无 message_content,不产生记录
-    def run_turn(self,agent,message:str=None,source:str='user')->str:
-        agent_rq = self._sent_message_api(agent=agent,message_content=message,source=source)
+    # 首条消息在这里记 input trace，source 标明谁送进来的；循环里那次 _sent_message_api 无 message_content,不产生记录
+    def run_turn(self,agent,message:str=None,attachment_content:str=None,source:str='user')->str:
+        if message:
+            Trace.trace_record(trace_type="input",source=source,loop_round=self.session.round if self.session else '',trace_detail={"input_message":message})
+
+        agent_rq = self._sent_message_api(agent=agent,message_content=message,attachment_content=attachment_content)
         tool_call = 0
 
         while tool_call < agent.max_toolcalls:
@@ -353,16 +367,8 @@ class Loop:
         if not message:
             return
 
-        Trace.trace_record(
-            trace_type="input",
-            source=source,
-            loop_round=self.session.round if self.session else '',
-            trace_detail={
-                "input_message":message
-            }
-        )
-
-        # 拼入user_message 组装 attachment 记录trace
+        # 取本轮 attachment 交给 run_turn 转下去；拼接与落盘归 _sent_message_api，这里不动 message
+        attachment_text = ''
         if self.hooks:
             attachment_content = {"content":""}
             self.hooks.trigger(
@@ -374,18 +380,13 @@ class Loop:
                     "agent_name":agent_name
                 }
             )
-            if attachment_content['content']:
-                # attachment 放前面：缓存的分叉点在“新内容第一次出现”那一刻，真人这轮输入
-                # 几乎必然是唯一变化的部分——attachment 排在它后面，内部顺序再怎么调都追不回
-                # 已经断掉的缓存；放前面才能让 attachment 内部（已经按 order 从稳定到易变排好）
-                # 真正影响这一轮还能续上多少缓存
-                message = attachment_content["content"] + "\n" + message
+            attachment_text = attachment_content["content"]
 
         try:
             if self.emit:
                 self.emit(event='LoopStart',agent_name=agent.agent_name)
 
-            result = self.run_turn(agent=agent,message=message,source=source)
+            result = self.run_turn(agent=agent,message=message,attachment_content=attachment_text,source=source)
 
             # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_loop 之前完成以保原切片时机
             plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
