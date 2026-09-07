@@ -1,5 +1,6 @@
 from hook.hook_core import hooks
 from eval import Trace
+from log import Log
 
 @hooks.register(
     hook_point="before_session",
@@ -18,6 +19,15 @@ def game_begin(prompt=None,session=None,agents=None,**kwargs):
     # （取决于 prompt/__init__.py 里目录名字母序）会让 order 字段形同虚设
     for prompt_block in sorted(prompt.prompt_list.values(),key=lambda p:p['order']):
         if prompt_block["type"] == "static" or not prompt_block["enabled"]:
+            continue
+
+        # 白名单式放行：type/target 没声明全的记账后跳过，不兜底投出，也不让下面的 "all" in target 炸穿 before_session
+        if prompt_block["type"] not in ("notification","interrupt") or not prompt_block["target"]:
+            Log.pending_record(level="high",source="game_begin",event="prompt_block_skip",detail={
+                "prompt_name":prompt_block["name"],
+                "type":prompt_block["type"],
+                "target":prompt_block["target"]
+            })
             continue
 
         # 求值一次：function 里有读盘和 tiktoken 编码，投递与 trace 两个消费者不该各调一次
