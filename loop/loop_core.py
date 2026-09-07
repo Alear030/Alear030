@@ -1,11 +1,16 @@
 import json
 
+from time import perf_counter
+
 from openai.types.chat import ChatCompletionMessage
 
 from .orchestrator import PlanRunner
 
+from eval import Trace
+from log import Log
 
-# 模型 API 调用失败（网络、限流、余额不足等），由 loop_run 统一兜底，不炸穿 main.py
+
+# 模型 API 调用失败（网络、限流、余额不足等），由 run_loop 统一兜底，不炸穿 main.py
 class LoopAPIError(Exception):
     pass
 
@@ -38,7 +43,7 @@ class Loop:
 
 
     # 统一 LLM 调用：with_tools 决定是否携带 tools 与 thinking
-    # 建连失败与流式中途异常都在此翻译成 LoopAPIError，由 loop_run 统一兜底
+    # 建连失败与流式中途异常都在此翻译成 LoopAPIError，由 run_loop 统一兜底
     def _chat(self,agent,with_tools:bool):
 
         # 组装请求参数：with_tools 时带 tools 与 thinking
@@ -151,11 +156,28 @@ class Loop:
             if AssistantUsage is not None:#判断是否返回了CompletionUsage pydantic 对象
                 complete_message.usage = AssistantUsage
 
+            # 一次调用记一条：thinking/content/tool_calls/usage 同源同时刻,拆开就得靠伪造时间戳才关联得回来
+            # tool_calls 原样存不 parse：arguments 是模型吐的 JSON 字符串,畸形参数本身就是 eval 要看的证据
+            loop_round=self.session.round if self.session else ''
+            Trace.trace_record(
+                trace_type="assistant_output",
+                source=agent.agent_name,
+                loop_round=loop_round,
+                stream_key=stream_key,
+                trace_detail={
+                    "assistant_reasoning":AssistantThinking or None,
+                    "assistant_content":AssistantMessage or None,
+                    "assistant_toolcalls":AssistantToolCalls or None,
+                    "assistant_usage":AssistantUsage.model_dump() if AssistantUsage is not None else None
+                }
+            )
+
             return complete_message
 
         except LoopAPIError:
             # LoopAPIError 别进 except Exception，原样上抛防二次包装
             raise
+
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
             # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败未开流则跳过
@@ -166,18 +188,24 @@ class Loop:
 
 
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
-    # attachment 只拼进模型可见的 message_list，不落盘、不还原：一旦发出去的历史字节
-    # 改动会破坏 provider 的 prompt cache 前缀，所以宁可让它留在历史里，也不事后改写
-    def _sent_message_api(self,agent,message_content:str=None)->ChatCompletionMessage:
-        if message_content:
-            model_content = message_content
-            if self.session and self.session.attachment.attachment_list:
-                model_content = f'{self.session.attachment.attachment_render()}\n\n{message_content}'
-                self.session.attachment.attachment_clear()
+    # attachment 只拼进 message_list 不落盘、不还原：改发出去的历史字节会破坏 provider 的 prompt cache 前缀
+    # 落盘只写用户原话，session_detail 答「对话里发生了什么」；实际发出去什么归 trace
+    # 只覆盖 attachment：_force_final_reply 与 PlanRunner 的 step prompt 仍落成 role='user'，收口未完
+    def _sent_message_api(self,agent,message_content:str=None,attachment_content:str=None)->ChatCompletionMessage:
 
-            agent.message_list.append({'role':'user','content':model_content})
+        if message_content:
+            # attachment 放前面：用户这轮输入几乎必然是唯一变化的部分，排它后面就落进已经断掉的缓存
+            sent_content = f'{attachment_content}\n{message_content}' if attachment_content else message_content
+            agent.message_list.append({'role':'user','content':sent_content})
             if self.session:
                 self.session.session_message_insert(role='user',content=message_content)
+
+        # 无正文可拼时 attachment 是净丢失:before_loop 已把节点翻成 processing,本轮结束就被回收
+        elif attachment_content:
+            Log.pending_record(level="high",source="loop",event="attachment_dropped",detail={
+                "agent_name":agent.agent_name,
+                "attachment_content":attachment_content
+            })
 
         try:
             agent_rq = self._chat(agent,with_tools=True)
@@ -218,12 +246,38 @@ class Loop:
         for func in tool_calls:
             # 调用前记 mode，回来 diff 是否真的切换（不信任提示词自觉性）
             mode_before = self.session.mode if self.session else None
+            # 耗时从外面量：match_tool 永不抛异常,成败全收敛进 tcr,出参就够观测,不必让 trace 渗进工具层
+            tool_call_start = perf_counter()
             # match_tool 接管 mode 旁路、参数解析/校验、hooks、执行、异常、生命周期 emit
             tcr = agent.match_tool(func,verbose=self.verbose,mode_switched=mode_switched,
                                    runtime={'session':self.session,'agents':self.agents,'hooks':self.hooks,'memory':self.memory,'Loop':Loop},
                                    emit=emit_wrapper)
+            tool_call_duration = perf_counter() - tool_call_start
             if self.session and self.session.mode != mode_before:
                 mode_switched = True
+
+            # args/return 存原样不 parse：invalid_tool_arguments 那条路径上参数本就不是合法 JSON,
+            # 解析一道要么让 trace 自己成崩溃点,要么把畸形证据抹掉
+            # 挑字段不用 asdict(tcr)：tool_call_extra_info 是 TUI 渲染树,展示层结构不进 eval 数据
+            # 不带 stream_key,靠 tool_call_id 对回 assistant_output 里的 assistant_toolcalls
+            Trace.trace_record(
+                trace_type="tool_call",
+                source=agent.agent_name,
+                loop_round=self.session.round if self.session else '',
+                trace_detail={
+                    "tool_call_id":func.id,
+                    "tool_call_name":func.function.name,
+                    "tool_call_args":func.function.arguments,
+                    "tool_call_state":tcr.tool_call_state.get('tool_call_state'),
+                    "tool_call_error":tcr.tool_call_error or None,
+                    "tool_call_return":tcr.tool_call_result.get('content'),
+                    # duration_ms 是 match_tool 整段,tool_func_ms 是工具本体；相减即 harness 开销
+                    # 只存两个事实不存差值：派生量交给读的人算,免得三个数长成两个真相
+                    "duration_ms":round(tool_call_duration*1000,3),
+                    "tool_func_ms":tcr.tool_call_duration_ms
+                }
+            )
+
             # 分发：协议消息 + 落盘
             agent.message_list.append(tcr.tool_call_result)
             if self.session:
@@ -237,12 +291,18 @@ class Loop:
             agent.message_list.pop()
 
         agent.message_list.append({'role':'user','content':notice})
+
+        # 强制收尾的提示不经 _sent_message_api,单独记：否则 trace 里会出现一条没有输入的模型回复
+        # source 用 attachment 不用 system：system 已归 trace 设施自身的生命周期,
+        # 而这条和 attachment 同类——都是系统注入进模型可见消息流的内容,只是投递方式不同
+        Trace.trace_record(trace_type="input",source="attachment",loop_round=self.session.round if self.session else '',trace_detail={"input_message":notice})
+
         if self.session:
             self.session.session_message_insert(role='user',content=notice)
         try:
             final_rq = self._chat(agent,with_tools=False)
         except LoopAPIError:
-            # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息
+            # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息 @claude实际上后续应该想办法将error变成类似attachment的内容和下一轮user消息拼接在一起，避免丢失上下文
             agent.message_list.pop()
             raise
         agent.message_list.append(final_rq)
@@ -253,14 +313,18 @@ class Loop:
 
 
     # 结束一轮：重置计数并递增 session.round
-    def _close_round(self):
+    def _close_round(self):# @claude 这东西应该迁到session里面作为一个方法，甚至应该是hook的点位该做的事情，不用改直接让loop去调用
         if self.session:
             self.session.round += 1
 
 
     # 引擎入口：发首条消息，进入 ReAct 工具循环直到出结果或达上限
-    def run_turn(self,agent,message:str=None)->str:
-        agent_rq = self._sent_message_api(agent=agent,message_content=message)
+    # 首条消息在这里记 input trace，source 标明谁送进来的；循环里那次 _sent_message_api 无 message_content,不产生记录
+    def run_turn(self,agent,message:str=None,attachment_content:str=None,source:str='user')->str:
+        if message:
+            Trace.trace_record(trace_type="input",source=source,loop_round=self.session.round if self.session else '',trace_detail={"input_message":message})
+
+        agent_rq = self._sent_message_api(agent=agent,message_content=message,attachment_content=attachment_content)
         tool_call = 0
 
         while tool_call < agent.max_toolcalls:
@@ -288,19 +352,52 @@ class Loop:
         return self._force_final_reply(agent=agent,notice='系统提示：已达到工具调用次数上限，请根据已有信息进行回复',drop_last_toolcalls=True)
 
 
-    # 对外入口：解析 agent（agent 实例或 agent_name 二选一）→跑一轮→plan 编排→触发 after_round hook
-    # 模型 API 失败在此统一兜底：本轮提前结束，不炸穿 main.py 的顶层循环
-    def loop_run(self,agent = None,agent_name:str=None,message:str=None):
-        agent = agent if not agent_name else self._get_agent(agent_name=agent_name)
+    # 顶层入口：一次外部输入的完整轮次，hook 边界收在这里；内部通过 run_turn 跑一次 agent 会话
+    # memory 管线/subagent/plan_design 等内部调用也统一走这里，只是不传 session/hooks——
+    # 对应的判空分支会自然跳过 hook 触发与 session 落盘，等价于以前单独的 loop_run
+    # source 记谁把消息送进来的（user/attachment/各agent名），与 trace 的 source 同一套词汇，A2A 时原样可用
+    # try/finally：异常路径也跑 after_loop。工具内部异常已被 match_tool 收口成 _error_result、
+    # 模型 API 异常已被 run_loop 的 LoopAPIError 分支吃掉，真正能穿透到这里的是
+    # Plan.advance() 的 ValueError（此时本轮消息完整，该跑）与 session 落盘失败（此时磁盘已不可信，跳过也挽回不了）
+    def run_loop(self,source:str,message:str=None,agent_name:str=None,agent=None):
+        agent = agent if agent else self._get_agent(agent_name=agent_name)
+        if not agent:
+            return
+        
+        if not message:
+            return
+
+        # 取本轮 attachment 交给 run_turn 转下去；拼接与落盘归 _sent_message_api，这里不动 message
+        attachment_text = ''
+        if self.hooks:
+            attachment_content = {"content":""}
+            self.hooks.trigger(
+                hook_point='before_loop',
+                session=self.session,
+                content = {
+                    "attachment_content":attachment_content,
+                    "source":source,
+                    "agent_name":agent_name
+                }
+            )
+            attachment_text = attachment_content["content"]
+
         try:
             if self.emit:
                 self.emit(event='LoopStart',agent_name=agent.agent_name)
-            result = self.run_turn(agent=agent,message=message)
-            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_round 之前完成以保原切片时机
+
+            result = self.run_turn(agent=agent,message=message,attachment_content=attachment_text,source=source)
+
+            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_loop 之前完成以保原切片时机
             plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
             if plan_result is not None:
                 result = plan_result
-        
+
+            if self.session:
+                self.session.attachment.attachment_round_finish()
+                # @claude tech-debt issue which loop shouldn't touch attachment's method cross session
+                # @claude enhance issue here, different label attachment message should be handle in different ways like <missing-message>this message may missed before or something like this
+
         except LoopAPIError as ee:
             result = f'[系统错误] 模型调用失败，本轮未完成：{ee}'
             if self.session:
@@ -308,9 +405,23 @@ class Loop:
             if self.emit:
                 self.emit(event='SystemError',content={'message':result},agent_name=agent.agent_name)
 
-        # 收尾：发 LoopEnd 事件
         finally:
+            if self.session:
+                self.session.attachment.attachment_recycle()
+
+            # 入库开关收拢在 memory.pipeline_enabled(创建时统一设置)，触发时不再传
+            if self.hooks:
+                self.hooks.trigger(
+                    hook_point='after_loop',
+                    session=self.session,
+                    agents=self.agents,
+                    memory=self.memory,
+                    hooks=self.hooks
+                )
+
+            # 与开头的 LoopStart 配对：TUI 靠这一对事件挂/卸 BottomThinkTip，
+            # 合并 loop_run/run_loop 时这行漏带了，导致 LoopStart 之后没有对应的收尾信号
             if self.emit:
                 self.emit(event='LoopEnd',content={},agent_name=agent.agent_name)
-                
+
         return result

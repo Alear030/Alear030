@@ -1,6 +1,6 @@
 import yaml
 
-from tool.tool_core import register_tool,tool_call_processing
+from tool.tool_core import tool,tool_call_processing
 from pathlib import Path
 from config import ROOT_DIRECTORY
 
@@ -11,7 +11,7 @@ if tool_prompt_file.exists():
 else:
     tool_prompt = None
 
-@register_tool(tool_name='skill_list',tool_desc=skill_list_desc,tool_prompt=tool_prompt,tool_enabled=False,tool_autho='skill_tool')
+@tool.tool_register(tool_name='skill_list',tool_desc=skill_list_desc,tool_prompt=tool_prompt,tool_enabled=False,tool_autho='skill_tool')
 def skill_list(**kwargs)->list:
     # 执行tool_call_processing
     tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))

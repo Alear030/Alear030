@@ -5,7 +5,6 @@ from openai import OpenAI
 
 from tool import get_tool,match_tool
 from config import MAX_TOOLCALLS,MODEL_LEVEL
-from prompt.prompt_core import Prompt
 
 # 得到agent_group配置文件
 agents_file = Path(__file__).parent/'agents.yaml'
@@ -25,7 +24,6 @@ class Agent:
         self.agent_desc:str = agent_profile['agent_desc']
 
         # agent model相关信息 openai实例、
-        self.agent_level = agent_profile['agent_level']
         self.base_url = MODEL_LEVEL[self.agent_level]['base_url']
         self.api_key = MODEL_LEVEL[self.agent_level]['api_key']
         self.model_name = MODEL_LEVEL[self.agent_level]['model_name']
@@ -33,13 +31,14 @@ class Agent:
         
         # agent tools 信息
         self.tool_autho:list[str] = self._get_tool_autho(agent_tool_autho=agent_profile['agent_tool_autho'])
-        self.tool_list:list = get_tool(self.tool_autho)
+        self.tool_list:list = get_tool(self.tool_autho)# 这个东西为啥放到agent身上啊！你咋想的，这东西真他妈的聪明啊你是
         self.max_toolcalls = MAX_TOOLCALLS
-        self.match_tool = match_tool
+        self.match_tool = match_tool# 这东西又是怎么来的啊！！
+        #@claude 这里的tool_list和match_tool后续一定记得他妈的提醒我我操了！！！！！放到别的地方去，agent不应该去持有这两个卧龙凤雏啊！！！我操！！！！！
 
-        # agent prompt&message_list 信息
-        self.prompt:Prompt = Prompt(self)
-        self.message_list:list = [{'role':'system','content':self.prompt.prompt_content}]
+        # # agent prompt&message_list 信息 # 转移到main中进行装配
+        # self.system_prompt:Prompt = Prompt(self)
+        # self.message_list:list = [{'role':'system','content':self.system_prompt.prompt_content}]
 
 
     # 重新按授权取一次工具表：tool_list 是构造期快照，运行时注册的工具（MCP server 连上/断开）
@@ -54,7 +53,7 @@ class Agent:
             if value:
                 tool_autho_list.append(key)
         return tool_autho_list
-    
+
     # 处理agent_level
     def refresh_agent_level(self,agent_level = None):
         agent_level_set = {'max_level','medium_level','low_level'}
@@ -63,7 +62,6 @@ class Agent:
         self.base_url = MODEL_LEVEL[self.agent_level]['base_url']
         self.api_key = MODEL_LEVEL[self.agent_level]['api_key']
         self.model_name = MODEL_LEVEL[self.agent_level]['model_name']
-
 
 
 class Agents:

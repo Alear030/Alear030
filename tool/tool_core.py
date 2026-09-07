@@ -2,6 +2,7 @@ import json
 import inspect
 import typing
 
+from time import perf_counter
 from dataclasses import dataclass,field,asdict
 
 @dataclass
@@ -10,6 +11,8 @@ class ToolCallResult:
     tool_call_name:str = ""                     # 信息性，TUI 路由不依赖
     tool_call_result:dict = field(default_factory=dict)   # {"role","tool_call_id","content"} 协议消息，loop 落盘/回模型
     tool_call_state:dict = field(default_factory=dict)    # {"tool_call_state","tool_call_state_message"} TUI 态
+    tool_call_error:dict = field(default_factory=dict)    # {"error","message"} 结构化错误，与 tool_call_result 里 dumps 的同源，省得下游再 parse 回来
+    tool_call_duration_ms:float|None = None               # 只量 tool_func 本体；None 表示压根没跑到执行（参数校验/hook 就失败了）
     tool_call_extra_info:list = field(default_factory=list)  # 未来 TUI 新建结果widget 路由
     # tool_call_extra_info 格式说明
     # [{"id":"","type":"Static","content":"","css":{}}]
@@ -22,7 +25,7 @@ def tool_call_processing(tcr,emit):
         emit(content=asdict(tcr))
     return
 
-class _ToolRegister:
+class Tool:
 
     #初始化ToolRegister类的技能列表，后续需要增加role、subagent区分
     def __init__(self,role:str='main'):
@@ -146,11 +149,17 @@ class _ToolRegister:
         #     emit(content=asdict(tcr))
 
         # 从注册表取出真正要执行的函数，展开调用；工具内部异常收口成 error，不炸穿 ReAct 循环
+        # 只夹住 tool_func 这一行：外层 _tool_calls_api 量的是 match_tool 整段，
+        # 两个数相减即 harness 自身开销（参数解析 + pre_toolUse + emit 回 UI 线程）
         tool_func = self.tool_list[tool_name]['function']
+        tool_func_start = perf_counter()
         try:
             tool_call_return = tool_func(**tool_args,**inject)
         except Exception as ee:
+            # 失败也算耗时：工具跑了一半才炸，那段时间照样花掉了
+            tcr.tool_call_duration_ms = round((perf_counter()-tool_func_start)*1000,3)
             return self._error_result(tcr,'tool_execution_error',f'工具执行失败：{type(ee).__name__}: {ee}。请根据错误修正后重试。',emit)
+        tool_func_duration_ms = round((perf_counter()-tool_func_start)*1000,3)
 
         # 统一终态：工具返回 dataclass 直接用；字符串/其他自动包一层 finished（中性态，未适配 success 样式的工具用）
         # success 由工具自己经 emit 触发，match_tool 只兜底发 finished
@@ -168,12 +177,16 @@ class _ToolRegister:
             tcr.tool_call_name = tool_name
             tcr.tool_call_result.setdefault('tool_call_id',tool_call_id)
 
+        # 挂在 return 之前：工具自带 dataclass 时上面刚把 tcr 整个换掉，早写就丢了
+        tcr.tool_call_duration_ms = tool_func_duration_ms
         return tcr
 
 
     # 失败结果统一构造：协议消息带结构化错误；TUI 态落 error，文案走 extra_info（与特化工具同槽）
     def _error_result(self,tcr:ToolCallResult,error_key:str,message:str,emit=None)->ToolCallResult:
-        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps({'error':error_key,'message':message},ensure_ascii=False)}
+        # 先落结构化再 dumps 同一个 dict：两处必然同源，不会长成两个事实
+        tcr.tool_call_error = {'error':error_key,'message':message}
+        tcr.tool_call_result = {'role':'tool','tool_call_id':tcr.tool_call_id,'content':json.dumps(tcr.tool_call_error,ensure_ascii=False)}
         tcr.tool_call_state = {'tool_call_state':'error'}
         tcr.tool_call_extra_info = [{
             "id":"tool_call_error_info",
@@ -209,11 +222,13 @@ class _ToolRegister:
 
 
     # 只返回name+简短description，不含tool_prompt全文，用于system prompt里罗列工具时避免和function-calling schema里的完整description重复
+    # mcp_tool 显式剔除:MCP 是 server 连上之后运行时注册的,放它进来会让 system prompt 随连接快慢
+    # 时有时无,跨 session 的前缀缓存跟着间歇性失效且不报错。MCP 工具只活在 function-calling schema 里
     def get_tool_briefs(self,tool_autho:list=None)->list:
         briefs = []
 
         for tool in self.tool_list.values():
-            if not tool['enabled']:
+            if not tool['enabled'] or tool['tool_autho'] == 'mcp_tool':
                 continue
 
             if tool['tool_autho'] in tool_autho:
@@ -254,10 +269,9 @@ def _pre_tool_use_hooks(tool_name:str,tool_args:dict,runtime:dict)->dict:
     return extra_args
 
 
-_register = _ToolRegister()
+tool = Tool()
 
-register_tool = _register.tool_register
-unregister_tool = _register.tool_unregister
-get_tool = _register.get_tools
-get_tool_brief = _register.get_tool_briefs
-match_tool = _register.match_tool
+unregister_tool = tool.tool_unregister
+get_tool = tool.get_tools
+get_tool_brief = tool.get_tool_briefs # 这个东西直接被prompt中的一个prompt直接import了！！！！@claude整体重构的时候别忘了提醒我
+match_tool = tool.match_tool

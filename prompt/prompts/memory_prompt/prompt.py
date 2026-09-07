@@ -1,12 +1,13 @@
 import json
 
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
 from config import MEMORY_STORAGE_PATH
 
-@register_prompt(prompt_name='memory_prompt',order=35,condition=lambda agent:agent.agent_name == 'main')
-def memory_prompt(agent)->str:
+# user.json 由 memory 管线持续改写,内容跨 session 就变,故走 attachment 不进 system prompt
+@prompt.register_prompt(prompt_name='memory_prompt',order=35,type="notification",target=['main'])
+def memory_prompt()->str:
     
     # 得到user.json的信息
     user_path = MEMORY_STORAGE_PATH/'user.json'
@@ -19,6 +20,8 @@ def memory_prompt(agent)->str:
         user_content = json.loads(user_json)
     else:
         return
+    # 语法/编码损坏不在此处吞：直接抛给 build_prompt 的中心化隔离统一捕获并记 log
+    # 结构层(形状)防御仍在下方,语法层防御已上移,避免双层防御各记各的
 
     # 空画像不注入(避免空标题污染 system prompt)
     # 顶层必须是 list；曾被写成 ["系统错误"] 这类 list[str] 时直接跳过，避免 dim.get 崩启动

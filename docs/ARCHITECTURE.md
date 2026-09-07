@@ -28,31 +28,42 @@ Alear030 不是一个「Python Agent 框架」，它是一套完整的 Agent 基
 
 ```text
 prewarm_embedding_model()        # spawn 独立 worker 进程加载嵌入模型，不阻塞 TUI 启动
+  → prompt.build_prompt(agent)   # 逐个 agent 拼 static 分块，结果写进 agent.message_list[0]
   → prewarm_mcp_servers(agents)  # 后台线程逐个连 MCP server，单个失败只记录
-  → Memory(memory agent, 独立 Loop())
   → Session(slice_agent, summary_agent, main system prompt)
+  → Log(session_id) / Trace(session_id)
+  → Memory(memory agent, 独立 Loop())
   → Loop(agents, session, hooks, memory)
   → Alear030TUI 装配（TUI 把自己的 receive_loop_emit 挂到 loop.emit 上）
-  → hooks.trigger('before_session')
+  → hooks.trigger('before_session')   # game_begin 在这里把 notification 分块投成 attachment
   → AlearTui.run()               # 进入 Textual 事件循环
 ```
 
 嵌入模型放在独立进程里预热，是因为它加载慢（首次还要从 ModelScope 下载约 195MB 权重），放主进程会让 TUI 迟迟起不来。MCP server 同理，走后台线程，连上一个就把它的工具注册进工具表并刷新各 agent 的 `tool_list`。
 
+system prompt 的装配之所以在组合根而不在 `Agent.__init__` 里：`agents` 在模块 import 期就构造完了，那时 session 还不存在，而 prompt 分块需要的运行时事实（session、memory）都晚于它。`Log` 与 `Trace` 同理——它们都以 `session_id` 为锚点，只能排在 `Session` 之后；两者都带 pending 缓冲，构造之前发生的记录不会丢，落地时补写。
+
 ### 一次用户输入
 
 ```text
 Input.Submitted
-  → do_work 线程 → _run_round()
-  → hooks.trigger('before_round')
-  → loop.loop_run('main', message)
-      → run_turn()                  # ReAct：模型 → 工具 → 模型 → …
-      → PlanRunner.run()            # 仅 plan 模式执行，内部可能再调多次 run_turn
-  → hooks.trigger('after_round')
+  → do_work 线程 → loop.run_loop(source='user', agent_name='main', message)
+      → hooks.trigger('before_loop')    # loop_run 钩子按 target 渲染 attachment
+      → run_turn(message, attachment)   # 记一条 input trace，再进 ReAct：模型 → 工具 → 模型 → …
+          → _sent_message_api()         # attachment 拼在用户输入之前发出，落盘只写用户原话
+      → PlanRunner.run()                # 仅 plan 模式执行，内部可能再调多次 run_turn
+      → attachment_round_finish()       # 仅成功路径：processing → finished
+      → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
   → finally 解锁输入
 ```
 
-`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_round` 由 TUI 的 `_run_round()` 在整个顶层 `loop_run()` 返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
+`run_loop` 是唯一的顶层入口，memory 管线、subagent、plan_design 等内部调用也走它，只是不传 session/hooks，对应分支自然跳过 hook 触发与 session 落盘。`source` 参数记谁把消息送进来（`user` / `memory_pipeline` / `subagent_dispatch` / `plan_design`），与 trace 的 `source` 是同一套词汇。
+
+`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `run_loop` 的 `finally` 块在整轮返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
+
+attachment 拼在用户输入**之前**而不是之后：前缀缓存的分叉点在新内容第一次出现的位置，用户这轮打的字几乎必然是唯一变化的部分，attachment 排在它后面就落在已经断掉的缓存里，内部再怎么按 order 排都追不回来。
+
+一轮输入的三个真相分开归属，拼接与落盘都收在 `_sent_message_api`：`agent.message_list` 是模型看到的（attachment + 用户原话），`session_detail` 是对话事实（只写用户原话），trace 是发送事实（`source='user'` 那条记原话，`source='attachment'` 那条单独记注入内容，相加即模型看到的全文）。这条分家目前**只覆盖 attachment 这一条注入路径**。`_force_final_reply` 的系统提示与 PlanRunner 的 step prompt 仍旧经同一个 writer 落成 `role='user'`，切片、summary、memory 管线读到它们时还是会当成用户说的话——收口没做完，见 issue。
 
 推理过程边跑边发流式事件回 TUI：
 
@@ -98,19 +109,18 @@ Alear030/
 │   └── agents.yaml             # 5 个常驻 Agent：main/slice/summary/plan/memory
 │
 ├── prompt/                     # Prompt 分层组合（装饰器 + 目录自动发现注册）
-│   ├── prompt_core.py          # Prompt 类：薄封装，调用 build_prompt(agent)
-│   ├── prompt_register.py      # @register_prompt + build_prompt（order 排序 / condition 过滤 / enabled 开关）
+│   ├── prompt_core.py          # Prompt 类与 prompt 单例：@prompt.register_prompt + build_prompt（order 排序 / condition 过滤 / 只拼 static）
 │   ├── __init__.py             # 自动发现并 import prompt/prompts/*/prompt.py
-│   └── prompts/                # 各分块独立注册，按 order 拼接
-│       ├── system_prompt/      # 认知架构（order 0，仅 main）
-│       ├── attachment_prompt/  # 运行时通知/中断处理协议（order 5，仅 main）
-│       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name 与简短描述（order 10）
-│       ├── skill_prompt/       # 技能原则 + 已注册技能列表（order 20，仅 skill_tool 权限）
-│       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（order 30，仅 main，当前 enabled=False）
-│       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（order 30，仅 main）
-│       ├── memory_prompt/      # 用户画像注入，读 user.json（order 35，仅 main）
-│       ├── agent_prompt/       # {agent_name}_agent.md 身份（order 40，覆盖 main/slice/summary/plan）
-│       └── basic_prompt/       # 当前时间戳（order 50）
+│   └── prompts/                # static 拼进 system prompt；notification 由 game_begin 按 target 投成 attachment
+│       ├── system_prompt/      # 认知架构（static，order 0，仅 main）
+│       ├── attachment_prompt/  # 运行时通知/中断处理协议（static，order 5，仅 main）
+│       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name 与简短描述（static，order 10）
+│       ├── skill_prompt/       # 技能原则 + 已注册技能列表（notification，order 20，投 main）
+│       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（notification，order 30，投 main，当前 enabled=False）
+│       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（notification，order 30，投 main）
+│       ├── memory_prompt/      # 用户画像注入，读 user.json（notification，order 35，投 main）
+│       ├── agent_prompt/       # {agent_name}_agent.md 身份（static，order 40，覆盖 main/slice/summary/plan）
+│       └── basic_prompt/       # 当前时间戳（notification，order 50，投 main）
 │
 ├── session/                    # 会话生命周期
 │   ├── session_core.py         # Session 类（持久化 / 切片 / 摘要 / 压缩 / message_list 重建）
@@ -120,12 +130,16 @@ Alear030/
 │   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
 │
 ├── hook/                       # 事件驱动 Hook 系统
-│   ├── hook_core.py            # HookManager：注册 / 触发 / match 过滤 / 后台线程池
-│   ├── __init__.py             # 递归发现 hook/hooks/**/hook.py
-│   └── hooks/                  # 按 hook point 分层
+│   ├── hook_core.py            # Hooks：注册 / 触发 / match 过滤 / 后台线程池
+│   ├── __init__.py             # 递归发现 hook/hook_point/**/hook.py
+│   └── hook_point/             # 按 hook point 分层
+│       ├── before_session/
+│       │   └── game_begin/            # 同步：把 notification 类 prompt 分块按 target 投成 attachment
+│       ├── before_loop/
+│       │   └── loop_run/              # 同步：按目标 agent 渲染 attachment，交回 Loop 转给发送层
 │       ├── pre_toolUse/
 │       │   └── inject_import_args/    # 同步：给全部工具注入 agents/session/hooks/Loop/memory
-│       ├── after_round/
+│       ├── after_loop/
 │       │   ├── memory_pipeline/       # 后台：切片 + 摘要，把 worthy slice 交给 Memory
 │       │   └── session_compress/      # 同步：Token 超限时压缩 session
 │       └── after_session/
@@ -158,7 +172,6 @@ Alear030/
 │       │   ├── skill_list/     # 扫描磁盘技能列表（当前禁用）
 │       │   ├── skill_load/     # 按目录名加载 skill.md 正文
 │       │   └── skill_finish/   # 技能创建收尾：确认后回写 skill_info
-│       ├── user_intention/     # 用户意图识别（当前禁用）
 │       └── interaction/
 │           └── askUserQuestion/# 反向提问 / 澄清
 │
@@ -166,7 +179,7 @@ Alear030/
 │   ├── mcp_core.py             # 对外门面：prewarm_mcp_servers / shutdown_mcp_servers
 │   ├── mcp_config.py           # 读 mcp.json、展开 ${VAR} 占位符、按 enabled 过滤
 │   ├── mcp_supervisor.py       # asyncio 隔离：daemon 线程 + 单个常驻 supervisor task
-│   ├── mcp_bridge.py           # 远端工具运行时 register_tool / unregister_tool
+│   ├── mcp_bridge.py           # 远端工具运行时 tool.tool_register / unregister_tool
 │   ├── mcp.json.example        # 配置模板
 │   └── mcp.json                # 本机实际配置（不纳入版本控制）
 │
@@ -181,7 +194,7 @@ Alear030/
 │                               # 权重不纳入版本控制，首次运行自动从 ModelScope 下载（约 195MB）
 │
 ├── tui/                        # Textual TUI
-│   ├── tui_core.py             # 入口：App 装配、do_work 工作线程、_run_round
+│   ├── tui_core.py             # 入口：App 装配、do_work 工作线程直调 run_loop
 │   ├── tui_style.tcss          # 全局样式
 │   ├── tui_channel/
 │   │   └── tui_channel_core.py # 按 agent_name 路由的 channel：append_stream / build_widget
@@ -231,13 +244,15 @@ Alear030/
 
 Hook 自动发现 → 注册 → 多事件点触发 → 同步/异步执行 → match 条件过滤。扩展一个 Hook 只需在对应 hook point 目录下新建 `hook.py`。
 
-当前注册 5 个：
+当前注册 7 个（按触发先后排）：
 
 | Hook | hook point | 模式 | 职责 |
 |---|---|---|---|
+| `game_begin` | `before_session` | 同步 | 把 `notification` 类 prompt 分块按 `order` 求值，按 `target` 逐个投成 attachment |
+| `loop_run` | `before_loop` | 同步 | 按目标 agent 渲染当轮 attachment，写回 Loop 转给 `_sent_message_api` 拼发 |
 | `inject_import_args` | `pre_toolUse` | 同步 | 给**全部**工具统一注入 `agents`/`session`/`hooks`/`Loop`/`memory`，工具自己决定用不用，无需按工具名逐一注册匹配 |
-| `memory_pipeline` | `after_round` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
-| `session_compress` | `after_round` | 同步 | Token 超限时压缩 session |
+| `memory_pipeline` | `after_loop` | 后台 | 切片 + 摘要，把已定型且 worthy 的 slice 交给 Memory |
+| `session_compress` | `after_loop` | 同步 | Token 超限时压缩 session |
 | `final_memory_pipeline` | `after_session` | 后台 | 会话退出时处理最终定型尾片 |
 | `session_timeline` | `after_session` | 后台 | 把 worthy slice 提炼成一条跨会话时间线事件 |
 
@@ -245,7 +260,7 @@ Memory 入库的总闸是 `Memory.pipeline_enabled`（由 `main.py` 创建时统
 
 ### 4. 工具注册 + OpenAI Schema 自动生成
 
-装饰器 `@register_tool` + `inspect.signature` → 自动生成 function-calling 参数 schema，新增工具零样板代码。
+装饰器 `@tool.tool_register` + `inspect.signature` → 自动生成 function-calling 参数 schema，新增工具零样板代码。
 
 函数签名是模型可见参数契约的**唯一真相源**。schema 推导时排除 `self`、`agents`、`session`、`memory` 和 `**kwargs`；所有工具函数统一保留 `**kwargs`，用来吞掉 `pre_toolUse` 无条件注入但本工具不使用的运行时对象。
 
@@ -253,7 +268,11 @@ MCP 工具是唯一的例外：远端 server 自报的 `inputSchema` 本身就�
 
 ### 5. Prompt 分层组合
 
-`prompt/prompts/` 下每个分块用 `@register_prompt(order, condition, enabled)` 独立注册，`build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成最终 system prompt。新增分块只需建目录写 `prompt.py`，自动发现注册，不改其他分块。
+`prompt/prompts/` 下每个分块用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定分块走哪条路：`static` 由 `build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成 system prompt；`notification` 不进 system prompt，由 `before_session/game_begin` 钩子按 `target` 声明的 agent 投成 attachment。**投递只发生一次**——`game_begin` 挂在 `before_session` 上，一个进程只触发一次，节点在首轮渲染后走 `processing` → `finished` 被回收，不会每轮重投。所以 notification 分块拿到的是**进程启动时的快照**，session 内的后续变化感知不到。
+
+这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 两边都不收**——`build_prompt` 只认 `static`，`game_begin` 走白名单只认 `notification` / `interrupt`，漏写或拼错的会记一条 `prompt_block_skip` 后跳过，不再兜底投出。
+
+新增分块只需建目录写 `prompt.py`，自动发现注册，不改其他分块。
 
 当前 9 个分块的顺序与条件见上文目录结构。几处值得注意的：
 
@@ -295,11 +314,11 @@ Hook、Prompt、Tool 都依赖「import 执行装饰器注册」的副作用，�
 
 | 系统 | 发现规则 | 新增模块的要求 |
 |---|---|---|
-| Hook | 递归发现 `hook/hooks/**/hook.py` | 放在对应 hook point 目录下并用 `@hooks.register`；路径中任一段以下划线开头会被跳过 |
-| Prompt | 只扫 `prompt/prompts/` 的**一级目录**，加载固定的 `prompt.py` | 用 `prompt/prompts/<name>/prompt.py` + `@register_prompt`，不支持任意深度递归 |
+| Hook | 递归发现 `hook/hook_point/**/hook.py` | 放在对应 hook point 目录下并用 `@hooks.register`；路径中任一段以下划线开头会被跳过 |
+| Prompt | 只扫 `prompt/prompts/` 的**一级目录**，加载固定的 `prompt.py` | 用 `prompt/prompts/<name>/prompt.py` + `@prompt.register_prompt`，不支持任意深度递归 |
 | Tool | 只导入 `tool/tools/` 下的**一级 package** | package 的 `__init__.py` 必须显式 import 具体实现；嵌套的 `tool.py` 不会仅因文件存在就被注册 |
 
-MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_bridge.py` 在运行时调 `register_tool(...)` 注册、断开时调 `unregister_tool(...)` 摘除，与 import 期自动发现无关。
+MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_bridge.py` 在运行时调 `tool.tool_register(...)` 注册、断开时调 `unregister_tool(...)` 摘除，与 import 期自动发现无关。它们也不进 system prompt——`get_tool_briefs` 显式剔除 `mcp_tool`，否则提示词会随 server 连接快慢时有时无，跨 session 的前缀缓存跟着间歇性失效。
 
 具体怎么写见 [扩展指南](EXTENDING.md)。
 
@@ -314,7 +333,7 @@ MCP 工具**不走这张表**：它们在 server 连上之后由 `mcp_bridge.py`
 切片流入 Memory 的两条路径：
 
 ```text
-after_round / memory_pipeline（后台）
+after_loop / memory_pipeline（后台）
   → session._session_slice()
   → session._session_summary()
   → 从已定型片 session_slice[:-1] 中筛出 worthy_summary
@@ -325,7 +344,7 @@ after_session / final_memory_pipeline（后台）
   → Memory.slices_pipeline()
 ```
 
-`after_round` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口都只过滤**传给 Memory** 的内容，session JSON 始终保留完整、无缝的原始 slices。
+`after_loop` 只是暂不把仍可能增长的最后一片交给 Memory，并不从 session 中删除它；`after_session` 负责补入最终尾片。两个入口都只过滤**传给 Memory** 的内容，session JSON 始终保留完整、无缝的原始 slices。
 
 以下目录都是真实运行数据，不是可随意重建的临时文件（均已 gitignore）：
 

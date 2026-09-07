@@ -27,7 +27,7 @@ Hook、Prompt、Tool 都靠「import 执行装饰器注册」这个副作用工�
 
 | 系统 | 扫描什么 | 意味着 |
 |---|---|---|
-| Hook | 递归 `hook/hooks/**/hook.py` | 放多深都能被找到，但文件名必须叫 `hook.py` |
+| Hook | 递归 `hook/hook_point/**/hook.py` | 放多深都能被找到，但文件名必须叫 `hook.py` |
 | Prompt | 只扫 `prompt/prompts/` 的**一级目录**，加载固定的 `prompt.py` | 不支持嵌套，`prompt/prompts/a/b/prompt.py` 不会被发现 |
 | Tool | 只导入 `tool/tools/` 下的**一级 package** | 嵌套的 `tool.py` 不会仅因文件存在就注册，package 的 `__init__.py` 必须显式 import |
 
@@ -59,7 +59,7 @@ from .tool import my_tool
 ```python
 from pathlib import Path
 
-from tool.tool_core import register_tool, tool_call_processing
+from tool.tool_core import tool, tool_call_processing
 
 tool_desc = '一句话描述这个工具做什么，会进 tool_prompt 的工具清单'
 
@@ -72,7 +72,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(
+@tool.tool_register(
     tool_name='my_tool',
     tool_desc=tool_desc,
     tool_prompt=tool_prompt,
@@ -115,14 +115,14 @@ if session is None:
 ### 目录骨架
 
 ```text
-hook/hooks/<hook_point>/my_hook/
+hook/hook_point/<hook_point>/my_hook/
 ├── __init__.py     # 可以是空文件
 └── hook.py         # 文件名必须是 hook.py
 ```
 
-当前可用的 hook point：`before_session`、`pre_toolUse`、`after_round`、`after_session`。
+当前可用的 hook point：`before_session`、`before_loop`、`pre_toolUse`、`after_loop`、`after_session`。
 
-> `before_session` 目录存在且 `main.py` 会触发它，但当前没有任何 hook 注册在上面，触发是空操作。
+> `before_session` 上挂着 `game_begin`（把 notification 类 prompt 分块投成 attachment），`before_loop` 上挂着 `loop_run`（按目标 agent 渲染 attachment 交回 Loop）。这两个点位是 attachment 投递链路的两端。
 
 ### 实现
 
@@ -130,7 +130,7 @@ hook/hooks/<hook_point>/my_hook/
 from hook.hook_core import hooks
 
 
-@hooks.register(hook_point='after_round', background=True, enabled=True)
+@hooks.register(hook_point='after_loop', background=True, enabled=True)
 def my_hook(session=None, memory=None, hooks=None, **kwargs):
     # 参数按需声明并给默认值:触发方传什么由 hooks.trigger(...) 的调用点决定,
     # 声明了对方没传的参数会直接 TypeError
@@ -182,14 +182,15 @@ prompt/prompts/my_prompt/
 ### 实现
 
 ```python
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
-@register_prompt(
+@prompt.register_prompt(
     prompt_name='my_prompt',
     order=25,
     condition=lambda agent: agent.agent_name == 'main',
     enabled=True,
+    type='static',
 )
 def build(agent) -> str:
     return '#我的分块' + '\n\n' + '正文内容'
@@ -197,21 +198,40 @@ def build(agent) -> str:
 
 `build_prompt(agent)` 按 `order` 升序拼接，过滤掉 `enabled=False` 和 `condition` 返回假的分块，**内容为空字符串的分块也会被跳过**——所以「这次不注入」直接返回 `''` 即可，不用额外开关。
 
+**`type` 必须显式写**。`static` 才进 system prompt；每轮或每 session 会变的内容要写 `notification` 并声明 `target`，由 `before_session/game_begin` 投成 attachment 随用户输入送达：
+
+```python
+@prompt.register_prompt(
+    prompt_name='my_notice',
+    order=45,
+    type='notification',
+    target=['main'],          # 只能写有 attachment 投递管线的 agent，见下方约束
+)
+def build() -> str:           # notification 类不收 agent 参数
+    return '#每轮都可能变的内容'
+```
+
+两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 走白名单只收 `notification` / `interrupt`，漏写或拼错的块会记一条 `prompt_block_skip` 后跳过，不会被当成 notification 兜底投出。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
+
 ### 当前 order 分布
 
 选 order 时对照这张表，插空即可：
 
 ```text
-system_prompt      0
-attachment_prompt  5
-tool_prompt       10
-skill_prompt      20
-session_recent    30
-timeline_prompt   30
-memory_prompt     35
-agent_prompt      40
-basic_prompt      50
+system_prompt      0   static
+attachment_prompt  5   static
+tool_prompt       10   static
+skill_prompt      20   notification → main
+session_recent    30   notification → main（enabled=False）
+timeline_prompt   30   notification → main
+memory_prompt     35   notification → main
+agent_prompt      40   static
+basic_prompt      50   notification → main
 ```
+
+`target` 里只能写**真的挂着 attachment 投递管线**的 agent。管线的两端是 `before_session/game_begin` 与 `before_loop/loop_run`，只有带 `hooks` 与 `session` 构造出来的那个 Loop 才跑得到——目前只有主 Loop 是这样。memory 管线、subagent、`plan_design` 都在自建的裸 Loop 上跑，投给它们的 attachment 会一直停在 `waiting`，每轮被遍历却永远送不出去。哨兵 `['all']` 会展开成当前全部 agent，因此现在没有分块该用它。
+
+两类分块共用同一条 order 轴：`static` 之间按它排系统提示词的顺序，`notification` 之间按它排 attachment 的投递顺序。两边都是从稳定到易变——越靠后越容易变，缓存断点就越晚出现。
 
 ### 两条约束
 
@@ -267,7 +287,7 @@ python main.py
 > `python main.py` 会真实调用模型 API 并写入 session 文件，不是无副作用的冒烟测试。只想确认「注册成功了没有」的话，直接查注册表比跑完整程序快得多：
 
 ```bash
-python -c "import tool; from tool.tool_core import _register; print(sorted(_register.tool_list))"
+python -c "import tool; from tool.tool_core import tool; print(sorted(tool.tool_list))"
 ```
 
-Hook 与 Prompt 同理，分别看 `hook.hook_core.hooks._hooks` 和 `prompt.prompt_register._register.prompt_list`。
+Hook 与 Prompt 同理，分别看 `hook.hook_core.hooks._hooks` 和 `prompt.prompt_core.prompt.prompt_list`。

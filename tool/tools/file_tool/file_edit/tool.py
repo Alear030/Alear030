@@ -1,5 +1,5 @@
 from pathlib import Path
-from tool.tool_core import register_tool,tool_call_processing
+from tool.tool_core import tool,tool_call_processing
 
 from config import WORK_SPACE,ROOT_DIRECTORY
 
@@ -14,7 +14,7 @@ if tool_prompt_file.exists():
 else:
     tool_prompt = None
 
-@register_tool(tool_name='file_edit',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_write_tool')
+@tool.tool_register(tool_name='file_edit',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='file_write_tool')
 def file_edit(file_path:str,old_string:str,new_string:str,replace_all:bool=False,**kwargs)->str:
     # 执行tool_call_processing
     tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))

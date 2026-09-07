@@ -17,38 +17,46 @@ class HookDef:
     func: Callable #钩子函数本身
     background: bool = False #True=后台线程异步跑不等结果，False=同步跑等待完成
     match: dict | list[dict] | None = None # None=无条件触发 {"tool": "write_file"}=只匹配该工具
+    priority:int = None
+    order:int = None
     enabled: bool = True # 整体开关，False时该钩子仍注册但永不触发（对应tool的tool_enabled、prompt的enabled）
 
 
-class HookManager:
+class Hooks:
     def __init__(self,max_workers:int = 1):
-        # 所有注册的钩子，按 hook_point 分组
-        # {
-        # "PostTurn":    [HookDef(切片钩子), HookDef(审批钩子)],
-        # "PreToolUse":  [HookDef(写保护钩子)],
-        # }
         self._hooks : dict[str,list[HookDef]] = {}
-
-        # 后台线程池: 1 个线程，给 background=True 的钩子排队用
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-
-        # 正在跑的后台任务: [(钩子名, Future对象)]
-        self._pending: list[tuple[str,Any]] = []
+        self._pending: list[tuple[str,Any]] = []# 正在跑的后台任务: [(钩子名, Future对象)]
 
 
-    def register(self,hook_point:str,background:bool=False,match:dict|None=None,enabled:bool=True):
+    def register(
+            self,
+            hook_point:str,
+            background:bool=False,
+            match:dict|None=None,
+            priority:int=None,
+            order:int=None,
+            enabled:bool=True
+    ):
         if hook_point not in self._hooks:
             self._hooks[hook_point] = []
 
         def add_hook(func):
-            hook_def = HookDef(func=func,background=background,match=match,enabled=enabled)
+            hook_def = HookDef(
+                func=func,
+                background=background,
+                match=match,
+                priority=priority,
+                order=order,
+                enabled=enabled
+            )
             self._hooks[hook_point].append(hook_def)
             return func
 
         return add_hook
 
 
-    # 主循环在某个时机点（如 after_round、pre_toolUse）调这个方法，
+    # 主循环在某个时机点（如 after_loop、pre_toolUse）调这个方法，
     # 意思是"通知所有挂在这个点上的钩子：这件事发生了"。
     # match_ctx 是这次事件的上下文，比如 pre_toolUse 时传 {"tool": "write_file"}，
     # 用来筛选出真正关心这次事件的钩子（见 _match）。
@@ -121,4 +129,5 @@ class HookManager:
 
 
 # 创建全局hook实例
-hooks = HookManager()
+hooks = Hooks()
+hooks.hooks = hooks # 自己挂载自己，现在没有，但是感觉后续有大用

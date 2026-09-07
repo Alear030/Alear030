@@ -34,12 +34,14 @@ class PlanRunner:
                 stall = 0
                 last_step_number = step.step_number
 
-            last_result = self.loop.run_turn(agent=agent,message=self._build_step_prompt(step))
+            # source=plan：step 内容出自已落盘的计划,与用户当轮输入分开,trace 里能区分谁在驱动模型
+            last_result = self.loop.run_turn(agent=agent,message=self._build_step_prompt(step),source='plan')
 
         # 全部 step 完成→提示 agent 调 plan_mode_off 收尾
         if self.session and self.session.plan:
             final_msg = "系统提示：所有 Plan Step 已执行完毕，请调用 plan_mode_off 结束 plan 模式。"
-            return self.loop.run_turn(agent=agent,message=final_msg)
+            # 这条是系统注入的收尾提示,不是计划内容,故与 _force_final_reply 同归 attachment
+            return self.loop.run_turn(agent=agent,message=final_msg,source='attachment')
         return last_result
 
     # 拼接单个 step 的执行提示（描述/验收标准/产出物/执行约束）

@@ -34,7 +34,7 @@
 
 `config.py` 里 `MEMORY_PIPELINE_ENABLED = False`。**保持默认值 clone 下来跑，本文描述的一切都不会发生。**
 
-而且它关掉的不只是「入库」——`hook/hooks/after_round/memory_pipeline/hook.py` 的判空在 `session._session_slice()` **之前**：
+而且它关掉的不只是「入库」——`hook/hook_point/after_loop/memory_pipeline/hook.py` 的判空在 `session._session_slice()` **之前**：
 
 ```python
 if memory is None or not memory.pipeline_enabled:
@@ -79,7 +79,7 @@ session._session_summary()
 用户/assistant 消息
   │ Session.session_message_insert() → session_detail/{id}.json 的 session_messages[]
   ▼
-after_round · memory_pipeline（后台线程，串行）
+after_loop · memory_pipeline（后台线程，串行）
   │
   ├─1 session._session_slice()
   │    锁内读快照 → 锁外跑 LLM 与 embedding → 锁内短写
@@ -228,7 +228,7 @@ memory 侧只有 `memory_agent` 一个实例，靠 `_switch_prompt()` 换 system
 
 代码注释写明了动机：避免过多 subagent 导致配置冗余。
 
-> 这种「原地改共享状态」的线程安全，依赖 `HookManager` 的后台线程池 `max_workers=1`——所有后台 hook 严格串行。这是一条**隐式约定**，`Memory` 内部没有加锁体现。详见[已知限制](#已知限制)。
+> 这种「原地改共享状态」的线程安全，依赖 `Hooks` 的后台线程池 `max_workers=1`——所有后台 hook 严格串行。这是一条**隐式约定**，`Memory` 内部没有加锁体现。详见[已知限制](#已知限制)。
 
 ---
 

@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 
 from config import ROOT_DIRECTORY
-from tool.tool_core import register_tool,tool_call_processing
+from tool.tool_core import tool,tool_call_processing
 
 tool_desc = '用于经由系统提示创建技能，并成功将技能文件落盘后，对整个技能创建过程进行收尾结束工作'
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
@@ -15,7 +15,7 @@ else:
 
 # skill_create 之后收尾:从 skill.md frontmatter 读 description 作为 skill_desc,
 # 写回 advanced_task_node 给对应 task_id 的 node 打 skill_info 标记,避免重复提示创建技能
-@register_tool(tool_name='skill_finish',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='skill_tool')
+@tool.tool_register(tool_name='skill_finish',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='skill_tool')
 def skill_finish(task_id:int,skill_name:str,**kwargs):
     # 执行tool_call_processing
     tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))

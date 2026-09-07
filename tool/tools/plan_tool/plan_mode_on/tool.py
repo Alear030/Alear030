@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from config import SESSION_PLAN_FILE_PATH
-from tool.tool_core import register_tool
+from tool.tool_core import tool
 
 
 tool_desc = '激活指定 plan 进入执行模式。用户确认计划后调用，将 plan_status 改为 in_progress，表示开始执行该计划。'
@@ -15,7 +15,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(tool_name='plan_mode_on', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
+@tool.tool_register(tool_name='plan_mode_on', tool_desc=tool_desc, tool_prompt=tool_prompt, tool_enabled=True, tool_autho='plan_tool')
 def plan_mode_on(plan_file: str, session=None, **kwargs):
     plan_path: Path = SESSION_PLAN_FILE_PATH / f'{plan_file}.json'
 

@@ -3,7 +3,7 @@ import locale
 import os
 import signal
 from pathlib import Path
-from tool.tool_core import register_tool
+from tool.tool_core import tool
 from .security import validate_command,is_destructive_category,COMMAND_WHITELIST
 
 MAX_TIMEOUT = 120
@@ -90,7 +90,7 @@ _known_block = f'\n\n已登记命令（会带上只读/写入分类标签；未�
 tool_prompt = (tool_prompt or '') + _known_block
 
 
-@register_tool(tool_name='command',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='command_tool')
+@tool.tool_register(tool_name='command',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='command_tool')
 def command(command:str,timeout:int=120,cwd:str=None,**kwargs)->str:
     safe, reason, category, destructive_warning = validate_command(command)
 

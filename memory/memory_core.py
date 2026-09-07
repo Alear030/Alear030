@@ -289,7 +289,8 @@ class Memory:
 
         # 得到最后的传入消息列表,并传入loop同时得到返回的json
         input_msg.append({"role":"user","content":input_info})
-        rq = self.loop.loop_run(agent=self.memory_agent,message=str(json.dumps(input_msg,ensure_ascii=False,indent=2)))
+        source = 'memory_pipeline'
+        rq = self.loop.run_loop(agent=self.memory_agent,source=source,message=f'<{source}>\n{json.dumps(input_msg,ensure_ascii=False,indent=2)}\n</{source}>')
 
         # 不区分成败记录thinking+原始输出，供后续评估质量/优化prompt使用
         memory_log.memory_eval_log(stage='user_info_extract',slice_data=slice_data,agent=self.memory_agent)
@@ -425,7 +426,8 @@ class Memory:
             "slice_summary_detail":slice_data['slice_anchor']['summary_detail'],
             "slice_messages_list":[message for message in messages if slice_data['start_round']<=message['message_round'] <= slice_data['end_round']]
         }
-        advanced_rq = self.loop.loop_run(agent=self.memory_agent,message=str(json.dumps(input_message,ensure_ascii=False,indent=2)))
+        source = 'memory_pipeline'
+        advanced_rq = self.loop.run_loop(agent=self.memory_agent,source=source,message=f'<{source}>\n{json.dumps(input_message,ensure_ascii=False,indent=2)}\n</{source}>')
 
         # 不区分成败记录thinking+原始输出，供后续评估质量/优化prompt使用
         memory_log.memory_eval_log(stage='advanced_task_node_judge',slice_data=slice_data,agent=self.memory_agent)
@@ -536,7 +538,8 @@ class Memory:
             "slice_summary_detail":slice_data['slice_anchor']['summary_detail'],
             "slice_messages_list":[message for message in messages if slice_data['start_round']<=message['message_round'] <= slice_data['end_round']]
         }
-        normal_rq = self.loop.loop_run(agent=self.memory_agent,message=str(json.dumps(input_message,ensure_ascii=False,indent=2)))
+        source = 'memory_pipeline'
+        normal_rq = self.loop.run_loop(agent=self.memory_agent,source=source,message=f'<{source}>\n{json.dumps(input_message,ensure_ascii=False,indent=2)}\n</{source}>')
 
         # 不区分成败记录thinking+原始输出，供后续评估质量/优化prompt使用
         memory_log.memory_eval_log(stage='normal_task_node_judge',slice_data=slice_data,agent=self.memory_agent)
@@ -648,7 +651,7 @@ class Memory:
 
 
     # 将一个已结束 session 内全部 worthy_summary 的 slice 摘要提炼成一条时间线事件；
-    # 走 loop.loop_run(而非 slice_type_define 式的孤立直调)是因为叙事提炼时可能需要
+    # 走 loop.run_loop(而非 slice_type_define 式的孤立直调)是因为叙事提炼时可能需要
     # memory_agent 主动调用 session_slice 重读某个关键片段的原文，孤立调用拿不到工具。
     # 不落 time_stamp：session_id 本身就带时间信息，不重复存一份容易漂移的派生字段。
     def session_timeline_extract(self,slices:list[dict],session_id:str)->dict|None:
@@ -670,7 +673,8 @@ class Memory:
             for s in slices
         ]
 
-        rq = self.loop.loop_run(agent=self.memory_agent,message=json.dumps(input_info,ensure_ascii=False,indent=2))
+        source = 'memory_pipeline'
+        rq = self.loop.run_loop(agent=self.memory_agent,source=source,message=f'<{source}>\n{json.dumps(input_info,ensure_ascii=False,indent=2)}\n</{source}>')
 
         # 不区分成败记录thinking+原始输出，供后续评估质量/优化prompt使用；无单条slice可关联，只记session_id
         memory_log.memory_eval_log(stage='session_timeline_extract',slice_data={'session_id':session_id},agent=self.memory_agent)
@@ -814,6 +818,7 @@ class Memory:
             attachment_type='interrupt',
             attachment_source='memory_pipeline',
             attachment_content=content,
+            attachment_target='main'
         )
 
     
@@ -874,7 +879,7 @@ class Memory:
         # 切片分类(只分新片)
         slices_type_results = self.slices_type_define(slices=new_slices,messages=messages)
 
-        # 锁内二次去重再入库:防两个 after_round 后台钩子并发时都判定同一片为新片导致重复 extend。
+        # 锁内二次去重再入库:防两个 after_loop 后台钩子并发时都判定同一片为新片导致重复 extend。
         # actually_new 记录本次锁内确认真正入库的片,下面 user_info 提取严格基于它,并发也不重复提取。
         actually_new = []
         def _dedup_extend(node):

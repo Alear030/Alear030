@@ -42,7 +42,8 @@ class Subagent:
 
     def subagent_run(self):
         subagent_loop = Loop(verbose=self.verbose)
-        subagent_rq = subagent_loop.loop_run(agent=self,message=self.task_message)
+        source = 'subagent_dispatch'
+        subagent_rq = subagent_loop.run_loop(agent=self,source=source,message=f'<{source}>\n{self.task_message}\n</{source}>')
         subagent_result = {"subagent_id":self.agent_id,"result":subagent_rq}
         return subagent_result
 

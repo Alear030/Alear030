@@ -27,7 +27,7 @@ Hook, Prompt, and Tool all rely on the side effect of "import runs decorator reg
 
 | System | What it scans | Meaning |
 |---|---|---|
-| Hook | Recursive `hook/hooks/**/hook.py` | Any nesting depth works, but the file must be named `hook.py` |
+| Hook | Recursive `hook/hook_point/**/hook.py` | Any nesting depth works, but the file must be named `hook.py` |
 | Prompt | Only **one-level directories** under `prompt/prompts/`, loading fixed `prompt.py` | No nesting; `prompt/prompts/a/b/prompt.py` is not discovered |
 | Tool | Only **one-level packages** under `tool/tools/` | A nested `tool.py` is not registered just by existing; the package `__init__.py` must explicitly import it |
 
@@ -59,7 +59,7 @@ from .tool import my_tool
 ```python
 from pathlib import Path
 
-from tool.tool_core import register_tool, tool_call_processing
+from tool.tool_core import tool, tool_call_processing
 
 tool_desc = 'One-line description of what this tool does; goes into the tool_prompt tool list'
 
@@ -72,7 +72,7 @@ else:
     tool_prompt = None
 
 
-@register_tool(
+@tool.tool_register(
     tool_name='my_tool',
     tool_desc=tool_desc,
     tool_prompt=tool_prompt,
@@ -115,14 +115,14 @@ if session is None:
 ### Directory skeleton
 
 ```text
-hook/hooks/<hook_point>/my_hook/
+hook/hook_point/<hook_point>/my_hook/
 ├── __init__.py     # may be empty
 └── hook.py         # filename must be hook.py
 ```
 
-Current hook points: `before_session`, `pre_toolUse`, `after_round`, `after_session`.
+Current hook points: `before_session`, `before_loop`, `pre_toolUse`, `after_loop`, `after_session`.
 
-> The `before_session` directory exists and `main.py` triggers it, but no hook is registered there today — the trigger is a no-op.
+> `before_session` carries `game_begin` (turning notification prompt blocks into attachments) and `before_loop` carries `loop_run` (rendering attachments for the target agent and handing them back to Loop). Those two points are the two ends of the attachment delivery path.
 
 ### Implementation
 
@@ -130,7 +130,7 @@ Current hook points: `before_session`, `pre_toolUse`, `after_round`, `after_sess
 from hook.hook_core import hooks
 
 
-@hooks.register(hook_point='after_round', background=True, enabled=True)
+@hooks.register(hook_point='after_loop', background=True, enabled=True)
 def my_hook(session=None, memory=None, hooks=None, **kwargs):
     # Declare parameters as needed with defaults: what the trigger passes is decided by hooks.trigger(...) call sites;
     # declaring a parameter the other side does not pass yields TypeError immediately
@@ -182,14 +182,15 @@ No `__init__.py` needed.
 ### Implementation
 
 ```python
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 
 
-@register_prompt(
+@prompt.register_prompt(
     prompt_name='my_prompt',
     order=25,
     condition=lambda agent: agent.agent_name == 'main',
     enabled=True,
+    type='static',
 )
 def build(agent) -> str:
     return '#我的分块' + '\n\n' + '正文内容'
@@ -197,21 +198,40 @@ def build(agent) -> str:
 
 `build_prompt(agent)` concatenates by ascending `order`, filters out `enabled=False` and blocks whose `condition` is false, and **also skips blocks whose content is the empty string** — so "do not inject this time" can simply return `''` without an extra switch.
 
+**`type` must be written explicitly.** Only `static` reaches the system prompt. Content that changes every round or every session must be declared `notification` with a `target`, and the `before_session/game_begin` hook delivers it as an attachment alongside the user's input:
+
+```python
+@prompt.register_prompt(
+    prompt_name='my_notice',
+    order=45,
+    type='notification',
+    target=['main'],          # only agents that actually have an attachment delivery pipeline; see the constraint below
+)
+def build() -> str:           # notification blocks take no agent argument
+    return '#content that may change every round'
+```
+
+Neither path accepts a block without `type` — `build_prompt` takes only `static`, and `game_begin` whitelists `notification` / `interrupt`, logging a `prompt_block_skip` and skipping anything omitted or misspelled rather than delivering it as a notification by default. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
+
 ### Current order layout
 
 When picking an order, use this table and insert into a gap:
 
 ```text
-system_prompt      0
-attachment_prompt  5
-tool_prompt       10
-skill_prompt      20
-session_recent    30
-timeline_prompt   30
-memory_prompt     35
-agent_prompt      40
-basic_prompt      50
+system_prompt      0   static
+attachment_prompt  5   static
+tool_prompt       10   static
+skill_prompt      20   notification → main
+session_recent    30   notification → main (enabled=False)
+timeline_prompt   30   notification → main
+memory_prompt     35   notification → main
+agent_prompt      40   static
+basic_prompt      50   notification → main
 ```
+
+`target` may only name agents that **actually carry an attachment delivery pipeline**. The pipeline's two ends are `before_session/game_begin` and `before_loop/loop_run`, and only a Loop constructed with both `hooks` and `session` reaches them — today that is the main Loop alone. The memory pipeline, subagents and `plan_design` all run on bare Loops they build themselves, so an attachment addressed to them stays `waiting` forever, walked every round and never delivered. The `['all']` sentinel expands to every registered agent, so no block should use it right now.
+
+Both kinds share one order axis: it sequences `static` blocks within the system prompt and `notification` blocks within attachment delivery. Both run stable-to-volatile — the later a block sits, the later the cache breaks.
 
 ### Two constraints
 
@@ -267,7 +287,7 @@ If something new does not take effect after startup, debug in this order:
 > `python main.py` really calls the model API and writes session files — it is not a side-effect-free smoke test. To only confirm "did it register?", querying the registry is much faster than a full run:
 
 ```bash
-python -c "import tool; from tool.tool_core import _register; print(sorted(_register.tool_list))"
+python -c "import tool; from tool.tool_core import tool; print(sorted(tool.tool_list))"
 ```
 
-Same idea for Hook and Prompt: inspect `hook.hook_core.hooks._hooks` and `prompt.prompt_register._register.prompt_list`.
+Same idea for Hook and Prompt: inspect `hook.hook_core.hooks._hooks` and `prompt.prompt_core.prompt.prompt_list`.

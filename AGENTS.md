@@ -1,6 +1,8 @@
 # Repository Guidelines
 
-> 权威关系：协作、安全、写入和验证约束以本文件为准；运行行为与架构事实以现场代码、注册器和配置为准；`CLAUDE.md` 仅作历史参考，引用前必须对照源码。
+> 权威关系：本文件是 `CLAUDE.md` 的压缩派生，供 Codex/Cursor 等宿主工具读取，不单独维护第二套说法；协作、安全、写入和验证约束以 `CLAUDE.md` 为源，两者出现分歧时以 `CLAUDE.md` 为准并需要同步修订本文件。运行行为与架构事实始终以现场代码、注册器和配置为准，不以任何文档（包括 `CLAUDE.md`）为准。
+>
+> 例外：下面「技能入口」一节逐项列出的技能名和触发时机，覆盖范围比 `CLAUDE.md` 正文广。`CLAUDE.md` 那边靠 `.claude/skills/` 的 `description` 自动触发，不需要逐项列出；但 Codex/Cursor 没有这套机制，这里必须替它们把索引摆全。这不算独立判断，只要索引内容不引入 `CLAUDE.md` 未认可的新规则。
 >
 > 维护原则：这里只保留无法通过常规探索自发现的长期规则、稳定不变量和源码入口。工具、Hook、Prompt、Widget 等易变清单以目录现状为准，不在本文件逐项枚举。
 
@@ -14,7 +16,12 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 
 ## 协作与写入
 
-- 基本节奏是：探索 → 规划 → 用户拍板 → 执行 → 验收。只读探索可随时进行。
+- 先判断当前是「构想 / research」还是「实现」，两者规则不同甚至相反，判错模式比答错内容代价更高：
+  - 识别信号：用户抛出一个方向性想法、一条论文观察或一个还模糊的架构直觉后问「怎么看」，或明确说「先交流信息」；讨论对象是要不要往这个方向走，而不是怎么落地。
+  - 构想阶段不要用当前代码实况去回应想法——用户提出想法的前提往往就是现有代码承接不了它，「现在没有」「现在不是这样」都只是工作量而非阻断。真正值得当场提出的阻断是：想法本身自相矛盾、会让用户已明确说过想要的东西变得不可能、或存在他没看到的方向性替代路线。
+  - 该产出的是想法本身的后果、边界、与用户其他目标之间的张力，以及至少一个用户框架之外的选项。
+  - 产出顺序是先交流信息、再修正项目、最后才决定落盘位置，与实现模式「先定验收标准再动手」的顺序相反，不要用实现模式的惯性覆盖它。
+- 实现模式的基本节奏是：探索 → 规划 → 用户拍板 → 执行 → 验收。只读探索可随时进行。
 - 所有文件修改默认先在对话中展示拟议全文或等价 diff，取得用户明确确认后再落盘。编辑器的 Accept/Keep 属于写入后的审阅，不算事前批准。
 - 无行为影响的纯文本改动可以免除单独的规划闸门，但不能免除“先预览、明确确认、后落盘”。
 - 触碰行为、机制或调用链时，规划必须说明生产者、消费者、生命周期、验证方式与取舍风险；切片应尽量做到可独立提交。
@@ -40,14 +47,14 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 ### 装配与扩展
 
 - 高层对象装配集中在 `main.py`，常驻 Agent 配置入口是 `agent/agents.yaml`。
-- 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_register.py` 及对应目录的加载代码。
-- 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hooks/pre_toolUse/` 和 `tool/tool_core.py`。
-- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。入口见 `prompt/prompt_core.py` 和 `prompt/prompt_register.py`。
+- 新增能力必须沿既有 Tool、Hook、Prompt 或界面注册机制接入，不得另建平行注册表。探索入口包括 `tool/tool_core.py`、`hook/hook_core.py`、`prompt/prompt_core.py` 及对应目录的加载代码。
+- 工具运行时对象由 `pre_toolUse` Hook 注入。工具通过 `kwargs.get(...)` 获取注入对象，判空后采用“报错返回”，不得假设模型能够构造这些对象。入口见 `hook/hook_point/pre_toolUse/` 和 `tool/tool_core.py`。
+- Prompt 是进程启动时构建的快照；运行中修改 Prompt 文件不会自动刷新当前进程。分块注册时必须声明 `type`：`static` 进 system prompt，`notification` 由 `before_session` 钩子按 `target` 投成 attachment，漏写 `type` 或 `target` 的分块两边都不收，会记一条 `prompt_block_skip` 后跳过。`target` 只能写真的挂着投递管线的 agent，目前仅 `main`。入口见 `prompt/prompt_core.py`。
 
 ### Session 与 Memory
 
 - 原始 Session 消息和 `session_slice` 是事实源；`slice_node`、`user_info`、`timeline` 等均是可追溯、可重建的派生物，不得反写派生结果替代原文。
-- Session 读写、切片和压缩入口在 `session/session_core.py`；Memory 摄入与提炼由 `hook/hooks/after_round/`、`hook/hooks/after_session/` 和 `memory/memory_core.py` 协作完成。
+- Session 读写、切片和压缩入口在 `session/session_core.py`；Memory 摄入与提炼由 `hook/hook_point/after_loop/`、`hook/hook_point/after_session/` 和 `memory/memory_core.py` 协作完成。
 - `json_lock` 只保护短时读取、合并和写入。持锁期间禁止调用模型或 embedding；耗时处理必须在锁外完成，再在锁内按身份或坐标合并。
 - Memory 存储入口在 `memory/memory_storage/memory_storage_core.py`。修改派生数据结构时必须保留来源坐标和可追溯性，并检查所有生产者与消费者。
 - 任何真实历史数据 replay 都必须在执行前后比对相关文件哈希并报告证据。
@@ -87,7 +94,10 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - `$alear030-worktree-change-guard`：在 worktree 修改非 `test/` 生产代码后核对改动确实落在目标 checkout。
 - `$alear030-scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
 - `$alear030-issue-pretodoHandle`：从 GitHub Projects 的 pre-todo 列处理下一个 issue。
-- `$alear030-issue-techdebt`：按项目格式记录审查或复盘发现的技术债。
+- `$alear030-issue-fix`：把单个 issue 从拉取、定位、方案拍板到修复、测试、review、commit 的流水线；止于 commit，关 issue 与 push 另行指令，分支/PR 场景仍走 pretodoHandle。
+- `$alear030-issue-mark`：按项目标签体系（tech-debt/boundary-violation/eval-require 等）记录审查或复盘发现的问题。
+- `$alear030-doc-drift-check`：按结构性/行为/笔误三种口径检查项目文档与代码现场的漂移；严格只读、只汇报不修复，依赖未提交代码的判定跳过并警示。
+- `$alear030-pr-review`：对已开 PR 做 merge 前审查，走数据、声明↔消费、可达性三道对账；靶子分类沿用 `docs/retrospective/eval-to-architecture.md`，严格只读，发现先汇总分级交用户拍板再分流。退出标准不是读完 diff，而是每条数据流的生产者、消费者与可达性都有结论。
 - `$alear030-commit-message`：生成符合项目规范的提交信息。
 - `$alear030-changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。
 - `$alear030-push-merge`：commit 之后 push、开 PR、合并进 master、清理分支与 worktree、同步本地 master。本项目走 GitHub PR 而非本地 merge；`master` 与 `Alear030_dev` 为常驻分支，永不删除。

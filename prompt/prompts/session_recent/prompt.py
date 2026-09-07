@@ -2,13 +2,14 @@ import json
 
 from pathlib import Path
 
-from prompt.prompt_register import register_prompt
+from prompt import prompt
 from config import SESSION_MEMORTY_DETAIL_PATH
 
 
-# 最近3轮历史session的切片摘要，用于跨session的短期记忆，仅main agent注入
-@register_prompt(prompt_name='session_recent',order=30,condition=lambda agent: agent.agent_name=='main',enabled=False)
-def build(agent)->str:
+# 最近3轮历史session的切片摘要，用于跨session的短期记忆
+# 每结束一个 session 就多一份历史 JSON,内容必然跨 session 变动,故走 attachment
+@prompt.register_prompt(prompt_name='session_recent',order=30,enabled=False,type="notification",target=['main'])
+def build()->str:
     session_recent_ids = sorted(file.stem for file in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))[-3:]
     session_prompt = f"# 最近{len(session_recent_ids)}轮对话信息" + '\n\n' if session_recent_ids else ''
 
