@@ -97,6 +97,7 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - `$alear030-issue-fix`：把单个 issue 从拉取、定位、方案拍板到修复、测试、review、commit 的流水线；止于 commit，关 issue 与 push 另行指令，分支/PR 场景仍走 pretodoHandle。
 - `$alear030-issue-mark`：按项目标签体系（tech-debt/boundary-violation/eval-require 等）记录审查或复盘发现的问题。
 - `$alear030-doc-drift-check`：按结构性/行为/笔误三种口径检查项目文档与代码现场的漂移；严格只读、只汇报不修复，依赖未提交代码的判定跳过并警示。
+- `$alear030-pr-review`：对已开 PR 做 merge 前审查，走数据、声明↔消费、可达性三道对账；靶子分类沿用 `docs/retrospective/eval-to-architecture.md`，严格只读，发现先汇总分级交用户拍板再分流。退出标准不是读完 diff，而是每条数据流的生产者、消费者与可达性都有结论。
 - `$alear030-commit-message`：生成符合项目规范的提交信息。
 - `$alear030-changelog-refresh`：将一批提交归纳到 `CHANGELOG.md` 的版本块。
 - `$alear030-push-merge`：commit 之后 push、开 PR、合并进 master、清理分支与 worktree、同步本地 master。本项目走 GitHub PR 而非本地 merge；`master` 与 `Alear030_dev` 为常驻分支，永不删除。

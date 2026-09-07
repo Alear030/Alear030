@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十三个技能，一共 1294 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十四个技能，一共 1406 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十三个里有十二个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十四个里有十三个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -22,8 +22,9 @@
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
-| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 81 | issue 的标签体系与正文规范 |
-| [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 41 | 文档与代码现场的只读漂移体检，只汇报不修复 |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | issue 的标签体系与正文规范 |
+| [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 105 | 已开 PR 的 merge 前只读审查，三道对账加一条退出标准 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
@@ -98,7 +99,7 @@
 
 还有三条是关于改我的代码的：保留我原有的标识符命名、优先用同文件里已有的 helper、先讲清楚再改。最后一条尤其重要——我需要知道改了什么、为什么改，不然这段代码就从「我的」变成「不知道谁的」了。
 
-### `alear030-issue-mark`（81 行）
+### `alear030-issue-mark`（86 行）
 
 技术债 issue 的规范：统一用 `tech-debt` 标签（不用 GitHub 默认的 bug/enhancement），严重度写成标题前缀 `[高]`/`[中]`/`[低]`，正文走三段式——issue背景（现状+风险）/ issue功能（目标+建议方案）/ issue检查（验收标准）。证据必须给到 `文件:行号`。
 
@@ -152,9 +153,23 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 用技能而不是让 agent 自己去 grep，是因为自己 grep 的结果每次都不一样：漏目录、把 `done(@claude)` 当成待办、或者去动了 `@claude(ignore)`。
 
-### `alear030-doc-drift-check`（41 行）
+### `alear030-doc-drift-check`（43 行）
 
 每天早上九点的定时任务沉淀成的技能：逐篇核对核心文档与代码现场，三种口径——结构性漂移（引用的文件/入口/计数已不存在）、行为描述漂移（断言与代码矛盾）、笔误过期。两条铁律：先机械核对再下结论（压误报）；判定依赖未提交代码的一律跳过进警示区，不猜。全程只读，报告完把决定权交回。
+
+### `alear030-pr-review`（105 行）
+
+和上一个同属只读汇报类，但对象不同：那个查文档与代码的日常漂移，这个查一批已开 PR 的改动在 merge 之前有没有真的收口。
+
+它的来历是一次外部 agent 做的 review：四轮才挖到位，最贵的一条（落盘语义反转）是我自己点破的，而同一个 PR 另一个 agent 很快就看见了。差别不在谁更懂这个项目，在提问方式——一个问「代码怎么写」，一个问「数据变成什么样」。
+
+所以这个技能不装知识，装接线：靶子分类直接用[那篇复盘](../../docs/retrospective/eval-to-architecture.md)已有的四类，机制事实一律写成探针指回 `docs/`（只给查法不给答案，答案会过期，而过期的答案比没有答案更糟），技能自己只留三道对账、分流纪律，和一条退出标准。
+
+**退出标准是这里唯一算新增的东西**：不是「diff 读完了」就算完，是三道对账过完、每条数据流的生产者—消费者—可达性都有结论才算完。漏掉的东西通常不是看不懂，是停太早。
+
+写它的过程里差点栽一次：我本来要往探针表里塞几个具体函数名，让 review 时 grep 一遍完事。拦下来的理由是——**写死名字的查法在改名之后不会报错，它照样返回一批结果**，跑完看到有命中，就以为这一项查过了，于是真正新增的那条路径被静默跳过。所以探针腐烂不是失灵，是**变成一个假的通过**，比没有这条探针更危险。判据因此定成一句：一条探针能进表，当且仅当它不会因为改名、新增实现或重构而变成静默通过；做不到就升到属性层，或者至少加一句失效自检。
+
+同一个理由也否掉了「给持久化入口统一打标记」这个更彻底的方案——那等于断言「持久化入口」已经是个稳定类别，可它现在还在这批改动里被反复挪动。给一份能随时重算的清单建缓存、再承担同步成本，正是这个项目自己的第二类靶子。所以清单改成每次 review 现列、并作为必交产物写进报告；等几次列出来的结果稳定一致了，再谈要不要固化。
 
 ---
 
@@ -178,9 +193,9 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ---
 
-## 它们不是十三个孤立的文件
+## 它们不是十四个孤立的文件
 
-这十三个技能之间有引用关系：
+这十四个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，被 `alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline` 三个反向引用——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
@@ -188,8 +203,9 @@ commit 之后的收尾，**分两段，中间必须停**：
 - `alear030-issue-fix` 与 `alear030-issue-pretodoHandle` 声明分工：前者当前 checkout 修到 commit 为止，后者管看板认领、分支与 PR；修复/测试/提交环节分别指向 `alear030-multitask-code`、`alear030-verify`、`alear030-commit-message`，不复述
 - `alear030-multitask-code` 与 `alear030-multitask-pipeline` 明确声明互补，各自不复述对方的内容
 - `alear030-style-notes` 和 `alear030-multitask-code` 都指向 `.cursor/rules/coding-conventions.mdc`，避免同一套写法纪律被抄成三份
+- `alear030-pr-review` 把这条反复述纪律用到了底：靶子分类指向 `docs/retrospective/`、机制事实指向 `docs/`、验证口径指向 `alear030-verify`、发现落盘指向 `alear030-issue-mark`，自己只留 review 时的提问顺序与退出标准。它卡在 `alear030-push-merge` 两段之间，与 `alear030-doc-drift-check` 声明分工：那个查文档漂移，这个查一批改动的机制收口
 
-所以真正被沉淀下来的不只是十三条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十四条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 
