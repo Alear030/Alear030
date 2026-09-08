@@ -48,7 +48,7 @@ plan_result = PlanRunner(loop=self, session=self.session).run(agent=agent)
 
 朴素做法是发一句「请直接回复，不要调用任何工具」。**但提示词不是约束，是建议**——模型完全可以无视它继续调工具。
 
-`_force_final_reply` 的做法是 `self._chat(agent, with_tools=False)`：**这次请求根本不带 `tools` 参数**。模型不是被劝住的，是没有工具可调。提示词照发，但它只负责解释原因，不负责生效。
+`_force_final_reply` 的做法是 `self._chat(agent, with_tools=False, stream_key=stream_key)`：**这次请求根本不带 `tools` 参数**。模型不是被劝住的，是没有工具可调。提示词照发，但它只负责解释原因，不负责生效。
 
 这条决定的连带处理：达上限那条路径要 `drop_last_toolcalls`——把最后一条带 `tool_calls` 的 assistant 消息弹掉，否则历史里挂着一批没有对应 tool result 的调用，协议不完整。
 
@@ -80,7 +80,7 @@ if self.session and self.session.mode != mode_before:
 - `_chat` 把所有裸异常翻译成 `LoopAPIError`（`except LoopAPIError: raise` 放在 `except Exception` 前面，防止二次包装）
 - `loop_run` 顶层捕获 `LoopAPIError`，返回一个错误字符串，同时 `emit` 一条 `SystemError` 给 TUI
 
-流式中途失败时还要**补发 `StreamEnd`**——否则 TUI 侧那条流永远悬挂着，widget 不会 finalize。建连失败还没开流，则跳过这一步。
+建连失败和流式中途失败时都会**补发 `StreamEnd`**——避免 TUI 侧已创建的流悬挂、widget 无法 finalize。建连失败时若尚未创建对应 widget，TUI 收尾为空操作。
 
 **这条边界目前没有覆盖全部路径**：`_tool_calls_api` 的参数解析、`match_tool` 内部的工具异常，以及工具内绕开 `Loop` 直调模型的情况，仍在边界之外。这是 20260702 那版方案里暂缓的两部分，不是遗漏。
 
