@@ -375,8 +375,11 @@ flowchart LR
 ### 检索源是原始 slice，不是 slice_node
 
 ```python
-def _get_session_detail_ids():
-    return sorted(f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))[:-1]
+def _get_session_detail_ids(current_session_id:str):
+    return sorted(
+        f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json")
+        if f.stem != current_session_id
+    )
 ```
 
 读的是 `session/session_detail/*.json` 里的 `session_slice`，**不是** Memory 管线产出的 `slice_node.json`。
@@ -389,7 +392,7 @@ def _get_session_detail_ids():
 
 当前这样做的实际效果是：召回不依赖管线是否跑过，即便 `MEMORY_PIPELINE_ENABLED=False` 也……并不能用——因为管线关闭时切片本身就不跑，没有 slice 也就没有向量。所以两者其实是绑定的。
 
-`[:-1]` **排除当前 session**（依赖 session_id 是可排序的时间戳，最新的排在最后）。当前会话内的失忆问题由[会话内压缩](#会话内压缩与记忆的边界)那条路径解决。
+**排除当前 session** 靠的是注入的 `session.session_id` 与文件名逐一比对，不依赖排序位置——早期实现用 `[:-1]` 假设当前 session 一定排在字典序最后，时钟回拨或目录里存在更大字典序文件时会排除错文件。当前会话内的失忆问题由[会话内压缩](#会话内压缩与记忆的边界)那条路径解决。
 
 ### 检索过程
 
