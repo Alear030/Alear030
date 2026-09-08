@@ -1,3 +1,5 @@
+import yaml
+
 from tool.tool_core import tool,tool_call_processing
 from pathlib import Path
 from config import ROOT_DIRECTORY
@@ -18,8 +20,23 @@ def skill_load(skill_name:str,**kwargs)->str:
     skill_md_list = list(skill_path.rglob(f'{skill_name}/skill.md'))
     if not skill_md_list:
         return f'{skill_name} fail to load'
+
     skill_text = skill_md_list[0].read_text(encoding='utf-8')
-    skill_parts = skill_text.split('---')
-    skill_body = '---'.join(skill_parts[2:]).strip()
+    if not skill_text.startswith('---'):
+        return f'{skill_name} fail to load: skill.md 缺少 frontmatter'
+
+    skill_parts = skill_text.split('---', 2)
+    if len(skill_parts) < 3:
+        return f'{skill_name} fail to load: skill.md frontmatter 未闭合'
+
+    skill_meta = yaml.safe_load(skill_parts[1].strip())
+    if not isinstance(skill_meta, dict) or not skill_meta:
+        return f'{skill_name} fail to load: skill.md frontmatter 为空或格式不对'
+    if skill_meta.get('name') != skill_name:
+        return f'{skill_name} fail to load: frontmatter name 与目录名不一致'
+
+    skill_body = skill_parts[2].strip()
+    if not skill_body:
+        return f'{skill_name} fail to load: skill.md 正文为空'
 
     return skill_body
