@@ -61,6 +61,8 @@ Input.Submitted
 
 `session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `run_loop` 的 `finally` 块在整轮返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
 
+流标识 `stream_key` 形如 `{agent}_{round}_{本轮第几条流}`，一次 API 调用分配一个，TUI 拿它挂 widget、trace 拿它锚定 `assistant_output`。序号在 round 递增的同一时刻归零——唯一性靠中段变化而非计数器一直涨。没有 session 的裸 Loop（memory 管线、subagent、plan_design）没有 round 可用，中段留空、计数器不重置。**已知限制**：计数器是实例级的，同一 session 里两台各自新建的裸 Loop 跑同名 agent（`plan_design` 每次调用即是）会在同一个 trace 文件里发出重复的键；根因是引擎被反复重建而非标识方案，留待 plan 链路收口时一并处理。
+
 attachment 拼在用户输入**之前**而不是之后：前缀缓存的分叉点在新内容第一次出现的位置，用户这轮打的字几乎必然是唯一变化的部分，attachment 排在它后面就落在已经断掉的缓存里，内部再怎么按 order 排都追不回来。
 
 一轮输入的三个真相分开归属，拼接与落盘都收在 `_sent_message_api`：`agent.message_list` 是模型看到的（attachment + 用户原话），`session_detail` 是对话事实（只写用户原话），trace 是发送事实（`source='user'` 那条记原话，`source='attachment'` 那条单独记注入内容，相加即模型看到的全文）。这条分家目前**只覆盖 attachment 这一条注入路径**。`_force_final_reply` 的系统提示与 PlanRunner 的 step prompt 仍旧经同一个 writer 落成 `role='user'`，切片、summary、memory 管线读到它们时还是会当成用户说的话——收口没做完，见 issue。

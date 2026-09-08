@@ -44,7 +44,8 @@ class Loop:
 
     # 统一 LLM 调用：with_tools 决定是否携带 tools 与 thinking
     # 建连失败与流式中途异常都在此翻译成 LoopAPIError，由 run_loop 统一兜底
-    def _chat(self,agent,with_tools:bool):
+    # stream_key 必填不给默认值：分配点在 run_turn，签名不留缺省是为了让将来新增的调用路径无法忘记分配
+    def _chat(self,agent,with_tools:bool,stream_key:str):
 
         # 组装请求参数：with_tools 时带 tools 与 thinking
         params = {'model':agent.model_name,'messages':agent.message_list}
@@ -59,13 +60,7 @@ class Loop:
         params["stream"] = True
         params["stream_options"] = {"include_usage":True}
 
-        # 本次调用的流序号，TUI 用它区分流；建连失败时未赋值，异常路径据此跳过 end 信号
-        stream_key = None
         try:
-            # 流号前置分配，先发 Thinking 骨架事件，input 即显示
-            self.stream_id += 1
-            stream_key = f'{agent.agent_name}_{self.stream_id}'
-
             # 发起请求，拿回 stream 对象
             stream = agent.agent_ai.chat.completions.create(**params)
 
@@ -180,8 +175,8 @@ class Loop:
 
         except Exception as ee:
             # 建连失败 / 流式中途断流：同款翻译，已 emit 不回滚
-            # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败未开流则跳过
-            if self.emit and stream_key:
+            # 流中断也发 stream_end 防 TUI 侧 stream 悬挂；建连失败时该流没挂过 widget，end_stream 扫不到就是空操作
+            if self.emit:
                 self.emit(event='StreamEnd',content={},stream_id=stream_key,agent_name=agent.agent_name)
             raise LoopAPIError(str(ee)) from ee
 
@@ -191,7 +186,7 @@ class Loop:
     # attachment 只拼进 message_list 不落盘、不还原：改发出去的历史字节会破坏 provider 的 prompt cache 前缀
     # 落盘只写用户原话，session_detail 答「对话里发生了什么」；实际发出去什么归 trace
     # 只覆盖 attachment：_force_final_reply 与 PlanRunner 的 step prompt 仍落成 role='user'，收口未完
-    def _sent_message_api(self,agent,message_content:str=None,attachment_content:str=None)->ChatCompletionMessage:
+    def _sent_message_api(self,agent,stream_key:str,message_content:str=None,attachment_content:str=None)->ChatCompletionMessage:
 
         if message_content:
             # attachment 放前面：用户这轮输入几乎必然是唯一变化的部分，排它后面就落进已经断掉的缓存
@@ -208,7 +203,7 @@ class Loop:
             })
 
         try:
-            agent_rq = self._chat(agent,with_tools=True)
+            agent_rq = self._chat(agent,with_tools=True,stream_key=stream_key)
         except LoopAPIError:
             # 失败时弹出刚 append 的 user 消息，避免下一轮出现连续两条 user 消息
             if message_content:
@@ -286,7 +281,7 @@ class Loop:
 
 
     # 强制收尾：不传 tools，模型物理上拿不到工具，只能吐文本；可选先弹出末尾 tool_calls
-    def _force_final_reply(self,agent,notice:str,drop_last_toolcalls:bool=False)->str:
+    def _force_final_reply(self,agent,notice:str,stream_key:str,drop_last_toolcalls:bool=False)->str:
         if drop_last_toolcalls and agent.message_list and getattr(agent.message_list[-1],'tool_calls',None):
             agent.message_list.pop()
 
@@ -300,7 +295,7 @@ class Loop:
         if self.session:
             self.session.session_message_insert(role='user',content=notice)
         try:
-            final_rq = self._chat(agent,with_tools=False)
+            final_rq = self._chat(agent,with_tools=False,stream_key=stream_key)
         except LoopAPIError:
             # 失败时弹出刚 append 的 notice 消息，避免下一轮出现连续两条 user 消息 @claude实际上后续应该想办法将error变成类似attachment的内容和下一轮user消息拼接在一起，避免丢失上下文
             agent.message_list.pop()
@@ -313,9 +308,20 @@ class Loop:
 
 
     # 结束一轮：重置计数并递增 session.round
+    # 重置必须和 round 递增同进同出：stream_key 的唯一性靠「前缀变了」而不是「计数器一直涨」，
+    # 裸 Loop 没有 round 可变，走不到这里，计数器保持单调递增
     def _close_round(self):# @claude 这东西应该迁到session里面作为一个方法，甚至应该是hook的点位该做的事情，不用改直接让loop去调用
         if self.session:
             self.session.round += 1
+            self.stream_id = 0
+
+
+    # 分配一条流的标识：一次 API 调用一个，TUI 拿它挂 widget、trace 拿它锚定 assistant_output
+    # 只在 run_turn 里调用——那里集齐了全部会触发 API 的动作，分配点集中才谈得上「本轮第几条流」
+    # 已知限制：裸 Loop 没有 round 可当中段，同一 session 里两台裸 Loop 跑同名 agent 会发出重复的键
+    def _next_stream_key(self,agent)->str:
+        self.stream_id += 1
+        return f'{agent.agent_name}_{self.session.round if self.session else ""}_{self.stream_id}'
 
 
     # 引擎入口：发首条消息，进入 ReAct 工具循环直到出结果或达上限
@@ -324,7 +330,8 @@ class Loop:
         if message:
             Trace.trace_record(trace_type="input",source=source,loop_round=self.session.round if self.session else '',trace_detail={"input_message":message})
 
-        agent_rq = self._sent_message_api(agent=agent,message_content=message,attachment_content=attachment_content)
+        agent_rq = self._sent_message_api(agent=agent,stream_key=self._next_stream_key(agent),
+                                          message_content=message,attachment_content=attachment_content)
         tool_call = 0
 
         while tool_call < agent.max_toolcalls:
@@ -339,17 +346,22 @@ class Loop:
             mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
 
             # plan_mode_on/off 生效后代码层强制结束本轮，不再给模型可调工具的机会
+            # _close_round 挪到强制收尾之后：收尾那次调用仍属于本轮，先关轮会让它的 loop_round 与 stream_key 落到下一轮去
             if mode_switched:
+                final_content = self._force_final_reply(agent=agent,stream_key=self._next_stream_key(agent),
+                                                        notice='系统提示：plan 模式已切换，本轮对话到此结束，请直接回复，不要调用任何工具')
                 self._close_round()
-                return self._force_final_reply(agent=agent,notice='系统提示：plan 模式已切换，本轮对话到此结束，请直接回复，不要调用任何工具')
+                return final_content
 
-            agent_rq = self._sent_message_api(agent=agent)
+            agent_rq = self._sent_message_api(agent=agent,stream_key=self._next_stream_key(agent))
 
         # 达到工具调用上限，强制无 tools 收尾
         if self.emit:
             self.emit(event='SystemError',content={'message':'已达到工具调用次数上限'},agent_name=agent.agent_name)
+        final_content = self._force_final_reply(agent=agent,stream_key=self._next_stream_key(agent),
+                                                notice='系统提示：已达到工具调用次数上限，请根据已有信息进行回复',drop_last_toolcalls=True)
         self._close_round()
-        return self._force_final_reply(agent=agent,notice='系统提示：已达到工具调用次数上限，请根据已有信息进行回复',drop_last_toolcalls=True)
+        return final_content
 
 
     # 顶层入口：一次外部输入的完整轮次，hook 边界收在这里；内部通过 run_turn 跑一次 agent 会话
@@ -400,8 +412,8 @@ class Loop:
 
         except LoopAPIError as ee:
             result = f'[系统错误] 模型调用失败，本轮未完成：{ee}'
-            if self.session:
-                self.session.round += 1
+            # 走 _close_round 而不是自己 +1：轮次推进与流计数重置是一件事，两个出口各写一份迟早漂移
+            self._close_round()
             if self.emit:
                 self.emit(event='SystemError',content={'message':result},agent_name=agent.agent_name)
 

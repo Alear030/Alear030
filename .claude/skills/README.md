@@ -16,12 +16,12 @@
 
 | 技能 | 行数 | 一句话 |
 |------|------|--------|
-| [`alear030-verify`](alear030-verify/SKILL.md) | 128 | 这个项目的验证方式和常规 Python 项目不一样 |
+| [`alear030-verify`](alear030-verify/SKILL.md) | 152 | 这个项目的验证方式和常规 Python 项目不一样 |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | 在 worktree 改完生产代码必须回读确认 |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
-| [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 72 | 往我的代码里写注释的口味 |
+| [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | 往我的代码里写注释的口味 |
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 105 | 已开 PR 的 merge 前只读审查，三道对账加一条退出标准 |
@@ -41,7 +41,7 @@
 
 这一组的共同点是：**按常规经验做就会出事**，而且出事之后不容易看出原因。
 
-### `alear030-verify`（128 行）
+### `alear030-verify`（152 行）
 
 这个项目的验证方式有几个反直觉的地方，凭通用 Python 项目的经验直接套会踩：
 
@@ -93,7 +93,7 @@
 
 另一个是重复记录：一个 commit 只能归一个版本块，实际发生过 patch 修复被同时记进两个版本的情况。
 
-### `alear030-style-notes`（72 行）
+### `alear030-style-notes`（74 行）
 
 往我的代码里写注释时的口味：中文、极简、动词或动作导向，禁止空标签注释（那种只是把函数名翻译一遍的）。
 
