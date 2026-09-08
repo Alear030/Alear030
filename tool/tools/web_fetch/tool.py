@@ -101,7 +101,8 @@ def _fetch_one(url:str)->dict:
                 # 避免这些字符原样经 json.dumps(ensure_ascii=False) 落进 trace，重现 issue #141 里那种 trace 幻影损坏
                 diagnostics['raw_snippet'] = full_text[:100].encode('unicode_escape').decode('ascii')
             else:
-                content = full_text[:_MAX_CONTENT_CHARS]
+                # 先剔后截再交付：C0 只留 \t\n（含 \r 一并剔除），另剔 C1 与替换字符，防低占比残留进 trace
+                content = ''.join(c for c in full_text if c in ('\t', '\n') or not (c == '�' or '\x00' <= c <= '\x1f' or '\x7f' <= c <= '\x9f'))[:_MAX_CONTENT_CHARS]
             diagnostics['truncated'] = diagnostics['extracted_chars'] > _MAX_CONTENT_CHARS
             result = {'url':url,'content':content,'success':verdict != 'reject','diagnostics':diagnostics}
             if verdict == 'suspect':
