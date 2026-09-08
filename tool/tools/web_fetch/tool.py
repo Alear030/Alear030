@@ -7,9 +7,11 @@ from bs4 import BeautifulSoup
 from tool.tool_core import tool,ToolCallResult
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor,as_completed
-from loop import *
 
 tool_desc = '用于批量抓取多个URL的网页内容'
+
+# 失败 content 的统一前缀：web_fetch() 收尾展示失败列表时靠 removeprefix 摘原因，写读两端必须同源
+_FAIL_PREFIX = 'web_fetch 失败: '
 
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
 if tool_prompt_file.exists():
@@ -17,6 +19,49 @@ if tool_prompt_file.exists():
     tool_prompt = tool_prompt_content.strip() if tool_prompt_content else None
 else:
     tool_prompt = None
+
+# 交付前自检阈值——保守起点，防止误杀正常静态页；宁可漏报不误杀
+_MAX_CONTENT_CHARS = 5000
+_MIN_CONTENT_CHARS = 200
+_SHORT_LINE_LEN = 20
+_SHORT_LINE_RATIO_SUSPECT = 0.7
+_REPLACEMENT_RATIO_REJECT = 0.05
+_CONTROL_CHAR_RATIO_REJECT = 0.03
+_CONTROL_CHAR_LOW = '\x80'
+_CONTROL_CHAR_HIGH = '\x9f'
+
+
+def _ratio(count:int, total:int)->float:
+    return count / total if total else 0.0
+
+
+# 质量判定（样板页/JS 渲染页）与编码判定（乱码）共用的交付前自检；返回 (verdict, reason, diagnostics)
+def _assess_content(lines:list[str], full_text:str)->tuple[str,str|None,dict]:
+    total_chars = len(full_text)
+    # 替换字符与控制字符共用一次遍历，避免对未截断的整段正文分别扫两遍
+    replacement_count = 0
+    control_count = 0
+    for c in full_text:
+        if c == '�':
+            replacement_count += 1
+        elif _CONTROL_CHAR_LOW <= c <= _CONTROL_CHAR_HIGH:
+            control_count += 1
+    replacement_ratio = _ratio(replacement_count, total_chars)
+    control_ratio = _ratio(control_count, total_chars)
+    short_line_ratio = _ratio(sum(1 for l in lines if len(l) <= _SHORT_LINE_LEN), len(lines))
+
+    diagnostics = {
+        'extracted_chars': total_chars,
+        'short_line_ratio': round(short_line_ratio, 3),
+        'replacement_char_ratio': round(replacement_ratio, 4),
+        'control_char_ratio': round(control_ratio, 4),
+    }
+    # total_chars 为 0 时 replacement_ratio/control_ratio 已是 0.0，天然落不进这条判据，不用再额外判 total_chars
+    if replacement_ratio > _REPLACEMENT_RATIO_REJECT or control_ratio > _CONTROL_CHAR_RATIO_REJECT:
+        return 'reject','疑似编码解析失败（替换字符/控制字符占比过高）',diagnostics
+    if total_chars < _MIN_CONTENT_CHARS or short_line_ratio > _SHORT_LINE_RATIO_SUSPECT:
+        return 'suspect','疑似 JS 渲染页或样板内容，正文信息量过低',diagnostics
+    return 'ok',None,diagnostics
 
 
 # 单个URL的抓取逻辑，供线程池并行调用
@@ -30,21 +75,37 @@ def _fetch_one(url:str)->dict:
             resp = requests.get(url, headers=headers, timeout=15)
             resp.raise_for_status()
 
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            # 用 resp.content（字节）而非 resp.text，交给 BeautifulSoup 的 UnicodeDammit 做编码探测；
+            # 只有 HTTP 头显式声明了 charset 才作为覆盖优先级传入，避免 requests 对无声明响应默认猜 ISO-8859-1 污染判断
+            content_type = resp.headers.get('Content-Type', '')
+            from_encoding = resp.encoding if 'charset=' in content_type.lower() else None
+            soup = BeautifulSoup(resp.content, 'html.parser', from_encoding=from_encoding)
             # 去掉 script/style
             for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
                 tag.decompose()
 
             text = soup.get_text(separator='\n', strip=True)
-            # 去空行，截断到 5000 字符
+            # 去空行
             lines = [l for l in text.split('\n') if l.strip()]
-            return {'url':url,'content':'\n'.join(lines)[:5000],'success':True}
+            full_text = '\n'.join(lines)
+            verdict,reason,diagnostics = _assess_content(lines, full_text)
+            if verdict == 'reject':
+                # content 只放分类结论：TUI 失败列表靠 removeprefix 摘这段展示给人看，原始片段挪进 diagnostics，只给模型看，不用迁就人类可读的截断长度
+                content = f'{_FAIL_PREFIX}{reason}'
+                diagnostics['raw_snippet'] = full_text[:100]
+            else:
+                content = full_text[:_MAX_CONTENT_CHARS]
+            diagnostics['truncated'] = diagnostics['extracted_chars'] > _MAX_CONTENT_CHARS
+            result = {'url':url,'content':content,'success':verdict != 'reject','diagnostics':diagnostics}
+            if verdict == 'suspect':
+                result['quality_warning'] = reason
+            return result
 
         except Exception as e:
             error = e
             time.sleep(1)
 
-    return {'url':url,'content':f'web_fetch 失败: {error}','success':False}
+    return {'url':url,'content':f'{_FAIL_PREFIX}{error}','success':False}
 
 
 @tool.tool_register(tool_name='web_fetch',tool_desc=tool_desc,tool_prompt=tool_prompt,tool_enabled=True,tool_autho='web_tool')
@@ -100,7 +161,7 @@ def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
                 results.append(thread.result())
             except Exception as e:
                 url = fetch_queue[thread]
-                results.append({'url':url,'content':f'web_fetch 失败: {e}','success':False})
+                results.append({'url':url,'content':f'{_FAIL_PREFIX}{e}','success':False})
 
     # 任一 URL 成功即整体 success，部分失败条目仍回传模型
     success_list = [item for item in results if item.get('success')]
@@ -130,7 +191,7 @@ def web_fetch(urls: list[str], **kwargs)->ToolCallResult:
     fail_items = [item for item in results if not item.get('success')]
     fail_items.sort(key=lambda item: urls.index(item['url']))
     for i,item in enumerate(fail_items):
-        reason = item['content'].removeprefix('web_fetch 失败: ')[:100]
+        reason = item['content'].removeprefix(_FAIL_PREFIX)[:100]
         tcr.tool_call_extra_info.append({
             "id": f"web_fetch_fail_info_{i}",
             "type": "Horizontal",
