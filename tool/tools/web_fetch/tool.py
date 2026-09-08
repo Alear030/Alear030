@@ -25,6 +25,7 @@ _MAX_CONTENT_CHARS = 5000
 _MIN_CONTENT_CHARS = 200
 _SHORT_LINE_LEN = 20
 _SHORT_LINE_RATIO_SUSPECT = 0.7
+_UNIQUE_LINE_RATIO_SUSPECT = 0.5
 _REPLACEMENT_RATIO_REJECT = 0.05
 _CONTROL_CHAR_RATIO_REJECT = 0.03
 _CONTROL_CHAR_LOW = '\x80'
@@ -49,17 +50,21 @@ def _assess_content(lines:list[str], full_text:str)->tuple[str,str|None,dict]:
     replacement_ratio = _ratio(replacement_count, total_chars)
     control_ratio = _ratio(control_count, total_chars)
     short_line_ratio = _ratio(sum(1 for l in lines if len(l) <= _SHORT_LINE_LEN), len(lines))
+    # short_line_ratio 只测行长度，测不出「长行反复出现」这类样板；唯一行占比补上重复度这一维
+    unique_line_ratio = _ratio(len(set(lines)), len(lines))
 
     diagnostics = {
         'extracted_chars': total_chars,
         'short_line_ratio': round(short_line_ratio, 3),
+        'unique_line_ratio': round(unique_line_ratio, 3),
         'replacement_char_ratio': round(replacement_ratio, 4),
         'control_char_ratio': round(control_ratio, 4),
     }
     # total_chars 为 0 时 replacement_ratio/control_ratio 已是 0.0，天然落不进这条判据，不用再额外判 total_chars
     if replacement_ratio > _REPLACEMENT_RATIO_REJECT or control_ratio > _CONTROL_CHAR_RATIO_REJECT:
         return 'reject','疑似编码解析失败（替换字符/控制字符占比过高）',diagnostics
-    if total_chars < _MIN_CONTENT_CHARS or short_line_ratio > _SHORT_LINE_RATIO_SUSPECT:
+    if (total_chars < _MIN_CONTENT_CHARS or short_line_ratio > _SHORT_LINE_RATIO_SUSPECT
+            or (lines and unique_line_ratio < _UNIQUE_LINE_RATIO_SUSPECT)):
         return 'suspect','疑似 JS 渲染页或样板内容，正文信息量过低',diagnostics
     return 'ok',None,diagnostics
 
@@ -92,7 +97,9 @@ def _fetch_one(url:str)->dict:
             if verdict == 'reject':
                 # content 只放分类结论：TUI 失败列表靠 removeprefix 摘这段展示给人看，原始片段挪进 diagnostics，只给模型看，不用迁就人类可读的截断长度
                 content = f'{_FAIL_PREFIX}{reason}'
-                diagnostics['raw_snippet'] = full_text[:100]
+                # unicode_escape 把触发 reject 的替换字符/C1 控制字符转成 \xNN 打印形式，
+                # 避免这些字符原样经 json.dumps(ensure_ascii=False) 落进 trace，重现 issue #141 里那种 trace 幻影损坏
+                diagnostics['raw_snippet'] = full_text[:100].encode('unicode_escape').decode('ascii')
             else:
                 content = full_text[:_MAX_CONTENT_CHARS]
             diagnostics['truncated'] = diagnostics['extracted_chars'] > _MAX_CONTENT_CHARS
