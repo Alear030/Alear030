@@ -22,10 +22,13 @@ else:
 
 #@claude 这里其实后续应该将搜索的节点转移到memory_storage中的slice_node文件中
 
-# 得到全部的session_detail id 为后续得到slices准备，且排除当前session的id
-def _get_session_detail_ids():
-    session_detail_ids = sorted(file.stem for file in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))[:-1]
-    return session_detail_ids
+# 按身份排除当前session；缺身份时按文件名排序排除最后一项，近似兼容无session调用
+def _get_session_detail_ids(current_session_id:str|None):
+    session_detail_ids = sorted(
+        file.stem for file in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json")
+        if file.stem != current_session_id
+    )
+    return session_detail_ids[:-1] if current_session_id is None else session_detail_ids
 
 # 得到一个session detail中的slice,并注入session_id
 def _get_slice(session_file)->list:
@@ -39,8 +42,8 @@ def _get_slice(session_file)->list:
     return session_slice
 
 # 并发得到全部session detail的slice；传入session_ids时收窄到交集,避免全量扫描
-def _get_slices(session_ids:list[str]=None):
-    all_session_ids = _get_session_detail_ids()
+def _get_slices(current_session_id:str|None,session_ids:list[str]=None):
+    all_session_ids = _get_session_detail_ids(current_session_id)
     if session_ids:
         session_ids = [session_id for session_id in session_ids if session_id in all_session_ids]
     else:
@@ -81,6 +84,9 @@ def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:li
     # 执行tool_call_processing
     tool_call_processing(kwargs.get('tcr',None),kwargs.get('emit',None))
 
+    # 有session按真实身份排除；未注入时交给排序fallback
+    session = kwargs.get('session')
+
     # 权重下载/加载未完成或 failed 时立刻 JSON 返回，禁止 encode 卡 120s
     embed_status = get_embedding_status()
     phase = embed_status.get('phase') or 'idle'
@@ -97,7 +103,7 @@ def memory_recall(key_words:list[str],search_target:str,top_k:int,session_ids:li
 
     # 得到slices并对每一个slice的embedding和target_embedding计算余弦相似度；
     # session_ids 非空时收窄扫描范围,为空则维持原有全量扫描行为
-    slices,failed_files = _get_slices(session_ids=session_ids)
+    slices,failed_files = _get_slices(session.session_id if session is not None else None,session_ids=session_ids)
 
     # 历史 slice 可能缺 slice_embedding(早期数据没这个字段)，无向量无法算相似度，跳过而非崩掉
     scored_slices = []

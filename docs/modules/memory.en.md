@@ -375,8 +375,12 @@ The `memory_recall` tool; the main agent calls it actively.
 ### Retrieval source is raw slices, not slice_node
 
 ```python
-def _get_session_detail_ids():
-    return sorted(f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))[:-1]
+def _get_session_detail_ids(current_session_id:str|None):
+    session_detail_ids = sorted(
+        f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json")
+        if f.stem != current_session_id
+    )
+    return session_detail_ids[:-1] if current_session_id is None else session_detail_ids
 ```
 
 It reads `session_slice` from `session/session_detail/*.json`, **not** the pipeline's `slice_node.json`.
@@ -389,7 +393,7 @@ It reads `session_slice` from `session/session_detail/*.json`, **not** the pipel
 
 In practice: recall does not depend on whether the pipeline has run — even with `MEMORY_PIPELINE_ENABLED=False` it still… cannot help — because when the pipeline is off, slicing itself does not run, so there are no slices and no vectors. The two are bound together.
 
-`[:-1]` **excludes the current session** (depends on session_id being a sortable timestamp, newest last). Within-session amnesia after compress is handled by the [in-session compression](#in-session-compression-vs-memory) path.
+**Excluding the current session** uses the injected `session.session_id` when available. Internal calls without an injected session use a compatibility fallback: sort all filenames, exclude the last entry, then intersect with the `session_ids` candidates. This approximation may exclude the wrong session under clock rollback or when a lexicographically larger file exists; it does not guarantee exclusion of the calling session. Within-session amnesia after compress is handled by the [in-session compression](#in-session-compression-vs-memory) path.
 
 ### Retrieval process
 
@@ -464,7 +468,7 @@ Listed honestly; each confirmed against concrete code.
 
 - **No similarity floor.** As the store grows and topics get colder, the "most related" hit may be unrelated in practice
 - **The recall pool includes chitchat slices.** `_get_slice` does not filter `worthy_summary`; slices with `worthy_summary=False` always have empty `summary_detail` and vectors stuck at the "topic+key_words only" first version, diluting recall quality
-- **`[:-1]` excluding the current session depends on sortable filenames.** session_id is a timestamp so it holds, but that is an implicit convention, not an explicit check
+- **The `[:-1]` fallback without a session depends on filename time order.** It excludes the lexicographically last file, which may not be the calling session
 
 **Ingestion**
 

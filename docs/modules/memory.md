@@ -375,8 +375,12 @@ flowchart LR
 ### 检索源是原始 slice，不是 slice_node
 
 ```python
-def _get_session_detail_ids():
-    return sorted(f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json"))[:-1]
+def _get_session_detail_ids(current_session_id:str|None):
+    session_detail_ids = sorted(
+        f.stem for f in Path(SESSION_MEMORTY_DETAIL_PATH).glob("*.json")
+        if f.stem != current_session_id
+    )
+    return session_detail_ids[:-1] if current_session_id is None else session_detail_ids
 ```
 
 读的是 `session/session_detail/*.json` 里的 `session_slice`，**不是** Memory 管线产出的 `slice_node.json`。
@@ -389,7 +393,7 @@ def _get_session_detail_ids():
 
 当前这样做的实际效果是：召回不依赖管线是否跑过，即便 `MEMORY_PIPELINE_ENABLED=False` 也……并不能用——因为管线关闭时切片本身就不跑，没有 slice 也就没有向量。所以两者其实是绑定的。
 
-`[:-1]` **排除当前 session**（依赖 session_id 是可排序的时间戳，最新的排在最后）。当前会话内的失忆问题由[会话内压缩](#会话内压缩与记忆的边界)那条路径解决。
+**排除当前 session** 优先使用注入的 `session.session_id` 与文件名逐一比对。未注入 session 的内部调用采用兼容 fallback：全部文件名排序后排除最后一项，再与 `session_ids` 候选取交集。该近似方式不保证排除调用来源会话，时钟回拨或目录里存在更大字典序文件时可能排错。当前会话内的失忆问题由[会话内压缩](#会话内压缩与记忆的边界)那条路径解决。
 
 ### 检索过程
 
@@ -464,7 +468,7 @@ worker 启动时强制把 `stdin` / `stdout` / `stderr` 三个流都设成 utf-8
 
 - **无相似度下限**。数据库越大、话题越冷门，返回的「最相关」结果实际可能毫不相关
 - **召回池包含闲聊片段**。`_get_slice` 不过滤 `worthy_summary`，而 `worthy_summary=False` 的片其 `summary_detail` 恒为空、向量永远停留在「仅 topic+key_words」的初版，会稀释召回质量
-- **`[:-1]` 排除当前 session 依赖文件名可排序**。session_id 是时间戳所以成立，但这是隐式约定而非显式判断
+- **无 session 时的 `[:-1]` fallback 依赖文件名时间顺序**。它排除字典序最后的文件，不能保证那就是调用来源会话
 
 **入库相关**
 
