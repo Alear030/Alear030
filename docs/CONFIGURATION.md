@@ -48,13 +48,13 @@ LOW_LEVEL_MODEL_NAME=deepseek-v4-flash
 
 | 级别 | 使用者 | 说明 |
 |---|---|---|
-| `medium_level` | main、slice、summary、plan | 主力档，绝大多数调用走这里 |
+| `medium_level` | main、slice、summary | 主力档，绝大多数调用走这里 |
 | `low_level` | memory | 只做 slice 分类这类结构化抽取，便宜的模型够用 |
 | `max_level` | 当前无常驻 Agent 使用 | 保留档位，配置里仍需填写 |
 
 > `max_level` 目前没有常驻 Agent 使用，但 `config.py` 会无条件读取这三组变量，缺失时对应值为 `None`。填上和 medium 相同的值即可。
 
-**模型能力要求**：main / plan 走 function calling，模型必须支持 tools；`loop._chat` 在带 tools 时会固定附加 `thinking: enabled` 的 `extra_body`，不支持该字段的服务商可能需要改 `loop/loop_core.py`。
+**模型能力要求**：main 走 function calling，模型必须支持 tools；`loop._chat` 在带 tools 时会固定附加 `thinking: enabled` 的 `extra_body`，不支持该字段的服务商可能需要改 `loop/loop_core.py`。
 
 ---
 
@@ -130,7 +130,7 @@ GITHUB_MCP_TOKEN=ghp_xxxxxxxxxxxx
 ### 连上之后
 
 - 工具名是 `mcp__{server_key}__{tool_name}`，前缀用配置里的 key 而非 server 自报名，两个 server 自报同名也不会撞
-- 授权走 `mcp_tool` 类别，在 `agents.yaml` 里对 main 和 plan 开启，其余 Agent 关闭
+- 授权走 `mcp_tool` 类别，在 `agents.yaml` 里对 main 开启，其余 Agent 关闭
 - MCP server 在启动时由后台线程逐个连接，**单个 server 失败只记录，不影响主程序启动**
 - 工具表是运行时可变的：server 连上后各 Agent 的 `tool_list` 会被刷新，下一次模型调用即可见
 - **但 system prompt 是启动快照，不会刷新**——MCP 工具只在 function-calling schema 里可见，不会出现在 `tool_prompt` 分块的工具清单里
@@ -195,7 +195,6 @@ memory_configs/
 | `MEMORY_PIPELINE_ENABLED` | `False` | 跨会话记忆管线总闸，见上一节 |
 | `MAX_TOOLCALLS` | 30 | 单轮 ReAct 的最大工具调用次数，超出后强制收尾 |
 | `SUB_MAX_TOOLCALLS` | 15 | 临时 subagent 的上限 |
-| `PLAN_STALL_LIMIT` | 3 | plan 编排无进展熔断：连续这么多轮拿到同一个 step 就退出 |
 | `MAX_SESSION_TOKEN` | 250000 | session 压缩的触发阈值，按模型上下文窗口留安全余量 |
 | `STRUCTURED_API_TIMEOUT` | 60 | slice / summary 这类不带 tools 的结构化直调的超时（秒） |
 | `STRUCTURED_API_RETRIES` | 0 | 同上，重试次数 |
@@ -213,7 +212,6 @@ memory_configs/
 | 常量 | 路径 |
 |---|---|
 | `SESSION_MEMORTY_DETAIL_PATH` | `session/session_detail/` |
-| `SESSION_PLAN_FILE_PATH` | `session/session_plan/` |
 | `MEMORY_STORAGE_PATH` | `memory/memory_storage/memory_storages/` |
 | `MCP_CONFIG_PATH` | `mcp_client/mcp.json` |
 | `LOCAL_EMBEDDING_MODEL` | `local_model/iic/nlp_gte_sentence-embedding_chinese-base` |

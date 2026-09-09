@@ -48,13 +48,13 @@ Which Agent uses which tier is set by `agent_level` in `agent/agents.yaml`:
 
 | Tier | Used by | Notes |
 |---|---|---|
-| `medium_level` | main, slice, summary, plan | Workhorse tier; almost all calls go here |
+| `medium_level` | main, slice, summary | Workhorse tier; almost all calls go here |
 | `low_level` | memory | Only structured extraction such as slice classification; a cheap model is enough |
 | `max_level` | No resident Agent uses it today | Reserved slot; still must be filled in config |
 
 > `max_level` currently has no resident Agent, but `config.py` unconditionally reads all three variable groups; missing ones become `None`. Filling the same values as medium is fine.
 
-**Model capability requirements**: main / plan use function calling, so the model must support tools; when tools are present, `loop._chat` always attaches `thinking: enabled` in `extra_body`. Providers that reject that field may require changes in `loop/loop_core.py`.
+**Model capability requirements**: main uses function calling, so the model must support tools; when tools are present, `loop._chat` always attaches `thinking: enabled` in `extra_body`. Providers that reject that field may require changes in `loop/loop_core.py`.
 
 ---
 
@@ -130,7 +130,7 @@ Placeholders are expanded when connecting. **If a placeholder cannot be resolved
 ### After connecting
 
 - Tool names are `mcp__{server_key}__{tool_name}`, prefixed with the config key rather than the server's self-reported name, so two servers reporting the same name do not collide
-- Authorization uses the `mcp_tool` category, enabled for main and plan in `agents.yaml` and disabled for other Agents
+- Authorization uses the `mcp_tool` category, enabled for main in `agents.yaml` and disabled for other Agents
 - MCP servers are connected one by one on a background thread at startup; **a single server failure is only logged and does not block main program startup**
 - The tool table is runtime-mutable: after a server connects, each Agent's `tool_list` is refreshed and visible on the next model call
 - **But the system prompt is a startup snapshot and is not refreshed** — MCP tools appear only in the function-calling schema, not in the `tool_prompt` block's tool list
@@ -195,7 +195,6 @@ The model loads in a separate worker process and does not block TUI startup.
 | `MEMORY_PIPELINE_ENABLED` | `False` | Master switch for the cross-session memory pipeline; see previous section |
 | `MAX_TOOLCALLS` | 30 | Max tool calls per ReAct round; beyond this, forced final reply |
 | `SUB_MAX_TOOLCALLS` | 15 | Cap for temporary subagents |
-| `PLAN_STALL_LIMIT` | 3 | Plan stall fuse: exit after this many consecutive rounds on the same step |
 | `MAX_SESSION_TOKEN` | 250000 | Session compress trigger threshold; leave headroom for the model context window |
 | `STRUCTURED_API_TIMEOUT` | 60 | Timeout (seconds) for structured direct calls without tools (slice / summary) |
 | `STRUCTURED_API_RETRIES` | 0 | Same path, retry count |
@@ -213,7 +212,6 @@ The model loads in a separate worker process and does not block TUI startup.
 | Constant | Path |
 |---|---|
 | `SESSION_MEMORTY_DETAIL_PATH` | `session/session_detail/` |
-| `SESSION_PLAN_FILE_PATH` | `session/session_plan/` |
 | `MEMORY_STORAGE_PATH` | `memory/memory_storage/memory_storages/` |
 | `MCP_CONFIG_PATH` | `mcp_client/mcp.json` |
 | `LOCAL_EMBEDDING_MODEL` | `local_model/iic/nlp_gte_sentence-embedding_chinese-base` |

@@ -51,21 +51,20 @@ Input.Submitted
       → hooks.trigger('before_loop')    # loop_run 钩子按 target 渲染 attachment
       → run_turn(message, attachment)   # 记一条 input trace，再进 ReAct：模型 → 工具 → 模型 → …
           → _sent_message_api()         # attachment 拼在用户输入之前发出，落盘只写用户原话
-      → PlanRunner.run()                # 仅 plan 模式执行，内部可能再调多次 run_turn
       → attachment_round_finish()       # 仅成功路径：processing → finished
       → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
   → finally 解锁输入
 ```
 
-`run_loop` 是唯一的顶层入口，memory 管线、subagent、plan_design 等内部调用也走它，只是不传 session/hooks，对应分支自然跳过 hook 触发与 session 落盘。`source` 参数记谁把消息送进来（`user` / `memory_pipeline` / `subagent_dispatch` / `plan_design`），与 trace 的 `source` 是同一套词汇。
+`run_loop` 是唯一的顶层入口，memory 管线、subagent 等内部调用也走它，只是不传 session/hooks，对应分支自然跳过 hook 触发与 session 落盘。`source` 参数记谁把消息送进来（`user` / `memory_pipeline` / `subagent_dispatch`），与 trace 的 `source` 是同一套词汇。
 
-`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `run_loop` 的 `finally` 块在整轮返回后**触发一次**。一个用户输入进入 plan 编排时可能包含多个 round，两者不是一一对应。
+`session.round` 在每次带 session 的 `run_turn()` 收尾时增长；`after_loop` 由 `run_loop` 的 `finally` 块在整轮返回后**触发一次**。一个用户输入对应一个 round。
 
-流标识 `stream_key` 形如 `{agent}_{round}_{本轮第几条流}`，一次 API 调用分配一个，TUI 拿它挂 widget、trace 拿它锚定 `assistant_output`。序号在 round 递增的同一时刻归零——唯一性靠中段变化而非计数器一直涨。没有 session 的裸 Loop（memory 管线、subagent、plan_design）没有 round 可用，中段留空、计数器不重置。**已知限制**：计数器是实例级的，同一 session 里两台各自新建的裸 Loop 跑同名 agent（`plan_design` 每次调用即是）会在同一个 trace 文件里发出重复的键；根因是引擎被反复重建而非标识方案，留待 plan 链路收口时一并处理。
+流标识 `stream_key` 形如 `{agent}_{round}_{本轮第几条流}`，一次 API 调用分配一个，TUI 拿它挂 widget、trace 拿它锚定 `assistant_output`。序号在 round 递增的同一时刻归零——唯一性靠中段变化而非计数器一直涨。没有 session 的裸 Loop（memory 管线、subagent）没有 round 可用，中段留空、计数器不重置。**已知限制**：计数器是实例级的，同一 session 里两台各自新建的裸 Loop 跑同名 agent 会在同一个 trace 文件里发出重复的键；根因是引擎被反复重建而非标识方案，留待引擎精炼时一并处理。
 
 attachment 拼在用户输入**之前**而不是之后：前缀缓存的分叉点在新内容第一次出现的位置，用户这轮打的字几乎必然是唯一变化的部分，attachment 排在它后面就落在已经断掉的缓存里，内部再怎么按 order 排都追不回来。
 
-一轮输入的三个真相分开归属，拼接与落盘都收在 `_sent_message_api`：`agent.message_list` 是模型看到的（attachment + 用户原话），`session_detail` 是对话事实（只写用户原话），trace 是发送事实（`source='user'` 那条记原话，`source='attachment'` 那条单独记注入内容，相加即模型看到的全文）。这条分家目前**只覆盖 attachment 这一条注入路径**。`_force_final_reply` 的系统提示与 PlanRunner 的 step prompt 仍旧经同一个 writer 落成 `role='user'`，切片、summary、memory 管线读到它们时还是会当成用户说的话——收口没做完，见 issue。
+一轮输入的三个真相分开归属，拼接与落盘都收在 `_sent_message_api`：`agent.message_list` 是模型看到的（attachment + 用户原话），`session_detail` 是对话事实（只写用户原话），trace 是发送事实（`source='user'` 那条记原话，`source='attachment'` 那条单独记注入内容，相加即模型看到的全文）。这条分家目前**只覆盖 attachment 这一条注入路径**。`_force_final_reply` 的系统提示仍旧经同一个 writer 落成 `role='user'`，切片、summary、memory 管线读到它们时还是会当成用户说的话——收口没做完，见 issue。
 
 推理过程边跑边发流式事件回 TUI：
 
@@ -103,12 +102,11 @@ Alear030/
 ├── .env                        # API key & 三级模型配置（不纳入版本控制）
 │
 ├── loop/                       # ReAct 推理循环
-│   ├── loop_core.py            # Loop 类 —— 纯 ReAct 引擎（main/subagent 共用，对 plan 编排零感知）
-│   └── orchestrator.py         # PlanRunner —— plan 分步编排器，独立于 Loop（含无进展熔断）
+│   └── loop_core.py            # Loop 类 —— 纯 ReAct 引擎（main/subagent 共用）
 │
 ├── agent/                      # Agent 集群
 │   ├── agent_core.py           # Agent 类 + Agents 容器（YAML 驱动）
-│   └── agents.yaml             # 5 个常驻 Agent：main/slice/summary/plan/memory
+│   └── agents.yaml             # 4 个常驻 Agent：main/slice/summary/memory
 │
 ├── prompt/                     # Prompt 分层组合（装饰器 + 目录自动发现注册）
 │   ├── prompt_core.py          # Prompt 类与 prompt 单例：@prompt.register_prompt + build_prompt（order 排序 / condition 过滤 / 只拼 static）
@@ -121,15 +119,13 @@ Alear030/
 │       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（notification，order 30，投 main，当前 enabled=False）
 │       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（notification，order 30，投 main）
 │       ├── memory_prompt/      # 用户画像注入，读 user.json（notification，order 35，投 main）
-│       ├── agent_prompt/       # {agent_name}_agent.md 身份（static，order 40，覆盖 main/slice/summary/plan）
+│       ├── agent_prompt/       # {agent_name}_agent.md 身份（static，order 40，覆盖 main/slice/summary）
 │       └── basic_prompt/       # 当前时间戳（notification，order 50，投 main）
 │
 ├── session/                    # 会话生命周期
 │   ├── session_core.py         # Session 类（持久化 / 切片 / 摘要 / 压缩 / message_list 重建）
 │   ├── attachment_core.py      # 运行时通知/中断的纯内存态实现
-│   ├── session_plan.py         # Plan / Plan_step 类（读取与推进 plan 状态）
-│   ├── session_detail/         # 每个会话的完整 JSON：切片 + 消息流（不纳入版本控制）
-│   └── session_plan/           # plan_design 落盘的计划文件（不纳入版本控制）
+│   └── session_detail/         # 每个会话的完整 JSON：切片 + 消息流（不纳入版本控制）
 │
 ├── hook/                       # 事件驱动 Hook 系统
 │   ├── hook_core.py            # Hooks：注册 / 触发 / match 过滤 / 后台线程池
@@ -163,11 +159,6 @@ Alear030/
 │       ├── web_fetch/          # 网页抓取（线程池并行多 URL）
 │       ├── memory_recall/      # 语义搜索历史会话切片
 │       ├── session_slice/      # 读取特定会话原文
-│       ├── plan_tool/          # plan 集群（内部调用 Loop 跑 plan_agent）
-│       │   ├── plan_design/    # 创建/修改分步计划
-│       │   ├── plan_update/    # 更新指定 step 的状态与结果
-│       │   ├── plan_mode_on/   # 激活 plan 执行模式
-│       │   └── plan_mode_off/  # 结束 plan 执行模式
 │       ├── subagent_tool/
 │       │   └── subagent_create/# 并行创建并运行多个临时 subagent（默认只读授权，可用 tool_autho 覆盖）
 │       ├── skill_tool/         # 技能集群
@@ -219,22 +210,21 @@ Alear030/
 
 ### 1. Multi-Agent 集群，而非单 Agent 函数调用
 
-5 个常驻 Agent 各有独立身份与工具授权，定义在 `agent/agents.yaml`。它们不是 main 的函数——共享记忆空间，独立推理。
+4 个常驻 Agent 各有独立身份与工具授权，定义在 `agent/agents.yaml`。它们不是 main 的函数——共享记忆空间，独立推理。
 
-模型等级分两档：main / slice / summary / plan 用 `medium_level`，memory 用 `low_level`。
+模型等级分两档：main / slice / summary 用 `medium_level`，memory 用 `low_level`。
 
 工具授权分化明显：
 
 | Agent | 授权 |
 |---|---|
 | `main` | 全开 |
-| `plan` | basic / file_read / memory / subagent / web / skill / mcp |
 | `memory` | 仅 memory_tool |
 | `slice`、`summary` | 全关（它们只做结构化抽取，不需要工具） |
 
-授权类别在 yaml 里有 13 个键，但其中 `advance_tool` 与 `config_tool` 目前是**预留位，没有任何工具挂靠**；真正有实体工具的是 10 类，加上运行时注册的 `mcp_tool` 共 11 类。
+授权类别在 yaml 里有 12 个键，但其中 `advance_tool`、`basic_tool` 与 `config_tool` 目前是**预留位，没有任何工具挂靠**；真正有实体工具的是 8 类，加上运行时注册的 `mcp_tool` 共 9 类。
 
-除 5 个常驻 Agent 外，`subagent_create` 可以在运行时按任务临时构造 Subagent（随机唯一名 `subagent_{uuid8}`），并注册进 agents 容器供按名路由。
+除 4 个常驻 Agent 外，`subagent_create` 可以在运行时按任务临时构造 Subagent（随机唯一名 `subagent_{uuid8}`），并注册进 agents 容器供按名路由。
 
 ### 2. 会话切片 + 嵌入召回，而非 RAG
 
@@ -350,6 +340,6 @@ after_session / final_memory_pipeline（后台）
 
 以下目录都是真实运行数据，不是可随意重建的临时文件（均已 gitignore）：
 
-- `session/session_detail/`、`session/session_plan/`
+- `session/session_detail/`、`session/session_plan/`（后者是 plan 模式下线前留下的历史数据，已无代码读写）
 - `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`
 - `local_model/` 下的模型权重

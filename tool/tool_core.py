@@ -100,10 +100,10 @@ class Tool:
     
     # verbose 单独接收，不并入 extra：extra 会原样透传进 tool_func(**tool_args,**extra)，
     # 混进去会污染工具实际收到的参数
-    # 工具调用唯一入口：mode 旁路→参数解析/校验→pre_toolUse hooks→执行→异常兜底，统一返回 ToolCallResult
+    # 工具调用唯一入口：参数解析/校验→pre_toolUse hooks→执行→异常兜底，统一返回 ToolCallResult
     # 生命周期触发：processing 跑工具前发、error 兜底路径发、success 由工具自己经 emit 发
     # runtime 是 loop 传入的运行时对象（session/agents/hooks/memory/Loop），只供 hook 触发，不落进工具参数
-    def match_tool(self,tool_call,mode_switched:bool=False,verbose:bool=True,runtime:dict=None,emit=None,**extra)->ToolCallResult:
+    def match_tool(self,tool_call,verbose:bool=True,runtime:dict=None,emit=None,**extra)->ToolCallResult:
         tool_name = tool_call.function.name
         tool_call_id = tool_call.id
 
@@ -112,10 +112,6 @@ class Tool:
             tool_call_id=tool_call_id,
             tool_call_name=tool_name
         )
-
-        # mode 已切换后剩余并行调用不再执行，但 openai 要求每个 tool_call_id 都有 tool 回复
-        if mode_switched:
-            return self._error_result(tcr,'plan_mode_switched','plan 模式已在本轮切换，系统跳过本轮其余工具调用',emit)
 
         # 工具没注册过：不给模型空转的机会，直接回一句"不存在"
         if tool_name not in self.tool_list:

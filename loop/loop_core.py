@@ -4,8 +4,6 @@ from time import perf_counter
 
 from openai.types.chat import ChatCompletionMessage
 
-from .orchestrator import PlanRunner
-
 from eval import Trace
 from log import Log
 
@@ -15,7 +13,7 @@ class LoopAPIError(Exception):
     pass
 
 
-# 纯 ReAct 推理引擎：main agent 与 subagent 共用，对 plan 编排零感知
+# 纯 ReAct 推理引擎：main agent 与 subagent 共用
 class Loop:
 
     def __init__(self,agents=None,session=None,hooks=None,verbose:bool=True,memory=None,emit=None):
@@ -185,7 +183,7 @@ class Loop:
     # 发送消息：拼 user 消息→调 LLM→写回 message_list→按需写 session
     # attachment 只拼进 message_list 不落盘、不还原：改发出去的历史字节会破坏 provider 的 prompt cache 前缀
     # 落盘只写用户原话，session_detail 答「对话里发生了什么」；实际发出去什么归 trace
-    # 只覆盖 attachment：_force_final_reply 与 PlanRunner 的 step prompt 仍落成 role='user'，收口未完
+    # 只覆盖 attachment：_force_final_reply 的收尾提示仍落成 role='user'，收口未完
     def _sent_message_api(self,agent,stream_key:str,message_content:str=None,attachment_content:str=None)->ChatCompletionMessage:
 
         if message_content:
@@ -217,11 +215,9 @@ class Loop:
         return agent_rq
 
 
-    # 处理一批 tool_calls：match_tool→分发；返回本批是否发生 mode 切换
-    # 不信任提示词自觉性，靠 diff session.mode 判断 plan_mode_on/off 是否真的生效
-    # 工具调用全生命周期（processing/error/success 触发）收口在 match_tool，这里只做 mode diff 与结果分发
-    def _tool_calls_api(self,agent,tool_calls)->bool:
-        mode_switched = False
+    # 处理一批 tool_calls：match_tool→分发
+    # 工具调用全生命周期（processing/error/success 触发）收口在 match_tool，这里只做结果分发
+    def _tool_calls_api(self,agent,tool_calls):
 
         # emit 包装提前抽取，两阶段复用；事件名默认 AssistantToolCallUpdate，工具可覆盖
         def _emit_wrapper(content,event="AssistantToolCallUpdate"):
@@ -239,17 +235,13 @@ class Loop:
                 emit_wrapper(content=wait_tcr)
         
         for func in tool_calls:
-            # 调用前记 mode，回来 diff 是否真的切换（不信任提示词自觉性）
-            mode_before = self.session.mode if self.session else None
             # 耗时从外面量：match_tool 永不抛异常,成败全收敛进 tcr,出参就够观测,不必让 trace 渗进工具层
             tool_call_start = perf_counter()
-            # match_tool 接管 mode 旁路、参数解析/校验、hooks、执行、异常、生命周期 emit
-            tcr = agent.match_tool(func,verbose=self.verbose,mode_switched=mode_switched,
+            # match_tool 接管参数解析/校验、hooks、执行、异常、生命周期 emit
+            tcr = agent.match_tool(func,verbose=self.verbose,
                                    runtime={'session':self.session,'agents':self.agents,'hooks':self.hooks,'memory':self.memory,'Loop':Loop},
                                    emit=emit_wrapper)
             tool_call_duration = perf_counter() - tool_call_start
-            if self.session and self.session.mode != mode_before:
-                mode_switched = True
 
             # args/return 存原样不 parse：invalid_tool_arguments 那条路径上参数本就不是合法 JSON,
             # 解析一道要么让 trace 自己成崩溃点,要么把畸形证据抹掉
@@ -277,7 +269,6 @@ class Loop:
             agent.message_list.append(tcr.tool_call_result)
             if self.session:
                 self.session.session_message_insert(role='tool_result',content=json.dumps(tcr.tool_call_result,ensure_ascii=False))
-        return mode_switched
 
 
     # 强制收尾：不传 tools，模型物理上拿不到工具，只能吐文本；可选先弹出末尾 tool_calls
@@ -342,20 +333,12 @@ class Loop:
 
             tool_call += 1
 
-            # 执行工具调用 + 通过 diff session.mode 检测模式是否真的切换（不信任提示词自觉性）
-            mode_switched = self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
-
-            # plan_mode_on/off 生效后代码层强制结束本轮，不再给模型可调工具的机会
-            # _close_round 挪到强制收尾之后：收尾那次调用仍属于本轮，先关轮会让它的 loop_round 与 stream_key 落到下一轮去
-            if mode_switched:
-                final_content = self._force_final_reply(agent=agent,stream_key=self._next_stream_key(agent),
-                                                        notice='系统提示：plan 模式已切换，本轮对话到此结束，请直接回复，不要调用任何工具')
-                self._close_round()
-                return final_content
+            self._tool_calls_api(agent=agent,tool_calls=agent_rq.tool_calls)
 
             agent_rq = self._sent_message_api(agent=agent,stream_key=self._next_stream_key(agent))
 
         # 达到工具调用上限，强制无 tools 收尾
+        # _close_round 排在强制收尾之后：收尾那次调用仍属于本轮，先关轮会让它的 loop_round 与 stream_key 落到下一轮去
         if self.emit:
             self.emit(event='SystemError',content={'message':'已达到工具调用次数上限'},agent_name=agent.agent_name)
         final_content = self._force_final_reply(agent=agent,stream_key=self._next_stream_key(agent),
@@ -365,12 +348,12 @@ class Loop:
 
 
     # 顶层入口：一次外部输入的完整轮次，hook 边界收在这里；内部通过 run_turn 跑一次 agent 会话
-    # memory 管线/subagent/plan_design 等内部调用也统一走这里，只是不传 session/hooks——
+    # memory 管线/subagent 等内部调用也统一走这里，只是不传 session/hooks——
     # 对应的判空分支会自然跳过 hook 触发与 session 落盘，等价于以前单独的 loop_run
     # source 记谁把消息送进来的（user/attachment/各agent名），与 trace 的 source 同一套词汇，A2A 时原样可用
     # try/finally：异常路径也跑 after_loop。工具内部异常已被 match_tool 收口成 _error_result、
-    # 模型 API 异常已被 run_loop 的 LoopAPIError 分支吃掉，真正能穿透到这里的是
-    # Plan.advance() 的 ValueError（此时本轮消息完整，该跑）与 session 落盘失败（此时磁盘已不可信，跳过也挽回不了）
+    # 模型 API 异常已被下面的 LoopAPIError 分支吃掉，剩下能穿透到这里的主要是
+    # session 落盘失败（此时磁盘已不可信，跳过 after_loop 也挽回不了）
     def run_loop(self,source:str,message:str=None,agent_name:str=None,agent=None):
         agent = agent if agent else self._get_agent(agent_name=agent_name)
         if not agent:
@@ -399,11 +382,6 @@ class Loop:
                 self.emit(event='LoopStart',agent_name=agent.agent_name)
 
             result = self.run_turn(agent=agent,message=message,attachment_content=attachment_text,source=source)
-
-            # plan 模式则进入分步编排，是否真跑由 PlanRunner 内部判断；after_loop 之前完成以保原切片时机
-            plan_result = PlanRunner(loop=self,session=self.session).run(agent=agent)
-            if plan_result is not None:
-                result = plan_result
 
             if self.session:
                 self.session.attachment.attachment_round_finish()

@@ -56,8 +56,8 @@ Alear030 不是一个「Python Agent 框架」，是一套完整的 Agent 基础
 
 ## 特性
 
-- **纯 ReAct 引擎** —— `Loop` 对 plan 编排零感知，main 与运行时临时 subagent 共用同一份实现
-- **Multi-Agent 集群** —— 5 个常驻 Agent，身份、模型等级与工具授权由 YAML 驱动；可在运行时按任务临时构造 subagent
+- **纯 ReAct 引擎** —— `Loop` 只跑 ReAct，main 与运行时临时 subagent 共用同一份实现
+- **Multi-Agent 集群** —— 4 个常驻 Agent，身份、模型等级与工具授权由 YAML 驱动；可在运行时按任务临时构造 subagent
 - **会话切片 + 本地嵌入召回** —— LLM 切话题边界，本地中文 GTE 算向量，不依赖任何外部向量库
 - **跨会话记忆** —— 后台管线做切片分类、去重、用户画像提炼与跨会话时间线
 - **事件驱动 Hook** —— 5 个事件点，同步/后台两种模式，新增 Hook 只需在对应目录建一个 `hook.py`
@@ -78,7 +78,7 @@ pip install -e .   # 直接依赖已钉死，但无锁文件，传递依赖可�
 cp .env.example .env
 # 编辑 .env —— 只需填 MAX / MEDIUM / LOW_LEVEL 三级模型配置
 # 三级可以指向同一服务商，仅 model_name 不同
-# 模型必须支持 function calling（tools），否则 main 与 plan 跑不起来
+# 模型必须支持 function calling（tools），否则 main 跑不起来
 
 python main.py
 ```
@@ -97,8 +97,7 @@ python main.py
 flowchart TB
     U([用户输入]) --> TUI[TUI channel]
     TUI --> LOOP{{ReAct Loop}}
-    LOOP <--> AG[Agent 集群<br/>main · plan · slice · summary · memory]
-    LOOP --> PR[PlanRunner<br/>plan 模式分步编排]
+    LOOP <--> AG[Agent 集群<br/>main · slice · summary · memory]
     LOOP --> TL[工具编排]
     TL -. pre_toolUse .-> INJ[注入运行时对象]
     TL --> MCP[MCP 远端工具]
@@ -159,7 +158,7 @@ flowchart LR
 
 ### 1. Multi-Agent 集群，而非单 Agent 函数调用
 
-5 个常驻 Agent 各有独立身份与工具授权，定义在 `agent/agents.yaml`。它们不是 main 的函数——共享记忆空间，独立推理。main 全开，plan 拿到 basic/file_read/memory/subagent/web/skill/mcp，memory 只开 memory_tool，slice 与 summary 全关。
+4 个常驻 Agent 各有独立身份与工具授权，定义在 `agent/agents.yaml`。它们不是 main 的函数——共享记忆空间，独立推理。main 全开，memory 只开 memory_tool，slice 与 summary 全关。
 
 ### 2. 会话切片 + 嵌入召回，而非 RAG
 

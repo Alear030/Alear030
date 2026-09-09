@@ -19,7 +19,6 @@ from config import (
     SLICE_TOOL_RESULT_MAX_CHARS,
 )
 from local_model import _get_embedding_model,embedding_to_b64
-from .session_plan import Plan
 from .attachment_core import Attachment
 
 
@@ -120,7 +119,6 @@ class Session:
         # session class 基础信息
         self.session_id = self._generate_session_id()
         self.round = 1
-        self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
         self.max_tokens = MAX_SESSION_TOKEN
         self.system_prompt = system_prompt # 这个地方应该持有agent的system_pompt吗？？！？！？！？@claude 这里后续记得告诉我挪出去
         self.session_path = self._generate_session_json()
@@ -131,12 +129,6 @@ class Session:
 
         # session 读写锁
         self.json_lock = threading.Lock()
-
-        # session 状态控制
-        self.mode = 'auto'#后续需要和tool get相关 plan mode 需要禁止一切的写操作
-        
-        # session_plan 类
-        self.plan:Plan = None
 
         # attachment：当前 session 内、仅供 main agent 本轮消费的运行时提示；纯内存态，不持久化
         self.attachment = Attachment()
@@ -506,11 +498,4 @@ class Session:
                 })
 
         self._json_update(updater=do_insert)
-
-
-# plan 函数方法集群
-    # 初始化session中的plan类，并将当前session进入plan模式用于后续loop使用
-    def _plan_init(self,plan_file):
-        self.plan = Plan(plan_file=plan_file)
-        self.mode = 'plan'
 
