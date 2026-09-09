@@ -62,7 +62,7 @@ Only documents with actual content are listed below; modules that don't have a w
 ## Design narratives
 
 - [Memory ideas & design](design/memory.en.md) — why the memory system ended up shaped this way
-- [Loop ideas & trade-offs](design/loop.md) — *Chinese only* · why Loop knows nothing about plan, plus four decisions: forced wrap-up by withholding tools, mode detection by diff, one error boundary, streaming accumulation
+- [Loop ideas & trade-offs](design/loop.md) — *Chinese only* · where the engine's boundary is drawn, forced wrap-up by withholding tools, one error boundary, streaming accumulation, and why plan orchestration was retired outright
 
 ## Research
 
@@ -76,4 +76,5 @@ Research threads are tracked on GitHub under the [`research` label](https://gith
 
 ## Retrospectives
 
+- [Retiring plan mode](retrospective/plan-mode-retirement.md) — *2026-09-09, Chinese only* · a subtraction: what got overturned was not plan's implementation but its premise. The order "establish a regression baseline first" was withdrawn mid-way and "extract" was replaced by "retire"; cleaning up the prompts turned out lighter than expected while one skill file turned out heavier; in the end a mechanical count check caught seven drifted numbers that reading the docs had missed
 - [From eval to architecture](retrospective/eval-to-architecture.md) — *2026-08-25 ~ 2026-09-06, Chinese only* · it began as wanting eval, which meant building trace first. The first real data trace produced exposed the prompt-cache problem, and fixing that required moving where prompts belong — from there it stopped being "fix one metric" and became a second look at module boundaries, construction order and cross-cutting concerns

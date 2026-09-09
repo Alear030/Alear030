@@ -11,7 +11,7 @@ PROMPT_DIR = Path(__file__).parent
 
 # 技能使用原则 + 全部已注册技能的名称和描述
 # 进程启动时快照一次,放 system prompt 会把它之后的工具 schema 一起顶出缓存,故走 attachment
-# target 只写 main:投递管线只有主 Loop 挂着,plan 跑在无 hooks 的 Loop 上收不到
+# target 只写 main:投递管线只有主 Loop 挂着,裸 Loop(memory 管线/subagent)不带 hooks 收不到
 @prompt.register_prompt(prompt_name='skill_prompt',order=20,type="notification",target=['main'])
 def build()->str:
     skill_prompt = ''

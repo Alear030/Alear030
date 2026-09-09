@@ -13,9 +13,6 @@ WORK_SPACE = Path(__file__).parent/'workspace'
 MAX_TOOLCALLS = int(30)
 SUB_MAX_TOOLCALLS = int(15)
 
-# plan 编排无进展熔断:连续这么多轮拿到同一 step(没推进)就退出
-PLAN_STALL_LIMIT = int(3)
-
 # agent_model config
 MODEL_LEVEL = {
     "max_level":{
@@ -40,8 +37,6 @@ MODEL_LEVEL = {
 
 # session 对话详情文件夹路径
 SESSION_MEMORTY_DETAIL_PATH = Path(__file__).parent/'session/session_detail'
-# session plan文件夹路径
-SESSION_PLAN_FILE_PATH = Path(__file__).parent/'session/session_plan'
 # slice/summary 这类结构化抽取直调的调用边界:
 # 实测同一份 4.2k tokens 的切片请求,开着 thinking 时挂 61s 后被网关掐断
 # (Server disconnected without sending a response),关掉后 6.5s 正常返回。

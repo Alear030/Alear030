@@ -79,7 +79,7 @@ Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型�
 - 模糊提问是合法且鼓励的；开放问题用于共创，不要求用户先给出成型需求
 - 制度性的关系定义与流程约定写进本文件；个别的行为校准与临时偏好写进用户 memory
 
-**三套 Agent 概念不能混用**：`agent/agents.yaml` 里进程内的 5 个常驻 Agent（main/slice/summary/plan/memory）；`subagent_create` 运行时临时构造、随机唯一名 `subagent_{uuid8}` 的 Subagent；`alear-executor` 是 Claude Code 层面的执行子代理，**仅当前会话实际提供该类型时可用，不得自动委派**——节奏是 Opus 规划拍板 → 推荐派发 → 用户拍板 → Sonnet 执行，派发指令必须自包含。
+**三套 Agent 概念不能混用**：`agent/agents.yaml` 里进程内的 4 个常驻 Agent（main/slice/summary/memory）；`subagent_create` 运行时临时构造、随机唯一名 `subagent_{uuid8}` 的 Subagent；`alear-executor` 是 Claude Code 层面的执行子代理，**仅当前会话实际提供该类型时可用，不得自动委派**——节奏是 Opus 规划拍板 → 推荐派发 → 用户拍板 → Sonnet 执行，派发指令必须自包含。
 
 **代码里的 `@claude` 标记**：`@claude` 是给 Claude 的任务；完成后原行改写成 `# done(@claude): <做了什么>`，保留痕迹且不再被扫到；`# @claude(ignore)` 是用户自己的备注，**不要修改**。仓库没有自动扫描机制，用 `alear030-scan-claude-markers` 触发，别自己 grep。
 

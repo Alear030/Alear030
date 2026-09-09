@@ -13,7 +13,6 @@ agents:
       command_tool: true
       config_tool: true
       memory_tool: true
-      plan_tool: true
       subagent_tool: true
       web_tool: true
       skill_tool: true
@@ -36,7 +35,6 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: false
-      plan_tool: false
       subagent_tool: false
       web_tool: false
       skill_tool: false
@@ -58,7 +56,6 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: false
-      plan_tool: false
       subagent_tool: false
       web_tool: false
       skill_tool: false
@@ -67,28 +64,6 @@ agents:
     agent_priority: 1
     agent_switch: true
     agent_desc: "身份 总结agent 负责 对已确定的slice进行summary总结"
-
-  # plan agent 身份 计划agent 负责 对任务目标制定计划
-  - agent_id: 004
-    agent_name: plan
-    agent_mode: auto
-    agent_tool_autho:
-      basic_tool: true
-      advance_tool: false
-      file_read_tool: true
-      file_write_tool: false
-      command_tool: false
-      config_tool: false
-      memory_tool: true
-      plan_tool: false
-      subagent_tool: true
-      web_tool: true
-      skill_tool: true
-      mcp_tool: true
-    agent_level: medium_level
-    agent_priority: 1
-    agent_switch: true
-    agent_desc: "身份 计划agent 负责 对任务目标制定计划"
 
   # memory_type agent 身份 slice分类agent 负责 对slice进行分类
   - agent_id: 005
@@ -102,7 +77,6 @@ agents:
       command_tool: false
       config_tool: false
       memory_tool: true
-      plan_tool: false
       subagent_tool: false
       web_tool: false
       skill_tool: false

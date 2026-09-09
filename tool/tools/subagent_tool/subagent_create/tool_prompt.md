@@ -22,7 +22,7 @@
     - `file_write_tool`：写入/编辑本地文件，有副作用
     - `command_tool`：执行本地 shell 命令，有副作用且风险最高
     - `skill_tool`：查询与加载已有技能
-    传入前先确认任务确实需要这些权限，不要无差别授予高权限类别。`plan_tool`（计划编排）、`subagent_tool`（创建下一层 subagent）、`interaction_tool`（向真实用户提问，subagent 在后台线程执行会因等待终端输入而卡死）都不属于"独立执行一条任务"的职责范围，不要授予 subagent
+    传入前先确认任务确实需要这些权限，不要无差别授予高权限类别。`subagent_tool`（创建下一层 subagent）、`interaction_tool`（向真实用户提问，subagent 在后台线程执行会因等待终端输入而卡死）都不属于"独立执行一条任务"的职责范围，不要授予 subagent
 - max_subagent (不需要传入，默认 5): len(subagent_files)超出max_subagent数量上限，会报错拒绝执行
 
 ### 上下文隔离:

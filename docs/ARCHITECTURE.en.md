@@ -51,21 +51,20 @@ Input.Submitted
       → hooks.trigger('before_loop')    # the loop_run hook renders attachments for the target agent
       → run_turn(message, attachment)   # records one input trace, then ReAct: model → tools → model → …
           → _sent_message_api()         # attachments go ahead of the user's text on the wire; only the raw words are persisted
-      → PlanRunner.run()                # plan mode only; may call run_turn multiple times inside
       → attachment_round_finish()       # success path only: processing → finished
       → finally: attachment_recycle() → hooks.trigger('after_loop') → emit LoopEnd
   → finally unlock input
 ```
 
-`run_loop` is the single top-level entry. Internal callers — the memory pipeline, subagents, `plan_design` — go through it too, simply without passing session/hooks, so the corresponding branches skip hook triggering and session persistence. The `source` argument records who sent the message in (`user` / `memory_pipeline` / `subagent_dispatch` / `plan_design`) and shares one vocabulary with trace's `source`.
+`run_loop` is the single top-level entry. Internal callers — the memory pipeline and subagents — go through it too, simply without passing session/hooks, so the corresponding branches skip hook triggering and session persistence. The `source` argument records who sent the message in (`user` / `memory_pipeline` / `subagent_dispatch`) and shares one vocabulary with trace's `source`.
 
-`session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `run_loop` after the round returns. When a user input enters plan orchestration it may contain multiple rounds — the two are not one-to-one.
+`session.round` increments at the end of every `run_turn()` that has a session; `after_loop` is triggered **once** by the `finally` block of `run_loop` after the round returns. One user input corresponds to one round.
 
-The stream identifier `stream_key` is shaped `{agent}_{round}_{nth stream this round}`, allocated once per API call; the TUI mounts widgets by it and trace anchors `assistant_output` on it. The sequence resets at the same moment `round` advances — uniqueness comes from the middle segment changing rather than from a counter that only grows. A bare `Loop` with no session (memory pipeline, subagent, plan_design) has no round to use, so the middle segment stays empty and the counter never resets. **Known limitation**: that counter is per-instance, so two separately constructed bare Loops running the same-named agent within one session (which is what every `plan_design` call does) emit duplicate keys into the same trace file; the root cause is the engine being rebuilt per call rather than the key scheme, and it is left to the plan-path consolidation.
+The stream identifier `stream_key` is shaped `{agent}_{round}_{nth stream this round}`, allocated once per API call; the TUI mounts widgets by it and trace anchors `assistant_output` on it. The sequence resets at the same moment `round` advances — uniqueness comes from the middle segment changing rather than from a counter that only grows. A bare `Loop` with no session (memory pipeline, subagent) has no round to use, so the middle segment stays empty and the counter never resets. **Known limitation**: that counter is per-instance, so two separately constructed bare Loops running the same-named agent within one session emit duplicate keys into the same trace file; the root cause is the engine being rebuilt per call rather than the key scheme, and it is left to the engine-refinement pass.
 
 Attachments are placed **before** the user's own text, not after. The cache fork point is wherever new content first appears, and what the user just typed is almost always the one thing that changed; an attachment placed after it sits inside the already-broken cache, and no amount of internal ordering can recover that.
 
-The three truths about one round of input are kept apart, with both concatenation and persistence collapsed into `_sent_message_api`: `agent.message_list` is what the model saw (attachment + the user's raw words), `session_detail` is the conversational fact (raw words only), and trace is the wire fact (the `source='user'` line holds the raw words, the `source='attachment'` line holds the injected content, and the two together reconstruct what the model saw). This separation currently covers **only the attachment injection path**. The system notices written by `_force_final_reply` and the step prompts issued by `PlanRunner` still go through the same writer and land as `role='user'`, so slicing, summary and the memory pipeline still read those as things the user said. The collapse is unfinished — see the tracking issue.
+The three truths about one round of input are kept apart, with both concatenation and persistence collapsed into `_sent_message_api`: `agent.message_list` is what the model saw (attachment + the user's raw words), `session_detail` is the conversational fact (raw words only), and trace is the wire fact (the `source='user'` line holds the raw words, the `source='attachment'` line holds the injected content, and the two together reconstruct what the model saw). This separation currently covers **only the attachment injection path**. The system notices written by `_force_final_reply` still go through the same writer and land as `role='user'`, so slicing, summary and the memory pipeline still read those as things the user said. The collapse is unfinished — see the tracking issue.
 
 While reasoning runs, streaming events are emitted back to the TUI:
 
@@ -103,12 +102,11 @@ Alear030/
 ├── .env                        # API key & three-tier model config (not version-controlled)
 │
 ├── loop/                       # ReAct reasoning loop
-│   ├── loop_core.py            # Loop class — pure ReAct engine (shared by main/subagent; zero awareness of plan orchestration)
-│   └── orchestrator.py         # PlanRunner — stepwise plan orchestrator, independent of Loop (includes stall circuit-breaker)
+│   └── loop_core.py            # Loop class — pure ReAct engine (shared by main/subagent)
 │
 ├── agent/                      # Agent cluster
 │   ├── agent_core.py           # Agent class + Agents container (YAML-driven)
-│   └── agents.yaml             # 5 resident Agents: main/slice/summary/plan/memory
+│   └── agents.yaml             # 4 resident Agents: main/slice/summary/memory
 │
 ├── prompt/                     # layered Prompt composition (decorator + directory auto-discovery registration)
 │   ├── prompt_core.py          # Prompt class and the prompt singleton: @prompt.register_prompt + build_prompt (order sort / condition filter / static only)
@@ -121,15 +119,13 @@ Alear030/
 │       ├── session_recent/     # slice summaries of last 3 sessions (notification, order 30, to main, currently enabled=False)
 │       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (notification, order 30, to main)
 │       ├── memory_prompt/      # user-profile injection; reads user.json (notification, order 35, to main)
-│       ├── agent_prompt/       # {agent_name}_agent.md identity (static, order 40, covers main/slice/summary/plan)
+│       ├── agent_prompt/       # {agent_name}_agent.md identity (static, order 40, covers main/slice/summary)
 │       └── basic_prompt/       # current timestamp (notification, order 50, to main)
 │
 ├── session/                    # session lifecycle
 │   ├── session_core.py         # Session class (persist / slice / summary / compress / rebuild message_list)
 │   ├── attachment_core.py      # pure in-memory runtime notice/interrupt implementation
-│   ├── session_plan.py         # Plan / Plan_step classes (read and advance plan state)
-│   ├── session_detail/         # full JSON per session: slices + message stream (not version-controlled)
-│   └── session_plan/           # plan files written by plan_design (not version-controlled)
+│   └── session_detail/         # full JSON per session: slices + message stream (not version-controlled)
 │
 ├── hook/                       # event-driven Hook system
 │   ├── hook_core.py            # Hooks: register / trigger / match filter / background thread pool
@@ -163,11 +159,6 @@ Alear030/
 │       ├── web_fetch/          # web fetch (thread-pool parallel multi-URL)
 │       ├── memory_recall/      # semantic search over historical session slices
 │       ├── session_slice/      # read a specific session raw text
-│       ├── plan_tool/          # plan cluster (internally calls Loop to run plan_agent)
-│       │   ├── plan_design/    # create/modify stepwise plan
-│       │   ├── plan_update/    # update status and result of a given step
-│       │   ├── plan_mode_on/   # activate plan execution mode
-│       │   └── plan_mode_off/  # end plan execution mode
 │       ├── subagent_tool/
 │       │   └── subagent_create/# create and run multiple temporary subagents in parallel (default read-only auth; overridable via tool_autho)
 │       ├── skill_tool/         # skill cluster
@@ -219,22 +210,21 @@ Alear030/
 
 ### 1. Multi-Agent cluster, not a single-Agent function call
 
-Five resident Agents each have their own identity and tool authorization, defined in `agent/agents.yaml`. They are not functions of main — they share a memory space and reason independently.
+Four resident Agents each have their own identity and tool authorization, defined in `agent/agents.yaml`. They are not functions of main — they share a memory space and reason independently.
 
-Model levels split into two tiers: main / slice / summary / plan use `medium_level`; memory uses `low_level`.
+Model levels split into two tiers: main / slice / summary use `medium_level`; memory uses `low_level`.
 
 Tool authorization is clearly differentiated:
 
 | Agent | Authorization |
 |---|---|
 | `main` | All on |
-| `plan` | basic / file_read / memory / subagent / web / skill / mcp |
 | `memory` | memory_tool only |
 | `slice`, `summary` | All off (they only do structured extraction and need no tools) |
 
-The yaml has 13 authorization-category keys, but `advance_tool` and `config_tool` are currently **placeholders with no tools attached**; 10 categories actually have concrete tools, plus runtime-registered `mcp_tool` for 11 in total.
+The yaml has 12 authorization-category keys, but `advance_tool`, `basic_tool` and `config_tool` are currently **placeholders with no tools attached**; 8 categories actually have concrete tools, plus runtime-registered `mcp_tool` for 9 in total.
 
-Besides the five resident Agents, `subagent_create` can construct temporary Subagents at runtime per task (random unique name `subagent_{uuid8}`) and register them into the agents container for name-based routing.
+Besides the four resident Agents, `subagent_create` can construct temporary Subagents at runtime per task (random unique name `subagent_{uuid8}`) and register them into the agents container for name-based routing.
 
 ### 2. Session slicing + embedding recall, not RAG
 
@@ -350,6 +340,6 @@ after_session / final_memory_pipeline (background)
 
 The following directories are real runtime data, not disposable temporary files (all gitignored):
 
-- `session/session_detail/`, `session/session_plan/`
+- `session/session_detail/`, `session/session_plan/` (the latter is historical data left from before plan mode was retired; no code reads or writes it now)
 - `memory/memory_storage/memory_storages/`, `memory/memory_log/memory_logs/`
 - Model weights under `local_model/`

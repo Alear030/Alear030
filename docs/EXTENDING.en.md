@@ -104,7 +104,7 @@ if session is None:
     return '错误:该工具需要 session,但未被注入'
 ```
 
-**4. `tool_autho` decides who can use it.** The value must be an authorization category already in `agents.yaml` (`basic_tool` / `file_read_tool` / `file_write_tool` / `command_tool` / `memory_tool` / `plan_tool` / `subagent_tool` / `web_tool` / `skill_tool` / `interaction_tool` / `mcp_tool`). To open a new category, also add the key for the relevant Agents in `agents.yaml` — **writing only the tool without changing yaml makes the tool invisible to every Agent**.
+**4. `tool_autho` decides who can use it.** The value must be an authorization category already in `agents.yaml` (`basic_tool` / `file_read_tool` / `file_write_tool` / `command_tool` / `memory_tool` / `subagent_tool` / `web_tool` / `skill_tool` / `interaction_tool` / `mcp_tool`). To open a new category, also add the key for the relevant Agents in `agents.yaml` — **writing only the tool without changing yaml makes the tool invisible to every Agent**.
 
 **5. Outputs need a cap.** Tool results go into the session as a whole; unbounded output can blow a model request in one shot. Follow existing tools: `file_read` has line / per-line / total-character triple caps and reuses the `offset` continue-read protocol; `command` has head-and-tail truncation with `MAX_OUTPUT_CHARS`. When truncating, **always explain in the text how to get the rest**, or the model will retry in place.
 
@@ -229,7 +229,7 @@ agent_prompt      40   static
 basic_prompt      50   notification → main
 ```
 
-`target` may only name agents that **actually carry an attachment delivery pipeline**. The pipeline's two ends are `before_session/game_begin` and `before_loop/loop_run`, and only a Loop constructed with both `hooks` and `session` reaches them — today that is the main Loop alone. The memory pipeline, subagents and `plan_design` all run on bare Loops they build themselves, so an attachment addressed to them stays `waiting` forever, walked every round and never delivered. The `['all']` sentinel expands to every registered agent, so no block should use it right now.
+`target` may only name agents that **actually carry an attachment delivery pipeline**. The pipeline's two ends are `before_session/game_begin` and `before_loop/loop_run`, and only a Loop constructed with both `hooks` and `session` reaches them — today that is the main Loop alone. The memory pipeline and subagents both run on bare Loops they build themselves, so an attachment addressed to them stays `waiting` forever, walked every round and never delivered. The `['all']` sentinel expands to every registered agent, so no block should use it right now.
 
 Both kinds share one order axis: it sequences `static` blocks within the system prompt and `notification` blocks within attachment delivery. Both run stable-to-volatile — the later a block sits, the later the cache breaks.
 

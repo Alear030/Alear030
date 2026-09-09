@@ -104,7 +104,7 @@ if session is None:
     return '错误:该工具需要 session,但未被注入'
 ```
 
-**4. `tool_autho` 决定谁能用它。** 值必须是 `agents.yaml` 里已有的授权类别（`basic_tool` / `file_read_tool` / `file_write_tool` / `command_tool` / `memory_tool` / `plan_tool` / `subagent_tool` / `web_tool` / `skill_tool` / `interaction_tool` / `mcp_tool`）。要新开一个类别，得同时在 `agents.yaml` 里给相关 Agent 补上这个键——**只写工具不改 yaml，工具对所有 Agent 都不可见**。
+**4. `tool_autho` 决定谁能用它。** 值必须是 `agents.yaml` 里已有的授权类别（`basic_tool` / `file_read_tool` / `file_write_tool` / `command_tool` / `memory_tool` / `subagent_tool` / `web_tool` / `skill_tool` / `interaction_tool` / `mcp_tool`）。要新开一个类别，得同时在 `agents.yaml` 里给相关 Agent 补上这个键——**只写工具不改 yaml，工具对所有 Agent 都不可见**。
 
 **5. 输出要有上限。** 工具结果整块进 session，没有上限的输出能一次顶爆模型请求。现有工具的做法可以照抄：`file_read` 有行数 / 单行 / 总字符三重上限并复用 `offset` 续读协议，`command` 有 `MAX_OUTPUT_CHARS` 的首尾保留式截断。截断时**一定要在文本里说明怎么拿到剩下的部分**，否则模型会原地重试。
 
@@ -229,7 +229,7 @@ agent_prompt      40   static
 basic_prompt      50   notification → main
 ```
 
-`target` 里只能写**真的挂着 attachment 投递管线**的 agent。管线的两端是 `before_session/game_begin` 与 `before_loop/loop_run`，只有带 `hooks` 与 `session` 构造出来的那个 Loop 才跑得到——目前只有主 Loop 是这样。memory 管线、subagent、`plan_design` 都在自建的裸 Loop 上跑，投给它们的 attachment 会一直停在 `waiting`，每轮被遍历却永远送不出去。哨兵 `['all']` 会展开成当前全部 agent，因此现在没有分块该用它。
+`target` 里只能写**真的挂着 attachment 投递管线**的 agent。管线的两端是 `before_session/game_begin` 与 `before_loop/loop_run`，只有带 `hooks` 与 `session` 构造出来的那个 Loop 才跑得到——目前只有主 Loop 是这样。memory 管线与 subagent 都在自建的裸 Loop 上跑，投给它们的 attachment 会一直停在 `waiting`，每轮被遍历却永远送不出去。哨兵 `['all']` 会展开成当前全部 agent，因此现在没有分块该用它。
 
 两类分块共用同一条 order 轴：`static` 之间按它排系统提示词的顺序，`notification` 之间按它排 attachment 的投递顺序。两边都是从稳定到易变——越靠后越容易变，缓存断点就越晚出现。
 

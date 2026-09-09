@@ -89,7 +89,7 @@ _supervise()  ← 唯一常驻 task
 ## 配置与凭证
 
 - 工具名格式 `mcp__{server_key}__{tool_name}`，**前缀用 `mcp.json` 里的配置 key 而非 server 自报名**——两个 server 自报同名也不会撞。实现见 `_name_hook`：`ClientSessionGroup` 会把 server 自报的 `Implementation` 传进来，这里刻意不用它。
-- 授权走工具类别 `mcp_tool`（`agent/agents.yaml` 里 main / plan 开、其余关）；具体启用哪些 server 由 `mcp.json` 每条的 `enabled` 控制。`enabled: false` 表示登记但不连接，用于控制 schema 膨胀。
+- 授权走工具类别 `mcp_tool`（`agent/agents.yaml` 里 main 开、其余关）；具体启用哪些 server 由 `mcp.json` 每条的 `enabled` 控制。`enabled: false` 表示登记但不连接，用于控制 schema 膨胀。
 - **凭证在 `mcp.json` 里只以 `${VAR}` 占位符出现**，真值走 `.env`。只认 `${VAR}` 这一种写法，不支持 `$VAR` / `${VAR:-default}` 等 shell 变体。
 - **占位符解析不到时跳过该 server 并记录原因，不拿空值去连**——`_expand_str` 抛 `McpConfigError`，`_connect_entry` 捕获后写进 `_errors` 并返回失败。
 - 传输类型缺省按 `url` 字段有无推断（有 `url` → http，否则 stdio），这样能和 Claude Code / Desktop 的配置互相拷贝。

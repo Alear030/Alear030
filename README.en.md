@@ -56,8 +56,8 @@ What the memory system looks like today is in **[the memory documentation](docs/
 
 ## Features
 
-- **A pure ReAct engine** — `Loop` knows nothing about plan orchestration; `main` and runtime-spawned subagents share the same implementation
-- **Multi-agent cluster** — five resident agents whose identity, model tier and tool authorization are driven by YAML; subagents can be constructed at runtime per task
+- **A pure ReAct engine** — `Loop` only runs ReAct; `main` and runtime-spawned subagents share the same implementation
+- **Multi-agent cluster** — four resident agents whose identity, model tier and tool authorization are driven by YAML; subagents can be constructed at runtime per task
 - **Session slicing + local embedding recall** — an LLM cuts topic boundaries, a local Chinese GTE model computes the vectors; no external vector database involved
 - **Cross-session memory** — a background pipeline classifies slices, deduplicates them, distills a user profile and builds a cross-session timeline
 - **Event-driven hooks** — five event points, synchronous or background, and adding a hook means dropping one `hook.py` into the right directory
@@ -78,7 +78,7 @@ pip install -e .   # direct dependencies are pinned, but there is no lockfile
 cp .env.example .env
 # Edit .env — you only need the three model tiers: MAX / MEDIUM / LOW_LEVEL.
 # All three may point at the same provider, differing only in model_name.
-# The models must support function calling (tools), or main and plan will not run.
+# The models must support function calling (tools), or main will not run.
 
 python main.py
 ```
@@ -97,8 +97,7 @@ How a single user input flows through the system:
 flowchart TB
     U([User input]) --> TUI[TUI channel]
     TUI --> LOOP{{ReAct Loop}}
-    LOOP <--> AG[Agent cluster<br/>main · plan · slice · summary · memory]
-    LOOP --> PR[PlanRunner<br/>step-wise plan orchestration]
+    LOOP <--> AG[Agent cluster<br/>main · slice · summary · memory]
     LOOP --> TL[Tool orchestration]
     TL -. pre_toolUse .-> INJ[Inject runtime objects]
     TL --> MCP[MCP remote tools]
@@ -159,7 +158,7 @@ Why I shaped it this way is in **[the design journey](docs/design/memory.en.md)*
 
 ### 1. A multi-agent cluster, not one agent calling functions
 
-Five resident agents, each with its own identity and tool authorization, declared in `agent/agents.yaml`. They are not functions of `main` — they share a memory space but reason independently. `main` gets everything; `plan` gets basic/file_read/memory/subagent/web/skill/mcp; `memory` gets only `memory_tool`; `slice` and `summary` get nothing.
+Four resident agents, each with its own identity and tool authorization, declared in `agent/agents.yaml`. They are not functions of `main` — they share a memory space but reason independently. `main` gets everything; `memory` gets only `memory_tool`; `slice` and `summary` get nothing.
 
 ### 2. Session slicing + embedding recall, not RAG
 
