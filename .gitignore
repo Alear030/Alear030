@@ -48,6 +48,7 @@ memory/memory_config/memory_configs/*.json
 !.claude/skills/
 !.claude/settings.local.json.example
 .agents/
+.opencode/
 .vscode/
 
 # 准用于claudecode产出代码的文件夹
