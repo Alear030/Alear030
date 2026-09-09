@@ -33,7 +33,7 @@ plan_result = PlanRunner(loop=self, session=self.session).run(agent=agent)
 
 **决策收在 `PlanRunner.run()` 内部**——非 plan 模式直接返回 `None`，调用方无条件调即可，不必在 Loop 里写 `if session.mode == 'plan'`。用一次空调用换 Loop 对 plan 的零感知。
 
-`PlanRunner` 自己还有两道卡控。一是**无进展熔断**：连续 `PLAN_STALL_LIMIT` 轮拿到同一个 `step_number`，说明模型没把 step 标 done，直接退出——不做这件事，一个不肯收尾的模型能把 plan 跑成死循环。二是 `Plan.advance()` 把当前 step 记进 `active_step_number`，**限制本轮唯一允许更新的 step**，否则模型可以在一轮里连续调 `plan_update` 把后面几个 step 一起标成 done，计划就成了摆设。两者是同一个判断的两个方向：**step 的推进权归代码，不归模型。**
+`PlanRunner` 自己还有两道卡控。一是**无进展熔断**：连续三轮（阈值由配置常量 `PLAN_STALL_LIMIT` 给出，已随本次下线从 `config.py` 删除）拿到同一个 `step_number`，说明模型没把 step 标 done，直接退出——不做这件事，一个不肯收尾的模型能把 plan 跑成死循环。二是 `Plan.advance()` 把当前 step 记进 `active_step_number`，**限制本轮唯一允许更新的 step**，否则模型可以在一轮里连续调 `plan_update` 把后面几个 step 一起标成 done，计划就成了摆设。两者是同一个判断的两个方向：**step 的推进权归代码，不归模型。**
 
 ### 为什么整体下线
 
