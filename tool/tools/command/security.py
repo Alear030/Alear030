@@ -866,46 +866,44 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
 # ============================================================
 #  Git 子命令分类
 # ============================================================
+# 这两张表只登记「确定属于哪一档」的子命令，不追求穷举 git 的全部子命令。
+# GIT_READ_ONLY 一度是 git help -a 的全量转储，rm / fast-import / receive-pack
+# 都躺在「只读」里，而第6层危险路径检查对 read 直接放行——分类错一个词条，整层消失。
+# 没登记的子命令在第4层落 unknown：照常执行，但要过危险路径闸。
 GIT_READ_ONLY = {
-    "status", "log", "diff", "show", "branch", "tag",
-    "remote", "config", "ls-files", "ls-tree", "rev-parse",
-    "rev-list", "describe", "blame", "shortlog", "stash",
-    "reflog", "cherry", "bisect", "grep", "archive",
-    "whatchanged", "notes", "worktree", "submodule",
-    "for-each-ref", "name-rev", "symbolic-ref", "update-ref",
-    "count-objects", "fsck", "prune", "verify-pack",
-    "show-ref", "pack-refs", "replace", "verify-commit",
-    "verify-tag", "check-ref-format", "check-attr",
-    "check-ignore", "check-mailmap", "checkout-index",
-    "column", "credential", "diff-files", "diff-index",
-    "diff-tree", "fast-export", "fast-import",
-    "fmt-merge-msg", "get-tar-commit-id", "hash-object",
-    "help", "index-pack", "instaweb", "interpret-trailers",
-    "log", "ls-remote", "merge-base", "merge-file",
-    "merge-index", "merge-one-file", "merge-tree",
-    "mktag", "mktree", "multi-pack-index", "pack-objects",
-    "patch-id", "prune-packed", "quiltimport",
-    "range-diff", "read-tree", "rebase", "receive-pack",
-    "reflog", "remote-ext", "remote-fd", "repack",
-    "request-pull", "rerere", "reset", "restore",
-    "revert", "rm", "send-email", "send-pack",
-    "sh-i18n--envsubst", "show-branch", "show-index",
-    "show-ref", "sparse-checkout", "stash", "stripspace",
-    "svn", "switch", "symbolic-ref", "unpack-file",
-    "unpack-objects", "update-index", "update-ref",
-    "update-server-info", "upload-archive",
-    "upload-pack", "var", "verify-commit", "verify-pack",
-    "verify-tag", "web--browse", "whatchanged",
-    "worktree", "write-tree",
+    # 只查询与输出，不动工作区、索引、refs 与对象库
+    "status", "log", "diff", "show", "blame", "shortlog",
+    "whatchanged", "describe", "cherry", "grep",
+    "ls-files", "ls-tree", "ls-remote", "rev-parse", "rev-list",
+    "name-rev", "for-each-ref", "show-ref", "show-branch", "show-index",
+    "diff-files", "diff-index", "diff-tree", "merge-base", "merge-tree",
+    "range-diff", "patch-id", "request-pull", "fast-export",
+    "count-objects", "fsck", "verify-pack", "verify-commit", "verify-tag",
+    "check-ref-format", "check-attr", "check-ignore", "check-mailmap",
+    "cat-file", "get-tar-commit-id", "var", "help", "column",
+    "stripspace", "interpret-trailers", "fmt-merge-msg",
+    "upload-pack", "upload-archive",
 }
 
 GIT_WRITE = {
-    "add", "mv", "commit", "checkout", "restore", "switch",
-    "merge", "rebase", "pull", "fetch", "push",
-    "init", "clone", "revert", "cherry-pick",
-    "stash", "branch", "tag", "remote",
-    # reset/clean 本身只是改工作区，真正不可逆的 --hard / -f 由 BLOCKING_PATTERNS 拦
-    "reset", "clean",
+    # 改工作区或索引。reset/clean 本身只是改工作区，
+    # 真正不可逆的 --hard / -f 由 BLOCKING_PATTERNS 拦
+    "add", "rm", "mv", "restore", "checkout", "switch", "reset", "clean",
+    "apply", "am", "cherry-pick", "revert", "merge", "rebase", "stash",
+    "checkout-index", "read-tree", "update-index", "sparse-checkout",
+    "mergetool", "merge-file", "merge-index", "merge-one-file",
+    # 改 refs、提交与配置
+    "commit", "branch", "tag", "notes", "reflog", "update-ref",
+    "symbolic-ref", "replace", "bisect", "config", "filter-branch",
+    # 与远端、子模块、外部系统交互
+    "push", "pull", "fetch", "clone", "init", "remote", "submodule",
+    "worktree", "svn", "send-email", "send-pack", "receive-pack",
+    "credential", "daemon", "archive", "bundle",
+    # 直接操作对象库与打包文件
+    "hash-object", "write-tree", "mktag", "mktree", "index-pack",
+    "pack-objects", "pack-refs", "prune", "prune-packed", "repack",
+    "multi-pack-index", "unpack-objects", "unpack-file",
+    "fast-import", "gc", "update-server-info", "rerere", "quiltimport",
 }
 
 
@@ -952,15 +950,13 @@ BLOCKING_PATTERNS = [
     (r"\bgit\s+reset\s+--hard\b", "git reset --hard 会丢弃未提交的更改"),
     (r"\bgit\s+clean\b[^;&|\n]*-[a-zA-Z]*f", "git clean -f 会永久删除未跟踪文件"),
 
-    # POSIX 递归 / 强制删除
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR]", "rm -r 递归删除文件"),
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f", "rm -f 强制删除文件"),
+    # POSIX 递归 / 强制 / 通配删除由 _check_delete_scope 在 token 层判定：
+    # 正则形式要求 rm 落在段首，git rm -rf . 这类包了一层的写法整个漏过硬拦
 
     # Windows 批量 / 静默 / 递归删除
     (r"(^|[;&|\n]\s*)del\b[^;&|\n]*\s/[sSqQ]\b", "del /s 或 /q 批量静默删除"),
     (r"(^|[;&|\n]\s*)(rd|rmdir)\b[^;&|\n]*\s/[sS]\b", "rd /s 递归删除目录"),
     (r"(^|[;&|\n]\s*)(del|erase)\b[^;&|\n]*[*?]", "del 通配符批量删除"),
-    (r"(^|[;&|\n]\s*)rm\b[^;&|\n]*[*?]", "rm 通配符批量删除"),
 
     # 数据库
     (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b", "删除或清空数据库对象"),
@@ -1352,6 +1348,42 @@ def _strip_quotes(arg: str) -> str:
     return arg
 
 
+_RECURSIVE_FLAGS = ("--recursive", "--force")
+
+
+def _check_delete_scope(base_cmd: str, args: list[str], positional: list[str]) -> Optional[str]:
+    """rm 与 git rm 的递归/强制/通配删除判定，返回拦截原因。
+
+    走已解析的 token 而不是原始命令文本：正则形式必须锚在段首才能避免误伤，
+    于是任何把 rm 包一层的写法（git rm -rf .）都从硬拦下漏了过去。
+    """
+    if base_cmd == "rm":
+        targets = positional
+    elif base_cmd == "git" and positional[:1] == ["rm"]:
+        # git rm --cached 只把文件移出索引、不动工作区，是取消跟踪的标准写法
+        if "--cached" in args:
+            return None
+        targets = positional[1:]
+    else:
+        return None
+
+    for arg in args:
+        if arg in _RECURSIVE_FLAGS:
+            return f"rm {arg} 递归或强制删除文件"
+        if not arg.startswith("-") or arg.startswith("--"):
+            continue
+        # 合并短 flag：-rf 与 -r -f 是同一件事，逐字符看
+        if "r" in arg[1:] or "R" in arg[1:]:
+            return "rm -r 递归删除文件"
+        if "f" in arg[1:]:
+            return "rm -f 强制删除文件"
+
+    for target in targets:
+        if "*" in target or "?" in target:
+            return "rm 通配符批量删除"
+    return None
+
+
 def _check_dangerous_paths(args: list[str], category: str) -> tuple[bool, str]:
     """检查危险路径（只对写操作生效）"""
     if category in ("read", "neutral"):
@@ -1534,15 +1566,23 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
         return (False, f"命令格式不符合 {base_cmd} 的安全要求", category)
 
     # 第4层: git 子命令分类。必须用 positional——-C 的路径参数若混在里面，
-    # 会被当成子命令，合法的 git -C <path> status 就此全军覆没
+    # 会被当成子命令，合法的 git -C <path> status 就此全军覆没。
+    # 扫完全部 positional 取最高危险档：同一个词可能落在两个集合里，
+    # 靠 if/elif 的书写顺序定档等于把正确性寄在代码行序上。
+    # 一个都没命中就落 unknown，不沿用 git 自身的 neutral——
+    # neutral 和 read 一样被第6层直接放行，"没认出来"不该和"确认只读"同档
     if base_cmd == "git":
-        for arg in positional:
-            if arg in GIT_WRITE:
-                category = "write"
-                break
-            elif arg in GIT_READ_ONLY:
-                category = "read"
-                break
+        hits = [
+            "write" if arg in GIT_WRITE else "read"
+            for arg in positional
+            if arg in GIT_WRITE or arg in GIT_READ_ONLY
+        ]
+        category = max(hits, key=lambda c: _SEVERITY[c]) if hits else "unknown"
+
+    # 第4.5层: 删除范围。放在分类之后——要先有 positional 才能认出 git rm
+    delete_err = _check_delete_scope(base_cmd, args, positional)
+    if delete_err:
+        return (False, delete_err, "destructive")
 
     # 第5层: 额外检查回调（返回原因字符串即拒绝，原因直接回给模型，不再吞成笼统提示）
     if config.additional_check:
