@@ -313,7 +313,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
         name="curl", category="read",
         safe_flags={
             "-I": "none", "-i": "none", "-v": "none", "-s": "none",
-            "-L": "none", "-f": "none", "-o": "path", "-O": "none",
+            "-L": "none", "-f": "none", "-o": "outpath", "-O": "none",
             "-H": "string", "-X": "string", "-u": "string",
             "-d": "string", "--data": "string",
             "--help": "none", "--version": "none",
@@ -322,7 +322,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
     "wget": CommandConfig(
         name="wget", category="read",
         safe_flags={
-            "-O": "path", "-q": "none", "-nv": "none", "-c": "none",
+            "-O": "outpath", "-q": "none", "-nv": "none", "-c": "none",
             "-t": "number", "--help": "none", "--version": "none",
         },
     ),
@@ -866,46 +866,44 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
 # ============================================================
 #  Git 子命令分类
 # ============================================================
+# 这两张表只登记「确定属于哪一档」的子命令，不追求穷举 git 的全部子命令。
+# GIT_READ_ONLY 一度是 git help -a 的全量转储，rm / fast-import / receive-pack
+# 都躺在「只读」里，而第6层危险路径检查对 read 直接放行——分类错一个词条，整层消失。
+# 没登记的子命令在第4层落 unknown：照常执行，但要过危险路径闸。
 GIT_READ_ONLY = {
-    "status", "log", "diff", "show", "branch", "tag",
-    "remote", "config", "ls-files", "ls-tree", "rev-parse",
-    "rev-list", "describe", "blame", "shortlog", "stash",
-    "reflog", "cherry", "bisect", "grep", "archive",
-    "whatchanged", "notes", "worktree", "submodule",
-    "for-each-ref", "name-rev", "symbolic-ref", "update-ref",
-    "count-objects", "fsck", "prune", "verify-pack",
-    "show-ref", "pack-refs", "replace", "verify-commit",
-    "verify-tag", "check-ref-format", "check-attr",
-    "check-ignore", "check-mailmap", "checkout-index",
-    "column", "credential", "diff-files", "diff-index",
-    "diff-tree", "fast-export", "fast-import",
-    "fmt-merge-msg", "get-tar-commit-id", "hash-object",
-    "help", "index-pack", "instaweb", "interpret-trailers",
-    "log", "ls-remote", "merge-base", "merge-file",
-    "merge-index", "merge-one-file", "merge-tree",
-    "mktag", "mktree", "multi-pack-index", "pack-objects",
-    "patch-id", "prune-packed", "quiltimport",
-    "range-diff", "read-tree", "rebase", "receive-pack",
-    "reflog", "remote-ext", "remote-fd", "repack",
-    "request-pull", "rerere", "reset", "restore",
-    "revert", "rm", "send-email", "send-pack",
-    "sh-i18n--envsubst", "show-branch", "show-index",
-    "show-ref", "sparse-checkout", "stash", "stripspace",
-    "svn", "switch", "symbolic-ref", "unpack-file",
-    "unpack-objects", "update-index", "update-ref",
-    "update-server-info", "upload-archive",
-    "upload-pack", "var", "verify-commit", "verify-pack",
-    "verify-tag", "web--browse", "whatchanged",
-    "worktree", "write-tree",
+    # 只查询与输出，不动工作区、索引、refs 与对象库
+    "status", "log", "diff", "show", "blame", "shortlog",
+    "whatchanged", "describe", "cherry", "grep",
+    "ls-files", "ls-tree", "ls-remote", "rev-parse", "rev-list",
+    "name-rev", "for-each-ref", "show-ref", "show-branch", "show-index",
+    "diff-files", "diff-index", "diff-tree", "merge-base", "merge-tree",
+    "range-diff", "patch-id", "request-pull", "fast-export",
+    "count-objects", "fsck", "verify-pack", "verify-commit", "verify-tag",
+    "check-ref-format", "check-attr", "check-ignore", "check-mailmap",
+    "cat-file", "get-tar-commit-id", "var", "help", "column",
+    "stripspace", "interpret-trailers", "fmt-merge-msg",
+    "upload-pack", "upload-archive",
 }
 
 GIT_WRITE = {
-    "add", "mv", "commit", "checkout", "restore", "switch",
-    "merge", "rebase", "pull", "fetch", "push",
-    "init", "clone", "revert", "cherry-pick",
-    "stash", "branch", "tag", "remote",
-    # reset/clean 本身只是改工作区，真正不可逆的 --hard / -f 由 BLOCKING_PATTERNS 拦
-    "reset", "clean",
+    # 改工作区或索引。reset/clean 本身只是改工作区，
+    # 真正不可逆的 --hard / -f 由 BLOCKING_PATTERNS 拦
+    "add", "rm", "mv", "restore", "checkout", "switch", "reset", "clean",
+    "apply", "am", "cherry-pick", "revert", "merge", "rebase", "stash",
+    "checkout-index", "read-tree", "update-index", "sparse-checkout",
+    "mergetool", "merge-file", "merge-index", "merge-one-file",
+    # 改 refs、提交与配置
+    "commit", "branch", "tag", "notes", "reflog", "update-ref",
+    "symbolic-ref", "replace", "bisect", "config", "filter-branch",
+    # 与远端、子模块、外部系统交互
+    "push", "pull", "fetch", "clone", "init", "remote", "submodule",
+    "worktree", "svn", "send-email", "send-pack", "receive-pack",
+    "credential", "daemon", "archive", "bundle",
+    # 直接操作对象库与打包文件
+    "hash-object", "write-tree", "mktag", "mktree", "index-pack",
+    "pack-objects", "pack-refs", "prune", "prune-packed", "repack",
+    "multi-pack-index", "unpack-objects", "unpack-file",
+    "fast-import", "gc", "update-server-info", "rerere", "quiltimport",
 }
 
 
@@ -952,15 +950,13 @@ BLOCKING_PATTERNS = [
     (r"\bgit\s+reset\s+--hard\b", "git reset --hard 会丢弃未提交的更改"),
     (r"\bgit\s+clean\b[^;&|\n]*-[a-zA-Z]*f", "git clean -f 会永久删除未跟踪文件"),
 
-    # POSIX 递归 / 强制删除
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR]", "rm -r 递归删除文件"),
-    (r"(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f", "rm -f 强制删除文件"),
+    # POSIX 递归 / 强制 / 通配删除由 _check_delete_scope 在 token 层判定：
+    # 正则形式要求 rm 落在段首，git rm -rf . 这类包了一层的写法整个漏过硬拦
 
     # Windows 批量 / 静默 / 递归删除
     (r"(^|[;&|\n]\s*)del\b[^;&|\n]*\s/[sSqQ]\b", "del /s 或 /q 批量静默删除"),
     (r"(^|[;&|\n]\s*)(rd|rmdir)\b[^;&|\n]*\s/[sS]\b", "rd /s 递归删除目录"),
     (r"(^|[;&|\n]\s*)(del|erase)\b[^;&|\n]*[*?]", "del 通配符批量删除"),
-    (r"(^|[;&|\n]\s*)rm\b[^;&|\n]*[*?]", "rm 通配符批量删除"),
 
     # 数据库
     (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b", "删除或清空数据库对象"),
@@ -1183,15 +1179,28 @@ def parse_command(command: str) -> tuple[str, list[str]]:
     return (segments[0][0].lower(), segments[0][1:])
 
 
+# 吃取值的 flag 类型。outpath 是写入目标（curl -o、wget -O），与只是路径的 path 分开：
+# 命令自身可能是 read，写入目标却永远按写操作校验，和重定向目标同一套道理。
+# 声明成 number/string/EOF/{} 的取值不当路径扫；其余取值（含未登记的 flag）一律多扫一遍
+_VALUE_TAKING = ("number", "string", "path", "outpath", "EOF", "{}")
+_NON_PATH_VALUES = ("number", "string", "EOF", "{}")
+
+
 def _expand_short_flags(arg: str, config: CommandConfig) -> list[str]:
-    """展开合并的短 flag（-la → -l -a）"""
+    """展开合并的短 flag（-la → -l -a）。
+
+    末位允许是吃取值的 flag：curl -sLo out.json 的 -o 认不出来，整串就按未登记 flag 处理，
+    out.json 落回位置参数，写入目标绕开路径检查
+    """
     if not arg.startswith("-") or arg.startswith("--") or len(arg) <= 2:
         return [arg]
     flags_str = arg[1:]
     expanded = []
-    for ch in flags_str:
+    last = len(flags_str) - 1
+    for index, ch in enumerate(flags_str):
         flag = f"-{ch}"
-        if flag in config.safe_flags and config.safe_flags[flag] == "none":
+        declared = config.safe_flags.get(flag)
+        if declared == "none" or (declared in _VALUE_TAKING and index == last):
             expanded.append(flag)
         else:
             return [arg]
@@ -1205,12 +1214,16 @@ def _flag_style(config: CommandConfig) -> tuple[str, str]:
     return ("-", "=")
 
 
-def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
-    """挑出非 flag 的位置参数。
+def _split_args(args: list[str], config: CommandConfig) -> tuple[list[str], list[str], list[str]]:
+    """一趟走完参数，分出 (位置参数, flag 带的路径值, 写入目标)。
 
     闸门翻转后 flag 不再是准入条件，但仍要分清哪些 token 是 flag 的取值、
     哪些才是真正的路径，否则危险路径检查会把 --index-url 的 URL 当路径扫。
     未登记的 flag 一律按"不吃参数"处理：宁可把它后面的 token 也当路径多扫一遍。
+
+    取值本身此前整个不过危险路径检查，于是 curl -o <系统文件>、git -C <系统目录>、
+    --prefix=<系统目录> 这些真正被写入的目标绕开了第6层。两份路径分开返回：
+    只有位置参数能参与 git 子命令分类与删除范围判定，取值只喂给路径检查。
     """
     prefix, sep = _flag_style(config)
 
@@ -1222,6 +1235,8 @@ def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
         expanded_args = list(args)
 
     positional: list[str] = []
+    flag_paths: list[str] = []
+    out_paths: list[str] = []
     i = 0
     while i < len(expanded_args):
         arg = expanded_args[i]
@@ -1240,13 +1255,30 @@ def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
             # Windows 命令的 / flag 大小写不敏感（dir /b 等价于 dir /B），白名单键统一按大写登记
             flag_name = flag_name.upper()
 
-        # 已登记且需要取值、且值没跟在同一个 token 里 → 下一个 token 是它的参数
-        if config.safe_flags.get(flag_name) in ("number", "string", "path", "EOF", "{}") and sep not in arg:
+        declared = config.safe_flags.get(flag_name)
+
+        # 取值贴在同一个 token 里（--prefix=<path>、-o=out.json、/format:list）
+        if sep in arg:
+            value = arg.split(sep, 1)[1]
+            if declared == "outpath":
+                out_paths.append(value)
+            elif declared not in _NON_PATH_VALUES:
+                flag_paths.append(value)
+            i += 1
+            continue
+
+        # 已登记且需要取值 → 下一个 token 是它的参数，声明成路径的才当路径扫
+        if declared in _VALUE_TAKING:
+            if i + 1 < len(expanded_args):
+                if declared == "outpath":
+                    out_paths.append(expanded_args[i + 1])
+                elif declared == "path":
+                    flag_paths.append(expanded_args[i + 1])
             i += 2
         else:
             i += 1
 
-    return positional
+    return positional, flag_paths, out_paths
 
 
 # ============================================================
@@ -1350,6 +1382,42 @@ def _strip_quotes(arg: str) -> str:
     if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in ("'", '"'):
         return arg[1:-1]
     return arg
+
+
+_RECURSIVE_FLAGS = ("--recursive", "--force")
+
+
+def _check_delete_scope(base_cmd: str, args: list[str], positional: list[str]) -> Optional[str]:
+    """rm 与 git rm 的递归/强制/通配删除判定，返回拦截原因。
+
+    走已解析的 token 而不是原始命令文本：正则形式必须锚在段首才能避免误伤，
+    于是任何把 rm 包一层的写法（git rm -rf .）都从硬拦下漏了过去。
+    """
+    if base_cmd == "rm":
+        targets = positional
+    elif base_cmd == "git" and positional[:1] == ["rm"]:
+        # git rm --cached 只把文件移出索引、不动工作区，是取消跟踪的标准写法
+        if "--cached" in args:
+            return None
+        targets = positional[1:]
+    else:
+        return None
+
+    for arg in args:
+        if arg in _RECURSIVE_FLAGS:
+            return f"rm {arg} 递归或强制删除文件"
+        if not arg.startswith("-") or arg.startswith("--"):
+            continue
+        # 合并短 flag：-rf 与 -r -f 是同一件事，逐字符看
+        if "r" in arg[1:] or "R" in arg[1:]:
+            return "rm -r 递归删除文件"
+        if "f" in arg[1:]:
+            return "rm -f 强制删除文件"
+
+    for target in targets:
+        if "*" in target or "?" in target:
+            return "rm 通配符批量删除"
+    return None
 
 
 def _check_dangerous_paths(args: list[str], category: str) -> tuple[bool, str]:
@@ -1520,29 +1588,43 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
     # 闸门已翻转，白名单从"准入条件"降级为"分类表"
     config = COMMAND_WHITELIST.get(base_cmd)
     if config is None:
-        loose = [a for a in args if not a.startswith("-") and not a.startswith("/")]
+        # 命令未登记就没有 flag 契约可查，位置参数与 flag 的 inline 取值一并当路径扫
+        loose = []
+        for a in args:
+            if not a.startswith("-") and not a.startswith("/"):
+                loose.append(a)
+            elif "=" in a:
+                loose.append(a.split("=", 1)[1])
         ok, err = _check_dangerous_paths(loose, "unknown")
         if not ok:
             return (False, err, "unknown")
         return (True, "", "unknown")
 
     category = config.category
-    positional = _positional_args(args, config)
+    positional, flag_paths, out_paths = _split_args(args, config)
 
     # 第3层: 正则检查
     if config.regex and not re.match(config.regex, segment_text):
         return (False, f"命令格式不符合 {base_cmd} 的安全要求", category)
 
     # 第4层: git 子命令分类。必须用 positional——-C 的路径参数若混在里面，
-    # 会被当成子命令，合法的 git -C <path> status 就此全军覆没
+    # 会被当成子命令，合法的 git -C <path> status 就此全军覆没。
+    # 扫完全部 positional 取最高危险档：同一个词可能落在两个集合里，
+    # 靠 if/elif 的书写顺序定档等于把正确性寄在代码行序上。
+    # 一个都没命中就落 unknown，不沿用 git 自身的 neutral——
+    # neutral 和 read 一样被第6层直接放行，"没认出来"不该和"确认只读"同档
     if base_cmd == "git":
-        for arg in positional:
-            if arg in GIT_WRITE:
-                category = "write"
-                break
-            elif arg in GIT_READ_ONLY:
-                category = "read"
-                break
+        hits = [
+            "write" if arg in GIT_WRITE else "read"
+            for arg in positional
+            if arg in GIT_WRITE or arg in GIT_READ_ONLY
+        ]
+        category = max(hits, key=lambda c: _SEVERITY[c]) if hits else "unknown"
+
+    # 第4.5层: 删除范围。放在分类之后——要先有 positional 才能认出 git rm
+    delete_err = _check_delete_scope(base_cmd, args, positional)
+    if delete_err:
+        return (False, delete_err, "destructive")
 
     # 第5层: 额外检查回调（返回原因字符串即拒绝，原因直接回给模型，不再吞成笼统提示）
     if config.additional_check:
@@ -1550,8 +1632,15 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
         if extra_err:
             return (False, extra_err, category)
 
-    # 第6层: 危险路径
-    ok, err = _check_dangerous_paths(positional, category)
+    # 第6层: 危险路径。flag 带的取值与位置参数同扫——真正被动到的路径常常只出现在
+    # -o / -C / --prefix= 后面，只扫位置参数等于放过落点。
+    # 写入目标显式传 write，与第0层的重定向目标同一套道理：curl/wget 本身是 read 档，
+    # 走命令自己的类别会被 _check_dangerous_paths 早返回直接放过
+    ok, err = _check_dangerous_paths(out_paths, "write")
+    if not ok:
+        return (False, f"输出目标是{err}", "write")
+
+    ok, err = _check_dangerous_paths(positional + flag_paths, category)
     if not ok:
         return (False, err, category)
 
