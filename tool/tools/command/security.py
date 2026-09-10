@@ -313,7 +313,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
         name="curl", category="read",
         safe_flags={
             "-I": "none", "-i": "none", "-v": "none", "-s": "none",
-            "-L": "none", "-f": "none", "-o": "path", "-O": "none",
+            "-L": "none", "-f": "none", "-o": "outpath", "-O": "none",
             "-H": "string", "-X": "string", "-u": "string",
             "-d": "string", "--data": "string",
             "--help": "none", "--version": "none",
@@ -322,7 +322,7 @@ COMMAND_WHITELIST: dict[str, CommandConfig] = {
     "wget": CommandConfig(
         name="wget", category="read",
         safe_flags={
-            "-O": "path", "-q": "none", "-nv": "none", "-c": "none",
+            "-O": "outpath", "-q": "none", "-nv": "none", "-c": "none",
             "-t": "number", "--help": "none", "--version": "none",
         },
     ),
@@ -1179,15 +1179,28 @@ def parse_command(command: str) -> tuple[str, list[str]]:
     return (segments[0][0].lower(), segments[0][1:])
 
 
+# 吃取值的 flag 类型。outpath 是写入目标（curl -o、wget -O），与只是路径的 path 分开：
+# 命令自身可能是 read，写入目标却永远按写操作校验，和重定向目标同一套道理。
+# 声明成 number/string/EOF/{} 的取值不当路径扫；其余取值（含未登记的 flag）一律多扫一遍
+_VALUE_TAKING = ("number", "string", "path", "outpath", "EOF", "{}")
+_NON_PATH_VALUES = ("number", "string", "EOF", "{}")
+
+
 def _expand_short_flags(arg: str, config: CommandConfig) -> list[str]:
-    """展开合并的短 flag（-la → -l -a）"""
+    """展开合并的短 flag（-la → -l -a）。
+
+    末位允许是吃取值的 flag：curl -sLo out.json 的 -o 认不出来，整串就按未登记 flag 处理，
+    out.json 落回位置参数，写入目标绕开路径检查
+    """
     if not arg.startswith("-") or arg.startswith("--") or len(arg) <= 2:
         return [arg]
     flags_str = arg[1:]
     expanded = []
-    for ch in flags_str:
+    last = len(flags_str) - 1
+    for index, ch in enumerate(flags_str):
         flag = f"-{ch}"
-        if flag in config.safe_flags and config.safe_flags[flag] == "none":
+        declared = config.safe_flags.get(flag)
+        if declared == "none" or (declared in _VALUE_TAKING and index == last):
             expanded.append(flag)
         else:
             return [arg]
@@ -1201,12 +1214,16 @@ def _flag_style(config: CommandConfig) -> tuple[str, str]:
     return ("-", "=")
 
 
-def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
-    """挑出非 flag 的位置参数。
+def _split_args(args: list[str], config: CommandConfig) -> tuple[list[str], list[str], list[str]]:
+    """一趟走完参数，分出 (位置参数, flag 带的路径值, 写入目标)。
 
     闸门翻转后 flag 不再是准入条件，但仍要分清哪些 token 是 flag 的取值、
     哪些才是真正的路径，否则危险路径检查会把 --index-url 的 URL 当路径扫。
     未登记的 flag 一律按"不吃参数"处理：宁可把它后面的 token 也当路径多扫一遍。
+
+    取值本身此前整个不过危险路径检查，于是 curl -o <系统文件>、git -C <系统目录>、
+    --prefix=<系统目录> 这些真正被写入的目标绕开了第6层。两份路径分开返回：
+    只有位置参数能参与 git 子命令分类与删除范围判定，取值只喂给路径检查。
     """
     prefix, sep = _flag_style(config)
 
@@ -1218,6 +1235,8 @@ def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
         expanded_args = list(args)
 
     positional: list[str] = []
+    flag_paths: list[str] = []
+    out_paths: list[str] = []
     i = 0
     while i < len(expanded_args):
         arg = expanded_args[i]
@@ -1236,13 +1255,30 @@ def _positional_args(args: list[str], config: CommandConfig) -> list[str]:
             # Windows 命令的 / flag 大小写不敏感（dir /b 等价于 dir /B），白名单键统一按大写登记
             flag_name = flag_name.upper()
 
-        # 已登记且需要取值、且值没跟在同一个 token 里 → 下一个 token 是它的参数
-        if config.safe_flags.get(flag_name) in ("number", "string", "path", "EOF", "{}") and sep not in arg:
+        declared = config.safe_flags.get(flag_name)
+
+        # 取值贴在同一个 token 里（--prefix=<path>、-o=out.json、/format:list）
+        if sep in arg:
+            value = arg.split(sep, 1)[1]
+            if declared == "outpath":
+                out_paths.append(value)
+            elif declared not in _NON_PATH_VALUES:
+                flag_paths.append(value)
+            i += 1
+            continue
+
+        # 已登记且需要取值 → 下一个 token 是它的参数，声明成路径的才当路径扫
+        if declared in _VALUE_TAKING:
+            if i + 1 < len(expanded_args):
+                if declared == "outpath":
+                    out_paths.append(expanded_args[i + 1])
+                elif declared == "path":
+                    flag_paths.append(expanded_args[i + 1])
             i += 2
         else:
             i += 1
 
-    return positional
+    return positional, flag_paths, out_paths
 
 
 # ============================================================
@@ -1552,14 +1588,20 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
     # 闸门已翻转，白名单从"准入条件"降级为"分类表"
     config = COMMAND_WHITELIST.get(base_cmd)
     if config is None:
-        loose = [a for a in args if not a.startswith("-") and not a.startswith("/")]
+        # 命令未登记就没有 flag 契约可查，位置参数与 flag 的 inline 取值一并当路径扫
+        loose = []
+        for a in args:
+            if not a.startswith("-") and not a.startswith("/"):
+                loose.append(a)
+            elif "=" in a:
+                loose.append(a.split("=", 1)[1])
         ok, err = _check_dangerous_paths(loose, "unknown")
         if not ok:
             return (False, err, "unknown")
         return (True, "", "unknown")
 
     category = config.category
-    positional = _positional_args(args, config)
+    positional, flag_paths, out_paths = _split_args(args, config)
 
     # 第3层: 正则检查
     if config.regex and not re.match(config.regex, segment_text):
@@ -1590,8 +1632,15 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
         if extra_err:
             return (False, extra_err, category)
 
-    # 第6层: 危险路径
-    ok, err = _check_dangerous_paths(positional, category)
+    # 第6层: 危险路径。flag 带的取值与位置参数同扫——真正被动到的路径常常只出现在
+    # -o / -C / --prefix= 后面，只扫位置参数等于放过落点。
+    # 写入目标显式传 write，与第0层的重定向目标同一套道理：curl/wget 本身是 read 档，
+    # 走命令自己的类别会被 _check_dangerous_paths 早返回直接放过
+    ok, err = _check_dangerous_paths(out_paths, "write")
+    if not ok:
+        return (False, f"输出目标是{err}", "write")
+
+    ok, err = _check_dangerous_paths(positional + flag_paths, category)
     if not ok:
         return (False, err, category)
 
