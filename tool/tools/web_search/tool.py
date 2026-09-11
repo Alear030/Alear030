@@ -1,5 +1,4 @@
 import os
-import time
 import json
 
 from dataclasses import asdict
@@ -14,6 +13,9 @@ load_dotenv()
 search_goal_url = None
 if os.getenv('HTTP_PROXY'):
     search_goal_url = os.getenv('HTTP_PROXY')
+
+SEARCH_TIMEOUT_SECONDS = 4
+SEARCH_BACKENDS = ('duckduckgo', 'yandex')
 
 tool_desc = '用于关键词批量并行搜索,得到相关网页标题、链接、概述'
 
@@ -73,11 +75,11 @@ def web_search(key_words:list[str],**kwargs)->ToolCallResult:
 
     # 单个关键词的搜索逻辑，供线程池并行调用
     def _search_one(key_word:str)->dict:
-        # 失败重试，最多 3 次
-        for attempt in range(3):
+        last_error = None
+        for backend in SEARCH_BACKENDS:
             try:
-                with DDGS(search_goal_url) as ddg:
-                    rq_list = list(ddg.text(key_word,max_results=10))
+                with DDGS(proxy=search_goal_url,timeout=SEARCH_TIMEOUT_SECONDS) as ddg:
+                    rq_list = list(ddg.text(key_word,backend=backend,max_results=10))
                     rq_return = []
 
                     for i,r in enumerate(rq_list,1):
@@ -86,11 +88,11 @@ def web_search(key_words:list[str],**kwargs)->ToolCallResult:
                         desc = r['body']
                         line = f'{i}. 标题：{title} 链接：{href} 描述：{desc}'
                         rq_return.append(line)
-            except Exception as EE:
-                time.sleep(1)
+            except Exception as error:
+                last_error = error
             else:
                 return {'key_word':key_word,'result':'\n\n'.join(rq_return),'success':True}
-        return {'key_word':key_word,'result':'web_search all fail to try','success':False}
+        return {'key_word':key_word,'result':f'web_search 失败: {last_error}','success':False}
 
     # 线程池并行调用单个关键词的搜索逻辑
     with ThreadPoolExecutor(max_workers=min(len(key_words),5)) as tp:
