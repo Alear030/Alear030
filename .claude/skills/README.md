@@ -127,7 +127,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ```text
 第一段：前置检查 → push → 开 PR → 报告链接 → 停
-      ⏸  我自己读，或交给 GitHub Copilot review
+      ⏸  我自己读，或开口要一次 PR review（走 `alear030-pr-review`）
 第二段：合并 → 清理分支/worktree（常驻分支除外） → 同步本地 master
 ```
 
