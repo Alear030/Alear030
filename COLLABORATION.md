@@ -234,7 +234,7 @@ ps：没准祈祷祈祷可能更有效，毕竟唯心这一块，人家是专业
 
 ### Claude Code
 
-现在的主力。`CLAUDE.md` 和 [`.claude/skills/` 下那十一个技能](.claude/skills/README.md)都是给它的。跨模块的机制改动、对外文档、CHANGELOG、commit message 基本走它。
+现在的主力。`CLAUDE.md` 和 [`.claude/skills/` 下的技能](.claude/skills/README.md)都是给它的。跨模块的机制改动、对外文档、CHANGELOG、commit message 基本走它。
 
 用它主要是因为他是目前唯一一个（我使用过的）能在edit file之前给我看diff，然后让我approve的agent，其他的都是让我看那个雷霆大review，我就说白了我白说了，那个雷霆review谁愿意看啊，而且一个地方有问题，其他的地方留不留？啧...
 
@@ -242,7 +242,7 @@ ps：没准祈祷祈祷可能更有效，毕竟唯心这一块，人家是专业
 
 ### Cursor
 
-`.cursor/rules/` 下那五条规则是给它的。
+`.cursor/rules/` 下的规则是给它的。
 
 tab自动补全有点东西，multitask有点东西，做的挺好挺方便的，plan的那个user_view界面做的不错，里面的todo_list我喜欢，总体是个不错的IDE，但是能不能完全替代vscode呢？
 
@@ -309,8 +309,8 @@ self.length_end = False# @claude 后续需要添加流式长度，截断工具�
 仓库里三份东西是给 agent 使用或者默认加载到context里面的
 
 - `CLAUDE.md` —— 项目概述、稳定模块地图、核心运行数据流、协作方式、数据安全红线
-- `.cursor/rules/` —— 5 条规则
-- `.claude/skills/` —— 11 个技能，逐个说明见[技能目录](.claude/skills/README.md)
+- `.cursor/rules/` —— 给 Cursor 的 alwaysApply 规则
+- `.claude/skills/` —— 给 coding agent 的协作技能，逐个说明见[技能目录](.claude/skills/README.md)
 
 我把它们放进版本控制，不是为了能让人类进去研究，没有必要。而是因为agent的context很珍贵，不能让他每次都是白板进去，写一个小东西就要探索整个仓库，那就太。。。怎么说呢。。。太富有了，佩服！
 
@@ -350,7 +350,7 @@ ps：我之前经历过追捧skill的浪潮，甚至最开始的时候我也做�
 
 仓库里技能这个东西，有两套存储的位置。
 
-一边是 `.claude/skills/`，我写给 coding agent 的十一个技能。另一边是 `skill/`，Alear030 自己的运行时技能系统。
+一边是 `.claude/skills/`，我写给 coding agent 的那些技能。另一边是 `skill/`，Alear030 自己的运行时技能系统。
 
 **格式是同一套。** 两边都是一个目录一个 `.md` 文件，都是 YAML frontmatter 里写 `name` 和 `description`，后面跟 Markdown 正文。触发也都主要靠 `description` 匹配——读的那一方看描述自己判断这次该不该用，而不是我在流程里写死什么时候调它。
 
@@ -358,7 +358,7 @@ ps：我之前经历过追捧skill的浪潮，甚至最开始的时候我也做�
 
 **区别在于谁来沉淀。**
 
-有些是主动create-skill产出的：踩一次坑、重复一件事情，就create出来一个。十一个技能 1201 行，全是这么攒出来的。
+有些是主动create-skill产出的：踩一次坑、重复一件事情，就create出来一个。十二个技能 1114 行，全是这么攒出来的。
 
 Alear030 这边自动的（自动提议产出的目前就一个）。memory 管线在同类任务累积到阈值的时候会产出技能候选，以 attachment 的形式打断当前对话：这类事已经做过几次了，建议固化成一个可复用技能。然后走 `create-skill` 起草、我确认、落盘，最后 `skill_finish` 回写任务节点并把累积计数清零，免得下次重复提示同一件事。
 

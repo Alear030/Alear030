@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十四个技能，一共 1406 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十二个技能，一共 1114 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十四个里有十三个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十二个里有十一个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -28,12 +28,10 @@
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
-| [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | 四角色并行改动的派发协议 |
-| [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | 改生产代码的三段纪律 |
 
 名字全部带 `alear030-` 前缀。早期只有项目特有的几个带，`commit-message` 这类「格式规范」没带——但它们同样只在这个项目里成立，前缀的有无并不表示任何区别，反而会让人以为有。所以后来统一加上了，规则变成一条没有例外的规则。
 
-按它们编码的知识类型，可以分成四组。
+按它们编码的知识类型，可以分成三组。
 
 ---
 
@@ -55,7 +53,7 @@
 
 「出现过不止一次」——这就是它为什么会变成一条规矩。
 
-这是被引用最多的一个技能，另外三个（`alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline`）都在自己的验证环节指向它。
+凡是走到「验证」这一步的技能都指向它——`alear030-issue-pretodoHandle` 和 `alear030-pr-review` 都不自己再写一套。
 
 ### `alear030-worktree-change-guard`（34 行）
 
@@ -173,39 +171,18 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ---
 
-## 四、派发协议
+## 它们不是十二个孤立的文件
 
-这一组是项目体量变大之后才出现的，处理的是「一个改动大到需要拆给多个 agent 并行做」的情况。
+这十二个技能之间有引用关系：
 
-### `alear030-multitask-pipeline`（210 行）
-
-最长的一个。四段流水线：plan → executor → style ∥ review → 协调合并，四个角色各有各的输出模板。
-
-关键不在角色划分，在**判断标准**：什么时候值得走满配四段、什么时候轻量路径（executor + 轻 review）就够了。跨模块、机制路径变更走满配，小改走轻量。判断错了两头都亏——小改走满配是浪费，大改走轻量是失控。
-
-### `alear030-multitask-code`（108 行）
-
-和上一个互补：pipeline 管角色怎么派，这个管**代码怎么写、怎么验**。
-
-三段纪律：Plan（先规划，**不落盘**）→ Execute（只改拍板范围内的东西）→ Review（强制，不过不算完成）。带一张对照 `.cursor/rules/` 五条规则的 checklist，还有一节叫「Hard lessons」——名字就说明了它是怎么来的。
-
-「先预览后落盘」这条是我反复强调过的：我要先看到要改成什么样，再决定让不让改。
-
----
-
-## 它们不是十四个孤立的文件
-
-这十四个技能之间有引用关系：
-
-- `alear030-verify` 是基础层，被 `alear030-issue-pretodoHandle`、`alear030-multitask-code`、`alear030-multitask-pipeline` 三个反向引用——凡是走到「验证」这一步的都指向它
+- `alear030-verify` 是基础层，`alear030-issue-pretodoHandle` 与 `alear030-pr-review` 都反向引用它——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
 - `alear030-commit-message` → `alear030-push-merge` 是一条单向交接：前者到 commit 为止，后者从 commit 之后接手。`alear030-issue-pretodoHandle` 的合并步骤直接引用后者，不自己再写一套
-- `alear030-issue-fix` 与 `alear030-issue-pretodoHandle` 声明分工：前者当前 checkout 修到 commit 为止，后者管看板认领、分支与 PR；修复/测试/提交环节分别指向 `alear030-multitask-code`、`alear030-verify`、`alear030-commit-message`，不复述
-- `alear030-multitask-code` 与 `alear030-multitask-pipeline` 明确声明互补，各自不复述对方的内容
-- `alear030-style-notes` 和 `alear030-multitask-code` 都指向 `.cursor/rules/coding-conventions.mdc`，避免同一套写法纪律被抄成三份
+- `alear030-issue-fix` 与 `alear030-issue-pretodoHandle` 声明分工：前者当前 checkout 修到 commit 为止，后者管看板认领、分支与 PR；测试与提交环节分别指向 `alear030-verify`、`alear030-commit-message`，不复述
+- `alear030-style-notes` 指向 `.cursor/rules/coding-conventions.mdc`，写法纪律只在那里维护一份，技能本身不复述全文
 - `alear030-pr-review` 把这条反复述纪律用到了底：靶子分类指向 `docs/retrospective/`、机制事实指向 `docs/`、验证口径指向 `alear030-verify`、发现落盘指向 `alear030-issue-mark`，自己只留 review 时的提问顺序与退出标准。它卡在 `alear030-push-merge` 两段之间，与 `alear030-doc-drift-check` 声明分工：那个查文档漂移，这个查一批改动的机制收口
 
-所以真正被沉淀下来的不只是十四条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十二条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 
