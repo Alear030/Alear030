@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the fourteen skills I use when working with coding agents — 1406 lines in total, all under version control, and you can open any of them directly.
+This directory holds the twelve skills I use when working with coding agents — 1114 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Thirteen of these fourteen have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Eleven of these twelve have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -28,12 +28,10 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
-| [`alear030-multitask-pipeline`](alear030-multitask-pipeline/SKILL.md) | 210 | The dispatch protocol for four-role parallel changes |
-| [`alear030-multitask-code`](alear030-multitask-code/SKILL.md) | 108 | The three-stage discipline for changing production code |
 
 Every name carries the `alear030-` prefix. Early on only the project-specific ones did — format rules like `commit-message` did not — but those hold only inside this project too, so the presence or absence of a prefix marked no real distinction while implying one. They were unified afterwards, turning the convention into a rule with no exceptions.
 
-By the kind of knowledge they encode, they fall into four groups.
+By the kind of knowledge they encode, they fall into three groups.
 
 ---
 
@@ -55,7 +53,7 @@ There's also a Windows-specific one, written like this in the original:
 
 "More than once" — that's exactly why it became a rule.
 
-This is the most-referenced skill of the set; the other three (`alear030-issue-pretodoHandle`, `alear030-multitask-code`, `alear030-multitask-pipeline`) all point at it from their own verification stages.
+Anything that reaches a "verification" step points at it — neither `alear030-issue-pretodoHandle` nor `alear030-pr-review` writes its own.
 
 ### `alear030-worktree-change-guard` (34 lines)
 
@@ -173,39 +171,18 @@ The same reasoning ruled out the more thorough option of tagging every persisten
 
 ---
 
-## 4. Dispatch Protocols
+## They Aren't Twelve Isolated Files
 
-This group only appeared once the project got larger, and it handles the case where "a change is big enough that it needs splitting across several agents in parallel."
+There are reference relationships among these twelve skills:
 
-### `alear030-multitask-pipeline` (210 lines)
-
-The longest one. A four-stage pipeline: plan → executor → style ∥ review → coordinated merge, with each of the four roles having its own output template.
-
-The key part isn't the role split, it's the **judgement criteria**: when the full four stages are worth it, and when a lightweight path (executor + light review) is enough. Cross-module and mechanism-path changes get the full set; small changes go light. Getting the judgement wrong loses on both ends — full set for a small change is waste, light path for a big change is loss of control.
-
-### `alear030-multitask-code` (108 lines)
-
-Complementary to the previous one: the pipeline governs how roles get dispatched, this one governs **how the code gets written and verified**.
-
-Three stages of discipline: Plan (plan first, **nothing lands on disk**) → Execute (change only what was signed off) → Review (mandatory; not done until it passes). It carries a checklist cross-referencing the five rules under `.cursor/rules/`, and a section called "Hard lessons" — the name alone tells you where it came from.
-
-"Preview before landing" is the one I've stressed repeatedly: I want to see what it's going to be changed into before I decide whether to allow the change.
-
----
-
-## They Aren't Fourteen Isolated Files
-
-There are reference relationships among these fourteen skills:
-
-- `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle`, `alear030-multitask-code`, and `alear030-multitask-pipeline` — anything that reaches a "verification" step points at it
+- `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle` and `alear030-pr-review` — anything that reaches a "verification" step points at it
 - `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
 - `alear030-commit-message` → `alear030-push-merge` is a one-way handoff: the first stops at the commit, the second takes over from there. `alear030-issue-pretodoHandle` points its merge step straight at the latter instead of writing its own
-- `alear030-issue-fix` declares its division of work with `alear030-issue-pretodoHandle`: the former fixes to commit in the current checkout, the latter owns board claiming, branching and PRs; its fix/test/commit stages point at `alear030-multitask-code`, `alear030-verify` and `alear030-commit-message` respectively without restating them
-- `alear030-multitask-code` and `alear030-multitask-pipeline` explicitly declare themselves complementary and don't restate each other's content
-- `alear030-style-notes` and `alear030-multitask-code` both point at `.cursor/rules/coding-conventions.mdc`, so the same set of writing discipline doesn't get copied into three places
+- `alear030-issue-fix` declares its division of work with `alear030-issue-pretodoHandle`: the former fixes to commit in the current checkout, the latter owns board claiming, branching and PRs; its test and commit stages point at `alear030-verify` and `alear030-commit-message` respectively without restating them
+- `alear030-style-notes` points at `.cursor/rules/coding-conventions.mdc`, so the writing discipline is maintained in exactly one place and the skill itself doesn't restate it
 - `alear030-pr-review` takes that don't-restate discipline all the way: target categories point at `docs/retrospective/`, mechanism facts at `docs/`, verification at `alear030-verify`, and where findings land at `alear030-issue-mark`, keeping only the order of questions and the exit criterion for itself. It sits between the two stages of `alear030-push-merge`, and declares its division of work with `alear030-doc-drift-check`: that one checks doc drift, this one checks whether a batch of changes closed off
 
-So what actually got distilled isn't just fourteen rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just twelve rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 

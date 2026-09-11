@@ -2,11 +2,13 @@
 
 ## 项目概述
 
-Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型之外的编排、状态与记忆全部自己实现**。处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
+Alear030 — 从零自研的 Python Agent Harness。处理工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
 
 **仓库已公开（MIT）。** 代码、注释、文档、commit message、`AGENTS.md`、`.claude/skills/` 与 `.cursor/rules/` 都会被陌生人读到——落笔前按「这会被公开」判断，不留本机绝对路径、内部语境或协作过程叙述。
 
 架构事实以 [docs/](docs/index.md) 为权威源，最终以代码为准。**本文件只承载「每次会话都要生效、且不知道就会犯错」的东西**，不复述架构。
+
+开场想知道进度，读 `git log -1`。
 
 ## 规约载体与准入判据
 
@@ -66,7 +68,7 @@ Alear030 — 从零自研的 Python Agent Harness。核心思想：**把模型�
 
 ### 收口 / 运维
 
-全部走技能，别凭通用 git/GitHub 经验直接做：`alear030-commit-message`（提交信息格式）、`alear030-changelog-refresh`（版本块）、`alear030-issue-mark` / `alear030-issue-pretodoHandle`（issue 规范与看板流转）、`alear030-issue-fix`（issue 从拉取定位到方案拍板、修复、测试、review、commit 的修复流水线，止于 commit）、`alear030-push-merge`（**分两段：push+开 PR 后必须停下交回用户**，`master` 与 `Alear030_dev` 永不删除）、`alear030-pr-review`（**卡在 push-merge 两段之间**的 merge 前只读审查，退出标准不是读完 diff）。
+全部走技能，别凭通用 git/GitHub 经验直接做：`alear030-commit-message`（提交信息格式）、`alear030-changelog-refresh`（版本块）、`alear030-issue-mark` / `alear030-issue-pretodoHandle`（issue 规范与看板流转；标签 `boundary-violation` 配合 `tech-debt` 使用，专门归类「对象跨越自身边界直接读写别的对象内部状态」这类问题）、`alear030-issue-fix`（issue 从拉取定位到方案拍板、修复、测试、review、commit 的修复流水线，止于 commit）、`alear030-push-merge`（**分两段：push+开 PR 后必须停下交回用户**，`master` 与 `Alear030_dev` 永不删除）、`alear030-pr-review`（**卡在 push-merge 两段之间**的 merge 前只读审查，退出标准不是读完 diff）。
 
 ## 分工边界与反馈文化
 

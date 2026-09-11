@@ -26,7 +26,7 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
    - **停下等用户确认。未拍板不写任何文件。**方案被拒就回第 2 步重做，不自行折中。
 
 4. **修复**
-   - 按拍板方案最小改动，遵守 `$alear030-multitask-code`（先预览后落盘、不顺手重构）与 `$alear030-style-notes`（中文极简动作导向注释）。
+   - 按拍板方案最小改动：先预览后落盘、不顺手重构；注释遵守 `$alear030-style-notes`（中文极简动作导向）。
    - 生产代码落盘后走 `$alear030-worktree-change-guard` 回读核对改动落在目标 checkout。
 
 5. **测试**
