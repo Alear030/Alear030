@@ -1,3 +1,3 @@
-from .agent_core import agents
+from .agent_core import Agent,agents
 
 __all__ = ['Agent','agents']
