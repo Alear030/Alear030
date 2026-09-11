@@ -35,7 +35,7 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
    - `python -m unittest discover` 基线必须保持绿；既有兄弟探针跑一遍防回归。
 
 6. **code review**
-   - 派恰好一个 review subagent：`subagent_type: general-purpose`（本环境无 bugbot 类型），`run_in_background: false`，prompt 按四段形状——Full Repository Path / Diff: uncommitted changes / Custom Instructions。
+   - 派恰好一个 review 子代理，前台跑（结论要当场接住，不能等）；执行者类型以当前会话实际提供的为准，不要写死——写死的类型名在它消失之后不报错，只静默失效。prompt 按四段形状——Full Repository Path / Diff: uncommitted changes / Custom Instructions。
    - Custom Instructions 必须写清：评审范围（本任务文件清单）；**test/ 整体被 gitignore，diff 看不到，要求 subagent 直接读测试文件**；工作区他人未提交改动文件清单（排除，不产出 findings）；重点（正确性 + 与用户代码风格一致性：中文注释、`func(kw='v')` 等号无空格、探针惯例）。
    - findings 处置：机械性修正（测试补丁、词表对齐、坐标换算类）当场修掉并重跑测试；设计层面的只报告不动，交用户拍板。
 

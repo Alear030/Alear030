@@ -127,7 +127,7 @@ The wrap-up after a commit, **in two stages with a mandatory stop between them**
 
 ```text
 Stage 1: pre-flight -> push -> open PR -> report the link -> stop
-       (I read it myself, or hand it to GitHub Copilot for review)
+       (I read it myself, or ask for a PR review via `alear030-pr-review`)
 Stage 2: merge -> clean up branch/worktree (permanent branches exempt) -> sync local master
 ```
 
