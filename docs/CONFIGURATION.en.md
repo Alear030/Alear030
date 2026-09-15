@@ -107,10 +107,10 @@ The format is **copy-compatible** with Claude Code / Claude Desktop MCP config.
 | Field | Applies to | Notes |
 |---|---|---|
 | `type` | both | `stdio` or `http`. **Optional** — if omitted, inferred from whether `url` is present |
-| `command` | stdio | Required. Executable that starts the server |
+| `command` | stdio | Required. Executable that starts the server. Use a command name on PATH or an absolute path — a relative path is looked up against the launch directory before the process starts, unaffected by `cwd` |
 | `args` | stdio | Command-line argument array |
 | `env` | stdio | Environment variables for the child process |
-| `cwd` | stdio | Child process working directory |
+| `cwd` | stdio | Child process working directory. Defaults to the repository root, and a relative value also resolves against the repository root, regardless of the launch directory; relative paths in `args` usually resolve against this directory, though that is ultimately up to the server program |
 | `url` | http | Required. Streamable HTTP endpoint |
 | `headers` | http | Request headers; credentials usually go here |
 | `timeout` | http | Seconds; default 30 |

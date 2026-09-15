@@ -13,7 +13,7 @@ from datetime import timedelta
 from mcp import StdioServerParameters
 from mcp.client.session_group import StreamableHttpParameters
 
-from config import MCP_CONFIG_PATH
+from config import MCP_CONFIG_PATH,ROOT_DIRECTORY
 
 
 # ${VAR} 占位符；只认这一种写法，不做 $VAR / ${VAR:-default} 等 shell 变体
@@ -121,7 +121,8 @@ def build_params(server_key:str,entry:dict):
         command=_expand_str(command,server_key,'command'),
         args=_expand_str_list(entry.get('args') or [],server_key,'args'),
         env=_expand_str_dict(entry.get('env') or {},server_key,'env') or None,
-        cwd=entry.get('cwd') or None,
+        # 缺省或相对 cwd 锚到仓库根，不继承启动目录；绝对路径经 / 拼接保持原样
+        cwd=str(ROOT_DIRECTORY/(entry.get('cwd') or '.')),
     )
 
 

@@ -80,8 +80,10 @@ cp .env.example .env
 # 三级可以指向同一服务商，仅 model_name 不同
 # 模型必须支持 function calling（tools），否则 main 跑不起来
 
-python main.py
+alear030           # pip install -e . 已注册该命令，可在任意目录启动
 ```
+
+必须用 `-e` 安装：命令从安装时所在的仓库原地加载代码，普通 `pip install .` 启动即缺包。启动目录就是 command 工具执行命令的默认工作目录；有多个 checkout 时，命令只指向最近一次安装的那个。
 
 首次运行时，本地嵌入模型权重（约 195MB）会自动从 ModelScope 下载到 `local_model/`。需要联网，仅首次需要，之后离线可用。这一步与 `MEMORY_PIPELINE_ENABLED` 无关——预热在总闸判断之前执行，记忆管线关着也照样下载。
 
