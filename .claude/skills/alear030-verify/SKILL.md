@@ -23,6 +23,8 @@ ls memory/memory_storage/memory_storages/
 
 **不要用「路径里有没有 `worktrees`」来判。** 未来完全可能出现开着 pipeline 的 worktree,路径名会骗人,配置不会。
 
+**验证不要用全局命令 `alear030`,一律用 `python main.py`。** 这个命令跑的是最近一次执行 `pip install -e .` 的那个 checkout,代码、配置、数据都在那边,跟你在哪个目录敲的无关,所以上面的判据对它不适用。在 worktree 里敲 `alear030`,完全可能写进主仓库的真实数据。想确认它指向哪,用 `pip show alear030` 看 `Editable project location`。
+
 ### 宽松档(开发 worktree)
 
 `pipeline_enabled=False` 让 memory 分类、user_info、task 落盘全部短路,跑什么都不会污染真实记忆。所以:

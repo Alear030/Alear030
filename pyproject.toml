@@ -29,8 +29,11 @@ dependencies = [
     "python-dotenv==1.2.1",
 ]
 
-# Alear030 是从仓库根目录 python main.py 运行的应用，不作为库被外部 import。
-# pip install -e . 的用途仅是装依赖，故显式声明不打包任何模块——
-# 否则 flat layout 下 setuptools 自动发现会因根目录多个顶层包而报错。
+[project.scripts]
+alear030 = "main:main"
+
+# 只纳入 main.py 作为 alear030 命令入口；其余顶层包不打包（flat layout 下自动发现会报错），
+# 由 main.py 顶部补 sys.path 从仓库原地读取，故须 pip install -e .，普通 pip install . 启动即缺包。
 [tool.setuptools]
 packages = []
+py-modules = ["main"]

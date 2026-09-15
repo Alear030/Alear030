@@ -110,7 +110,7 @@ cp mcp_client/mcp.json.example mcp_client/mcp.json
 | `command` | stdio | 必填。启动 server 的可执行文件 |
 | `args` | stdio | 命令行参数数组 |
 | `env` | stdio | 传给子进程的环境变量 |
-| `cwd` | stdio | 子进程工作目录 |
+| `cwd` | stdio | 子进程工作目录。缺省为仓库根，相对路径也按仓库根解析，与从哪个目录启动无关；`args` 里的相对路径随之按这个目录解析 |
 | `url` | http | 必填。Streamable HTTP 端点 |
 | `headers` | http | 请求头，凭证通常放这里 |
 | `timeout` | http | 秒，默认 30 |

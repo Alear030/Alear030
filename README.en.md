@@ -80,8 +80,10 @@ cp .env.example .env
 # All three may point at the same provider, differing only in model_name.
 # The models must support function calling (tools), or main will not run.
 
-python main.py
+alear030           # registered by pip install -e .; runs from any directory
 ```
+
+The `-e` is required: the command loads code in place from the repository it was installed from, so a plain `pip install .` fails on startup with missing packages. The launch directory is the default working directory for the command tool; with several checkouts, the command points only at the most recently installed one.
 
 On the first run, the local embedding weights (~195 MB) download automatically from ModelScope into `local_model/`. It needs network access only the first time; after that it works offline. This is unrelated to `MEMORY_PIPELINE_ENABLED` — the prewarm runs before that switch is read, so the weights download even with the memory pipeline off.
 
