@@ -8,7 +8,7 @@
 
 ## 项目定位
 
-Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook 和跨会话记忆；它不是供外部导入的库。`main.py` 是高层装配与 Textual TUI 启动入口，具体运行行为以现场代码、注册器和 `agent/agents.yaml` 为准，README 仅作概览。
+Alear030 是一个 Python Agent Harness，负责工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook 和跨会话记忆；它不是供外部导入的库。`main.py` 是高层装配与 Textual TUI 启动入口，可在仓库根 `python main.py` 运行，也可经 `pip install -e .` 注册的 `alear030` 命令从任意目录启动（后者运行的是安装所在 checkout 的代码与数据），具体运行行为以现场代码、注册器和 `agent/agents.yaml` 为准，README 仅作概览。
 
 项目存在三个不同层级的 Agent：`agent/agents.yaml` 配置的常驻 Agent、`subagent_create` 创建的运行时子代理，以及宿主开发工具自身的协作 Agent。讨论生命周期、权限和路由时必须明确所指层级，不得混用。
 
@@ -28,7 +28,7 @@ Alear030 是从仓库根目录运行的 Python Agent Harness，负责工具编�
 - 写盘前确认当前目录是仓库根，并检查 `git status --short`。只修改任务直接需要的内容，不顺手重构、格式化或清理历史代码，保留用户已有改动。
 - 不要让多个 Agent 同时编辑同一 checkout。
 - 临时截断或禁用路径时，只增加入口 `return` 或等价 guard，禁止删除或清空原函数体；移除 guard 后必须能够原样恢复。
-- 任务收尾时检查是否产生了无法从源码自发现的长期规则。确有必要沉淀时，先在对话中给出拟议内容并取得用户确认，再修改本文件，不强制调用未加载的技能。
+- 任务收尾时检查是否产生了无法从源码自发现的长期规则。确有必要沉淀时再修改本文件，不强制调用未加载的技能。
 
 ## 验证
 
