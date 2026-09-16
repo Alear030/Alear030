@@ -281,7 +281,7 @@ agent、session、tool、hook 等模块彼此之间不直接引用，而是通�
 
 ### 关于 file_tool 的读写不对称
 
-`file_write` 与 `file_edit` 的写入路径被限制在 `workspace/` 与技能目录内，但 `file_read`、`file_grep`、`file_glob` **可以读磁盘上任意绝对路径**。这是有意的取舍（读写风险等级不同），但别误以为整个 file_tool 集群都在沙箱里。
+`file_write` 与 `file_edit` 的写入路径默认被限制在 `workspace/` 与技能目录内（`FILE_EDIT_SANDBOX`，关闭后可写任意绝对路径；对模型的说明经 `file_sandbox_prompt` 以 attachment 投给 main，被授予写权限的 subagent 收不到说明，只靠工具返回的错误文案），但 `file_read`、`file_grep`、`file_glob` **可以读磁盘上任意绝对路径**。这是有意的取舍（读写风险等级不同），但别误以为整个 file_tool 集群都在沙箱里。
 
 另外 `web_fetch` 的输出硬截断在 5000 字符且**没有续读协议**——是唯一一个截断后不告诉模型怎么拿剩余部分的工具，与 `file_read` 的 offset 续读、`command` 的首尾保留式截断不一致。已知待修。
 

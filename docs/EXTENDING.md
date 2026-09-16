@@ -221,6 +221,7 @@ def build() -> str:           # notification 类不收 agent 参数
 system_prompt      0   static
 attachment_prompt  5   static
 tool_prompt       10   static
+file_sandbox_prompt 15 notification → main（FILE_EDIT_SANDBOX=False 时为空，不投）
 skill_prompt      20   notification → main
 session_recent    30   notification → main（enabled=False）
 timeline_prompt   30   notification → main

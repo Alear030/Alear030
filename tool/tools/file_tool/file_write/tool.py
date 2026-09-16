@@ -1,9 +1,7 @@
 from pathlib import Path
 from tool.tool_core import tool,tool_call_processing
 
-from config import WORK_SPACE,ROOT_DIRECTORY
-
-SKILL_DIRECTORY = ROOT_DIRECTORY/'skill'
+from tool.tools.file_tool.sandbox import check_write_path
 
 tool_desc = '创建或覆盖本地文本文件，会自动创建父目录'
 tool_prompt_file = Path(__file__).parent/'tool_prompt.md'
@@ -30,8 +28,9 @@ def file_write(file_path:str,content:str,**kwargs)->str:
     path_exist = path.exists()
 
     resolved_path = path.resolve()
-    if not resolved_path.is_relative_to(WORK_SPACE) and not resolved_path.is_relative_to(SKILL_DIRECTORY):
-        return f'错误，当前写入路径非工作空间，学习模式下只能在工作空间或技能目录写入文件，工作空间地址：{WORK_SPACE}，技能目录：{SKILL_DIRECTORY}'
+    sandbox_error = check_write_path(resolved_path,'写入')
+    if sandbox_error:
+        return sandbox_error
 
     try:
         path.parent.mkdir(parents=True,exist_ok=True)

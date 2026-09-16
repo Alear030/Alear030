@@ -281,7 +281,7 @@ Lower-level registry, types, config, and storage components may be imported dire
 
 ### On file_tool read/write asymmetry
 
-Write paths for `file_write` and `file_edit` are restricted to `workspace/` and skill directories, but `file_read`, `file_grep`, and `file_glob` **can read any absolute path on disk**. This is an intentional tradeoff (read and write have different risk levels); do not assume the entire file_tool cluster is sandboxed.
+Write paths for `file_write` and `file_edit` are restricted to `workspace/` and skill directories by default (`FILE_EDIT_SANDBOX`; when off, any absolute path is writable. The model is told about the restriction through the `file_sandbox_prompt` attachment delivered to main — subagents granted write access do not receive it and only see the tool's error message), but `file_read`, `file_grep`, and `file_glob` **can read any absolute path on disk**. This is an intentional tradeoff (read and write have different risk levels); do not assume the entire file_tool cluster is sandboxed.
 
 Separately, `web_fetch` hard-truncates output at 5000 characters and has **no continuation protocol** — it is the only tool that truncates without telling the model how to get the remainder, inconsistent with `file_read`'s offset continuation and `command`'s head-and-tail truncation. Known issue to fix.
 

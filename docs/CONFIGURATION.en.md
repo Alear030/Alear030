@@ -193,6 +193,7 @@ The model loads in a separate worker process and does not block TUI startup.
 | Constant | Default | Role |
 |---|---|---|
 | `MEMORY_PIPELINE_ENABLED` | `False` | Master switch for the cross-session memory pipeline; see previous section |
+| `FILE_EDIT_SANDBOX` | `True` | Write sandbox for `file_write` / `file_edit`: when on, only `workspace/` and `skill/` are writable; when off, any absolute path is |
 | `MAX_TOOLCALLS` | 30 | Max tool calls per ReAct round; beyond this, forced final reply |
 | `SUB_MAX_TOOLCALLS` | 15 | Cap for temporary subagents |
 | `MAX_SESSION_TOKEN` | 250000 | Session compress trigger threshold; leave headroom for the model context window |
