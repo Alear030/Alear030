@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1202 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1205 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -16,19 +16,19 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 
 | Skill | Lines | In one line |
 |------|------|--------|
-| [`alear030-verify`](alear030-verify/SKILL.md) | 152 | This project's verification doesn't work like a normal Python project's |
+| [`alear030-verify`](alear030-verify/SKILL.md) | 154 | This project's verification doesn't work like a normal Python project's |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
-| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | After a commit: push and open a PR, stop for review, merge only after approval |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | The taste for writing comments in my code |
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 105 | Read-only pre-merge review of an open PR: three reconciliation passes and one exit criterion |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 129 | Read-only pre-merge review of an open PR: three reconciliation passes and one exit criterion |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
-| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 58 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
+| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
 
 Every name carries the `alear030-` prefix. Early on only the project-specific ones did — format rules like `commit-message` did not — but those hold only inside this project too, so the presence or absence of a prefix marked no real distinction while implying one. They were unified afterwards, turning the convention into a rule with no exceptions.
 
@@ -40,7 +40,7 @@ By the kind of knowledge they encode, they fall into three groups.
 
 What this group has in common: **doing it the way general experience says will go wrong**, and once it goes wrong the cause isn't easy to see.
 
-### `alear030-verify` (152 lines)
+### `alear030-verify` (154 lines)
 
 Verification in this project has several counterintuitive spots, and applying general Python-project experience directly will trip you:
 
@@ -122,7 +122,7 @@ Without an issue number it pulls the open tech-debt list (oldest first) for me t
 
 It divides work explicitly with pretodoHandle: board claiming, branching and PR merging belong to that one; this one fixes directly in the current checkout, no branch, no push. One lesson from #8 made it into the body: **issues go stale** — the "no isolation" premise at filing time had been changed by #5 landing, and it nearly got "fixed" again against the stale premise; so the locate step mandates re-checking whether the premise still holds.
 
-### `alear030-push-merge` (199 lines)
+### `alear030-push-merge` (203 lines)
 
 The wrap-up after a commit, **in two stages with a mandatory stop between them**:
 
@@ -156,7 +156,7 @@ Using a skill rather than letting the agent grep for itself is because self-grep
 
 Sedimented from the scheduled task that fires at nine every morning: it checks the core docs one by one against the live code, through three lenses — structural drift (referenced files/entry points/counts that no longer exist), behavioural drift (assertions contradicting the code), and typos or stale wording. Two iron rules: verify mechanically before concluding (to keep false positives down); any judgement that depends on uncommitted code is skipped into the warning section, no guessing. Strictly read-only throughout — once the report is out, the decision returns to me.
 
-### `alear030-pr-review` (105 lines)
+### `alear030-pr-review` (129 lines)
 
 Same read-only reporting family as the previous one, but pointed at a different object: that one checks docs against the code as routine hygiene, this one checks whether a batch of changes on an open PR has actually closed off before it gets merged.
 
@@ -170,7 +170,7 @@ Writing it nearly went wrong once. I was about to put a few concrete function na
 
 The same reasoning ruled out the more thorough option of tagging every persistence entry point with a marker. That would assert "persistence entry point" is already a settled category, while this very batch of changes keeps moving it. Caching a list that can be recomputed at any time, and paying the sync cost for it, is precisely this project's own second target category. So the list is derived fresh in each review and is a required deliverable of the report; once several independently derived lists agree, it's worth asking whether to freeze one.
 
-### `alear030-clear-logdata` (58 lines)
+### `alear030-clear-logdata` (61 lines)
 
 A single session leaves one file named by its session_id in each of session_detail, trace_log and log_data. Forgetting to turn on the memory pipeline, or starting up just to check connectivity, leaves behind a set of records with no conversation in them. Deleting by hand was manageable while session_detail was the only place; with more process files, going directory by directory makes it easy to miss one of them.
 
