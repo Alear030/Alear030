@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the twelve skills I use when working with coding agents — 1114 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1193 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Eleven of these twelve have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Twelve of these thirteen have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -28,6 +28,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
+| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 49 | Clean up process files of sessions with no real conversation, per session, to the Recycle Bin after confirmation |
 
 Every name carries the `alear030-` prefix. Early on only the project-specific ones did — format rules like `commit-message` did not — but those hold only inside this project too, so the presence or absence of a prefix marked no real distinction while implying one. They were unified afterwards, turning the convention into a rule with no exceptions.
 
@@ -169,11 +170,19 @@ Writing it nearly went wrong once. I was about to put a few concrete function na
 
 The same reasoning ruled out the more thorough option of tagging every persistence entry point with a marker. That would assert "persistence entry point" is already a settled category, while this very batch of changes keeps moving it. Caching a list that can be recomputed at any time, and paying the sync cost for it, is precisely this project's own second target category. So the list is derived fresh in each review and is a required deliverable of the report; once several independently derived lists agree, it's worth asking whether to freeze one.
 
+### `alear030-clear-logdata` (49 lines)
+
+A single session leaves one file named by its session_id in each of session_detail, trace_log and log_data. Forgetting to turn on the memory pipeline, or starting up just to check connectivity, leaves behind a set of records with no conversation in them. Deleting by hand was manageable while session_detail was the only place; with more process files, going directory by directory makes it easy to miss one of them.
+
+So the unit of cleanup is the session, not the file: judge once, handle the whole set. The skill ships a script that finds artifacts in every ignored directory by the convention "per-session process data is named by session_id", rather than keeping a list of directories — adding a new kind of process file later doesn't require coming back to change it.
+
+The judgement looks at whether the user's own messages carry substance, not at the number of rounds. Sessions referenced by memory, sessions still being written to, and artifacts with no detail file (such as the session_plan files left after plan mode was retired) are listed separately and not recommended for cleanup. All of these directories are git-ignored, so nothing deleted can be recovered from the repository; the last step therefore only clears ids confirmed one by one, and sends them to the Recycle Bin instead of deleting permanently.
+
 ---
 
-## They Aren't Twelve Isolated Files
+## They Aren't Thirteen Isolated Files
 
-There are reference relationships among these twelve skills:
+There are reference relationships among these thirteen skills:
 
 - `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle` and `alear030-pr-review` — anything that reaches a "verification" step points at it
 - `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
@@ -182,7 +191,7 @@ There are reference relationships among these twelve skills:
 - `alear030-style-notes` points at `.cursor/rules/coding-conventions.mdc`, so the writing discipline is maintained in exactly one place and the skill itself doesn't restate it
 - `alear030-pr-review` takes that don't-restate discipline all the way: target categories point at `docs/retrospective/`, mechanism facts at `docs/`, verification at `alear030-verify`, and where findings land at `alear030-issue-mark`, keeping only the order of questions and the exit criterion for itself. It sits between the two stages of `alear030-push-merge`, and declares its division of work with `alear030-doc-drift-check`: that one checks doc drift, this one checks whether a batch of changes closed off
 
-So what actually got distilled isn't just twelve rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just thirteen rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 
