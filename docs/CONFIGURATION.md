@@ -110,7 +110,7 @@ cp mcp_client/mcp.json.example mcp_client/mcp.json
 | `command` | stdio | 必填。启动 server 的可执行文件。写 PATH 上的命令名或绝对路径——相对路径在启动前按启动目录查找，不受 `cwd` 影响 |
 | `args` | stdio | 命令行参数数组 |
 | `env` | stdio | 传给子进程的环境变量 |
-| `cwd` | stdio | 子进程工作目录。缺省为仓库根，相对路径也按仓库根解析，与从哪个目录启动无关；`args` 里的相对路径通常按这个目录解析，但最终取决于 server 程序自身 |
+| `cwd` | stdio | 子进程工作目录。`${VAR}` 与其它字段同一套展开规则；缺省为仓库根，展开后仍是相对路径的也按仓库根解析，与从哪个目录启动无关；`args` 里的相对路径通常按这个目录解析，但最终取决于 server 程序自身 |
 | `url` | http | 必填。Streamable HTTP 端点 |
 | `headers` | http | 请求头，凭证通常放这里 |
 | `timeout` | http | 秒，默认 30 |
