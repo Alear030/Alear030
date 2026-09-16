@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1205 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1226 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -24,7 +24,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | The taste for writing comments in my code |
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 129 | Read-only pre-merge review of an open PR: three reconciliation passes and one exit criterion |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 150 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
@@ -156,17 +156,19 @@ Using a skill rather than letting the agent grep for itself is because self-grep
 
 Sedimented from the scheduled task that fires at nine every morning: it checks the core docs one by one against the live code, through three lenses — structural drift (referenced files/entry points/counts that no longer exist), behavioural drift (assertions contradicting the code), and typos or stale wording. Two iron rules: verify mechanically before concluding (to keep false positives down); any judgement that depends on uncommitted code is skipped into the warning section, no guessing. Strictly read-only throughout — once the report is out, the decision returns to me.
 
-### `alear030-pr-review` (129 lines)
+### `alear030-pr-review` (150 lines)
 
 Same read-only reporting family as the previous one, but pointed at a different object: that one checks docs against the code as routine hygiene, this one checks whether a batch of changes on an open PR has actually closed off before it gets merged.
 
 It came out of a review done by an external agent: it took four rounds to get there, the most expensive finding (a reversal in what gets persisted) was one I pointed out myself, and a different agent on the same PR saw it almost immediately. The difference wasn't who knew the project better, it was the question being asked — one asks "is this code written correctly," the other asks "what does the data turn into."
 
-So this skill carries no knowledge of its own, it carries wiring: the target categories point at [the retrospective](../../docs/retrospective/eval-to-architecture.md) that already names them, mechanism facts are written as probes pointing back into `docs/` (how to check, never the current answer — answers go stale, and a stale answer is worse than none), and the skill keeps only three reconciliation passes, the routing discipline, and one exit criterion.
+So this skill carries no knowledge of its own, it carries wiring: the target categories point at [the retrospective](../../docs/retrospective/eval-to-architecture.md) that already names them, mechanism facts are written as probes pointing back into `docs/` (how to check, never the current answer — answers go stale, and a stale answer is worse than none), and the skill originally kept only three reconciliation passes, the routing discipline, and one exit criterion.
 
-**The exit criterion is the only genuinely new thing here**: "the diff has been read" doesn't mean done; done is when all three passes are complete and every data flow has a conclusion on its producer, its consumer, and its reachability. What gets missed usually isn't beyond understanding — it's stopping too early.
+**The exit criterion was the only genuinely new thing in the first version**: "the diff has been read" doesn't mean done; done is when all three passes are complete and every data flow has a conclusion on its producer, its consumer, and its reachability. What gets missed usually isn't beyond understanding — it's stopping too early.
 
 Writing it nearly went wrong once. I was about to put a few concrete function names into the probe table, so a review could just grep them and move on. What stopped it: **a check written against hard-coded names doesn't fail after a rename — it still returns a batch of results**, and whoever runs it sees hits and assumes that item is covered, so the genuinely new path gets skipped in silence. Probe rot isn't a probe going dead, it's a probe **turning into a false pass**, which is worse than not having it. Hence the admission rule: a probe belongs in that table only if it can't be turned into a silent pass by a rename, a new implementation, or a refactor; where that can't be met, it gets raised to the level of a property, or at minimum carries a self-check for its own staleness.
+
+A later layer: the review itself is now run by an executor with no session history, and an adversarial-input pass was added. The trigger was a comparison with a zero-context external reviewer — falsy values slipping past validation, path parameters escaping their root, liveness heuristics failing, totals not matching their tables: it caught these reliably, self-review reliably missed them. Not because they were hard to follow, but because the reviewer inherited the assumptions the code was written under; remove that session history and the assumptions become questions again.
 
 The same reasoning ruled out the more thorough option of tagging every persistence entry point with a marker. That would assert "persistence entry point" is already a settled category, while this very batch of changes keeps moving it. Caching a list that can be recomputed at any time, and paying the sync cost for it, is precisely this project's own second target category. So the list is derived fresh in each review and is a required deliverable of the report; once several independently derived lists agree, it's worth asking whether to freeze one.
 

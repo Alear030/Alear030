@@ -20,10 +20,10 @@ Concretely:
 
 This is easy to misunderstand, so it gets its own section:
 
-- **Write**: target paths for `file_write` and `file_edit` must fall under `workspace/` or `skill/`, or they are refused
+- **Write**: by default, target paths for `file_write` and `file_edit` must fall under `workspace/` or `skill/`, or they are refused; this is controlled by `FILE_EDIT_SANDBOX` in `config.py`, and turning it off allows any absolute path
 - **Read**: `file_read`, `file_grep`, and `file_glob` **can read any absolute path on disk**; they only require the path to be absolute
 
-In other words, the model cannot write outside the workspace, but it can read any file it has permission to read on your machine. If the machine holds content you do not want read, keep that in mind.
+In other words, with the sandbox on the model cannot write outside the workspace, but it can read any file it has permission to read on your machine. If the machine holds content you do not want read, keep that in mind.
 
 ## Other Boundaries Worth Knowing
 

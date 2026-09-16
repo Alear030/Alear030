@@ -193,6 +193,7 @@ memory_configs/
 | 常量 | 默认值 | 作用 |
 |---|---|---|
 | `MEMORY_PIPELINE_ENABLED` | `False` | 跨会话记忆管线总闸，见上一节 |
+| `FILE_EDIT_SANDBOX` | `True` | `file_write` / `file_edit` 写入沙箱：开启时只能写 `workspace/` 与 `skill/`，关闭后可写任意绝对路径 |
 | `MAX_TOOLCALLS` | 30 | 单轮 ReAct 的最大工具调用次数，超出后强制收尾 |
 | `SUB_MAX_TOOLCALLS` | 15 | 临时 subagent 的上限 |
 | `MAX_SESSION_TOKEN` | 250000 | session 压缩的触发阈值，按模型上下文窗口留安全余量 |

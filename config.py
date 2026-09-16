@@ -8,6 +8,8 @@ load_dotenv()
 
 ROOT_DIRECTORY = Path(__file__).parent
 WORK_SPACE = Path(__file__).parent/'workspace'
+# file_write / file_edit 写入沙箱:开启时只能写 WORK_SPACE 与 skill/,关闭后可写任意绝对路径;command 工具不受它约束
+FILE_EDIT_SANDBOX = True
 
 # agent_max_tool_call config
 MAX_TOOLCALLS = int(30)

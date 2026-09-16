@@ -115,6 +115,7 @@ Alear030/
 │       ├── system_prompt/      # 认知架构（static，order 0，仅 main）
 │       ├── attachment_prompt/  # 运行时通知/中断处理协议（static，order 5，仅 main）
 │       ├── tool_prompt/        # 工具使用原则 + 已持有工具的 name 与简短描述（static，order 10）
+│       ├── file_sandbox_prompt/ # 文件写入沙箱说明，FILE_EDIT_SANDBOX 关闭时为空不投（notification，order 15，投 main）
 │       ├── skill_prompt/       # 技能原则 + 已注册技能列表（notification，order 20，投 main）
 │       ├── session_recent/     # 最近 3 个 session 的 slice 摘要（notification，order 30，投 main，当前 enabled=False）
 │       ├── timeline_prompt/    # 跨会话时间线，读 timeline.json 做近/远分层（notification，order 30，投 main）
@@ -149,7 +150,7 @@ Alear030/
 │   ├── __init__.py             # 只导入 tool/tools/ 下的一级 package
 │   └── tools/
 │       ├── command/            # 命令行执行 + security.py 安全闸门（见设计决策末尾）
-│       ├── file_tool/          # 文件工具集群
+│       ├── file_tool/          # 文件工具集群 + sandbox.py 写入路径闸门（FILE_EDIT_SANDBOX）
 │       │   ├── file_read/      # 读取（带行号，三重输出上限）
 │       │   ├── file_write/     # 写入/新建（整体覆盖）
 │       │   ├── file_edit/      # 局部编辑（唯一字符串替换）
@@ -281,7 +282,7 @@ agent、session、tool、hook 等模块彼此之间不直接引用，而是通�
 
 ### 关于 file_tool 的读写不对称
 
-`file_write` 与 `file_edit` 的写入路径被限制在 `workspace/` 与技能目录内，但 `file_read`、`file_grep`、`file_glob` **可以读磁盘上任意绝对路径**。这是有意的取舍（读写风险等级不同），但别误以为整个 file_tool 集群都在沙箱里。
+`file_write` 与 `file_edit` 的写入路径默认被限制在 `workspace/` 与技能目录内（`FILE_EDIT_SANDBOX`，关闭后可写任意绝对路径；对模型的说明经 `file_sandbox_prompt` 以 attachment 投给 main，会话压缩后与被授予写权限的 subagent 都收不到说明，只靠工具返回的错误文案），但 `file_read`、`file_grep`、`file_glob` **可以读磁盘上任意绝对路径**。这是有意的取舍（读写风险等级不同），但别误以为整个 file_tool 集群都在沙箱里。
 
 另外 `web_fetch` 的输出硬截断在 5000 字符且**没有续读协议**——是唯一一个截断后不告诉模型怎么拿剩余部分的工具，与 `file_read` 的 offset 续读、`command` 的首尾保留式截断不一致。已知待修。
 

@@ -221,6 +221,7 @@ When picking an order, use this table and insert into a gap:
 system_prompt      0   static
 attachment_prompt  5   static
 tool_prompt       10   static
+file_sandbox_prompt 15 notification → main (empty, not delivered, when FILE_EDIT_SANDBOX=False)
 skill_prompt      20   notification → main
 session_recent    30   notification → main (enabled=False)
 timeline_prompt   30   notification → main
