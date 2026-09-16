@@ -1,22 +1,23 @@
 ---
 name: alear030-clear-logdata
-description: "清理 Alear030 没有实际对话意义的会话过程文件时使用：测试启动、打招呼试连通、开了就关的空会话，在 session_detail、trace_log、log_data 等处按 session_id 各留一份。按 session 归集全部产物、读用户原话判断有无实质、排除被 memory 引用与可能正在运行的会话，列清单交用户逐条确认后整组送进回收站。用户说清理测试会话、清空会话、删没用的 session/trace/log 记录时用这个 skill。"
+description: "清理 Alear030 没有实际对话意义的会话过程文件时使用：测试启动、打招呼试连通、开了就关的空会话，在 session_detail、trace_log、log_data 等处按 session_id 各留一份。按 session 归集全部产物、读用户原话判断有无实质、排除被 memory 引用与可能正在运行的会话，列清单交用户逐条确认后整组移入隔离目录，可按批还原。用户说清理测试会话、清空会话、删没用的 session/trace/log 记录时用这个 skill。"
 ---
 
 # Alear030 会话过程文件清理
 
 一次会话会在多个目录各落一份以 `session_id` 为文件名的过程文件，清理的单位是**会话**而不是文件：判断一次，整组处理，不会只删了 detail 漏掉 trace。
 
-这些目录全部被 git 忽略，删了无法从仓库恢复，所以硬边界是：**只清用户逐条确认过的 session，一律送回收站，不做永久删除。** 按 session_id 聚合的共享文件（memory 存储、memory 管线日志）里的行不在清理范围内。
+这些目录全部被 git 忽略，删了无法从仓库恢复，所以硬边界是：**只清用户逐条确认过的 session，一律移进隔离目录，不做任何删除。** 不用系统回收站——文件放不进回收站时 shell 会改为永久删除，而为了不弹窗压掉确认框，这一步就会静默发生。按 session_id 聚合的共享文件（memory 存储、memory 管线日志）里的行不在清理范围内。
 
 ## 工具
 
 `logdata.py` 与本文件同目录，从要清理的那个 checkout 根目录调用（它按当前目录的 git 仓库定位数据）：
 
 - `python <skill 目录>/logdata.py scan`：只读，输出 JSON
-- `python <skill 目录>/logdata.py trash <id> [<id> ...]`：重扫后把这些 session 的全部产物送回收站
+- `python <skill 目录>/logdata.py quarantine <id> [<id> ...]`：重扫后把这些 session 的全部产物按原相对路径移进隔离目录的一个新批次（`scan` 输出的 `quarantine_dir` 下，按 checkout 分开），附 manifest
+- `python <skill 目录>/logdata.py restore <批次>`：把一批移回原处；原处已有同名文件的不覆盖，报失败，处理后重跑即可
 
-发现规则不维护目录清单，靠项目约定「单 session 过程数据以 session_id 为文件名」在所有被忽略的目录里找——新加一种过程文件不用改脚本。scan 输出里的 `artifact_dirs` 是这次实际发现的产物目录，出现没见过的目录时在报告里点出来。脚本在 session_id 格式对不上时会报错退出，那是约定变了，停下来报告，不要改正则绕过去。
+发现规则不维护目录清单，靠项目约定「单 session 过程数据以 session_id 为文件名」在所有被忽略的目录里找——新加的过程文件只要沿用这条约定就不用改脚本，不沿用的（按会话建子目录、文件名带前后缀）会被漏掉；反过来，被忽略目录里名字恰好形如 session_id 的非会话文件会被并进同名会话，所以清单里必须列出每个会话的产物目录。scan 输出里的 `artifact_dirs` 是这次实际发现的产物目录，出现没见过的目录时在报告里点出来。session_detail 下只要有一个文件名对不上 session_id 格式，脚本就报错退出，那是约定变了，停下来报告，不要改正则绕过去。
 
 ## 流程
 
@@ -26,12 +27,12 @@ description: "清理 Alear030 没有实际对话意义的会话过程文件时�
 
 1. **确定范围。** 主仓库和各 worktree 的数据互相独立，`git worktree list` 列出全部 checkout。用户点名了就只扫那个；没点名就每个都 scan（只读无副作用），分 checkout 汇报。
 2. **scan**，按下面的分类逐个 session 圈选，每个圈进来的 session 都要写出理由。
-3. **按清单格式汇报，停下。** 不调用 `trash`，不追问「要不要现在清」之外的任何动作。
+3. **按清单格式汇报，停下。** 不调用 `quarantine`，不追问「要不要现在清」之外的任何动作。
 
 **第二段：执行（只在用户给出决策之后）**
 
 4. 用户的决策要能落到具体 id 和 checkout 上：可以增删；「按建议来」指建议清理表里的 id，单列区不含在内；说不清清哪些就再问，不按自己的圈选推断。
-5. **trash** 这些 id，如实汇报每个 session 的结果，`partial`、`skipped_*` 单独说明。
+5. **quarantine** 这些 id，如实汇报批次名、每个 session 的结果，`partial`、`skipped_*`、`not_found` 单独说明，并告诉用户还原命令。隔离目录不会自动清空，占用的空间由用户自己决定何时处理。
 
 ## 怎么判断
 

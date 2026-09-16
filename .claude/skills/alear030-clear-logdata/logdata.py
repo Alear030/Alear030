@@ -1,18 +1,23 @@
 """按 session_id 归集过程文件，供 alear030-clear-logdata 技能清理用。
 
 scan：只读，输出每个 session 的产物、对话量、是否被 memory 引用，JSON 到 stdout
-trash：按给定 session_id 重新扫描，把全部产物送进系统回收站（仅 Windows）
+quarantine：按给定 session_id 重新扫描，把全部产物移进仓库外的隔离目录，每批一份 manifest
+restore：按 manifest 把一批隔离的文件移回原处
 
 发现规则依赖项目约定「单 session 过程数据以 session_id 为文件名」，不枚举目录，
-在 git 忽略的目录里找文件名形如 session_id 的文件，新增产物类型无需改这里。
+在 git 忽略的目录里找文件名形如 session_id 的文件；不沿用这条约定的产物会被漏掉。
+
+不走系统回收站：shell 在放不进回收站时会改为永久删除，而压掉确认框又会让这一步静默发生。
 """
 import argparse
+import hashlib
 import json
-import os
 import re
+import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(subprocess.run(
@@ -28,6 +33,9 @@ EXCLUDE_TOP = {'workspace', 'z_ccstudy', 'z_old_code', '.cc_file', 'local_model'
                '.git', '.claude', '.agents', '.local', '.opencode', '.zcode'}
 ACTIVE_WINDOW_SECONDS = 600
 EXCERPT_CHARS = 80
+# 按 checkout 分开：主仓库与各 worktree 的同名 session 是不同的文件
+QUARANTINE_ROOT = (Path.home() / '.alear030' / 'logdata_quarantine'
+                   / f"{ROOT.name}_{hashlib.md5(str(ROOT).lower().encode()).hexdigest()[:8]}")
 
 
 def _ignored_dirs():
@@ -76,9 +84,10 @@ def _memory_text():
 def scan():
     detail_dir = Path(SESSION_MEMORTY_DETAIL_PATH)
     detail_files = list(detail_dir.glob('*.json')) if detail_dir.exists() else []
-    # 失效自检：session_id 格式或落盘约定变了，发现规则会静默返回空，必须报错而不是当作「没有可清理的」
-    if detail_files and not any(SESSION_ID.match(f.stem) for f in detail_files):
-        sys.exit(f'session_detail 下的文件名都不匹配 {SESSION_ID.pattern}，session_id 格式可能已变更，停止')
+    # 失效自检：格式一变，新会话会从发现结果里静默消失而旧会话照常匹配，所以有一个对不上就停
+    unrecognized = sorted(f.name for f in detail_files if not SESSION_ID.match(f.stem))
+    if unrecognized:
+        sys.exit(f'session_detail 下有文件名不匹配 {SESSION_ID.pattern}，session_id 格式可能已变更，停止：{unrecognized}')
 
     artifacts = _collect_artifacts()
     memory_text = _memory_text()
@@ -98,22 +107,28 @@ def scan():
         sessions.append(entry)
 
     kinds = sorted({Path(f['path']).parent.as_posix() for s in sessions for f in s['files']})
-    return {'root': ROOT.as_posix(), 'artifact_dirs': kinds, 'sessions': sessions}
+    return {'root': ROOT.as_posix(), 'quarantine_dir': QUARANTINE_ROOT.as_posix(),
+            'artifact_dirs': kinds, 'sessions': sessions}
 
 
-def _send_to_recycle_bin(path: Path):
-    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; "
-          "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($env:TRASH_TARGET, 'OnlyErrorDialogs', 'SendToRecycleBin')")
-    env = {**os.environ, 'TRASH_TARGET': str(path)}
-    r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', ps],
-                       capture_output=True, text=True, env=env)
-    return r.returncode == 0 and not path.exists(), r.stderr.strip()
+def _move(src: Path, dest: Path):
+    if dest.exists():
+        return f'目标已存在：{dest}'
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dest))
+    except OSError as e:
+        return f'{type(e).__name__}: {e}'
+    return None if dest.exists() and not src.exists() else '移动后校验失败'
 
 
-def trash(session_ids, allow_referenced):
-    if sys.platform != 'win32':
-        sys.exit('trash 目前只实现了 Windows 回收站，其他平台请手动处理')
+def quarantine(session_ids, allow_referenced):
     by_id = {s['session_id']: s for s in scan()['sessions']}
+    batch = datetime.now().strftime('%Y%m%d_%H%M%S')
+    batch_dir = QUARANTINE_ROOT / batch
+    while batch_dir.exists():
+        batch += '_'
+        batch_dir = QUARANTINE_ROOT / batch
     results = []
     for sid in session_ids:
         s = by_id.get(sid)
@@ -127,25 +142,58 @@ def trash(session_ids, allow_referenced):
         if s['memory_referenced'] and not allow_referenced:
             results.append({'session_id': sid, 'status': 'skipped_memory_referenced'})
             continue
-        done, failed = [], []
+        moved, failed = [], []
         for f in s['files']:
-            ok, err = _send_to_recycle_bin(ROOT / f['path'])
-            (done if ok else failed).append(f['path'] if ok else {'path': f['path'], 'error': err})
-        results.append({'session_id': sid, 'status': 'trashed' if not failed else 'partial',
-                        'trashed': done, 'failed': failed})
-    return results
+            err = _move(ROOT / f['path'], batch_dir / f['path'])
+            if err:
+                failed.append({'path': f['path'], 'error': err})
+            else:
+                moved.append(f['path'])
+        results.append({'session_id': sid, 'status': 'partial' if failed else 'quarantined',
+                        'moved': moved, 'failed': failed})
+    if batch_dir.exists():
+        # 批目录按原相对路径摆放，manifest 只做记录，restore 不依赖它
+        manifest = {'root': ROOT.as_posix(), 'batch': batch, 'results': results}
+        (batch_dir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    return {'batch': batch, 'batch_dir': batch_dir.as_posix(), 'results': results}
+
+
+def restore(batch):
+    batch_dir = QUARANTINE_ROOT / batch
+    if not batch_dir.is_dir():
+        sys.exit(f'隔离批次不存在：{batch_dir}')
+    restored, failed = [], []
+    for f in sorted(batch_dir.rglob('*')):
+        if not f.is_file() or f == batch_dir / 'manifest.json':
+            continue
+        rel = f.relative_to(batch_dir)
+        err = _move(f, ROOT / rel)
+        if err:
+            failed.append({'path': rel.as_posix(), 'error': err})
+        else:
+            restored.append(rel.as_posix())
+    if not failed:
+        shutil.rmtree(batch_dir)
+    return {'batch': batch, 'restored': restored, 'failed': failed}
 
 
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='cmd', required=True)
     sub.add_parser('scan')
-    t = sub.add_parser('trash')
-    t.add_argument('session_ids', nargs='+')
-    t.add_argument('--allow-memory-referenced', action='store_true')
+    q = sub.add_parser('quarantine')
+    q.add_argument('session_ids', nargs='+')
+    q.add_argument('--allow-memory-referenced', action='store_true')
+    r = sub.add_parser('restore')
+    r.add_argument('batch')
     args = parser.parse_args()
 
-    result = scan() if args.cmd == 'scan' else trash(args.session_ids, args.allow_memory_referenced)
+    if args.cmd == 'scan':
+        result = scan()
+    elif args.cmd == 'quarantine':
+        result = quarantine(args.session_ids, args.allow_memory_referenced)
+    else:
+        result = restore(args.batch)
     sys.stdout.reconfigure(encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
