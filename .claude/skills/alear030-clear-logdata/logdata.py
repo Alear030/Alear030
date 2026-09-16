@@ -66,7 +66,8 @@ def _collect_artifacts(detail_dir: Path, known_ids: set):
     artifacts, unkeyed = {}, []
     for d, files in sorted(by_dir.items()):
         matches = sum(f.stem in known_ids for f in files)
-        keyed = d == detail_dir or (matches >= KEYED_DIR_MIN_MATCHES and matches * 2 > len(files))
+        total_files = sum(f.is_file() for f in d.iterdir())  # 普通文件也计入目录匹配比例
+        keyed = d == detail_dir or (matches >= KEYED_DIR_MIN_MATCHES and matches * 2 > total_files)
         for f in sorted(files):
             if keyed:
                 artifacts.setdefault(f.stem, []).append(f)
