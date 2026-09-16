@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十二个技能，一共 1114 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十三个技能，一共 1205 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十二个里有十一个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十三个里有十二个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -16,18 +16,19 @@
 
 | 技能 | 行数 | 一句话 |
 |------|------|--------|
-| [`alear030-verify`](alear030-verify/SKILL.md) | 152 | 这个项目的验证方式和常规 Python 项目不一样 |
+| [`alear030-verify`](alear030-verify/SKILL.md) | 154 | 这个项目的验证方式和常规 Python 项目不一样 |
 | [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | 在 worktree 改完生产代码必须回读确认 |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
-| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 199 | commit 之后 push、开 PR，停下评审，放行后才合并 |
+| [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | 往我的代码里写注释的口味 |
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 105 | 已开 PR 的 merge 前只读审查，三道对账加一条退出标准 |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 129 | 已开 PR 的 merge 前只读审查，三道对账加一条退出标准 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
+| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
 
 名字全部带 `alear030-` 前缀。早期只有项目特有的几个带，`commit-message` 这类「格式规范」没带——但它们同样只在这个项目里成立，前缀的有无并不表示任何区别，反而会让人以为有。所以后来统一加上了，规则变成一条没有例外的规则。
 
@@ -39,7 +40,7 @@
 
 这一组的共同点是：**按常规经验做就会出事**，而且出事之后不容易看出原因。
 
-### `alear030-verify`（152 行）
+### `alear030-verify`（154 行）
 
 这个项目的验证方式有几个反直觉的地方，凭通用 Python 项目的经验直接套会踩：
 
@@ -121,7 +122,7 @@
 
 它和 pretodoHandle 是显式分工：看板认领、开分支、PR 合并归那个，这个在当前 checkout 直接修、不开分支不 push。里面有一条从 #8 学来的教训进了正文：**issue 会过时**——立项时"无隔离"的前提被 #5 合入改变，差点照着过时前提再修一遍；所以定位步骤强制先复核前提还成不成立。
 
-### `alear030-push-merge`（199 行）
+### `alear030-push-merge`（203 行）
 
 commit 之后的收尾，**分两段，中间必须停**：
 
@@ -155,7 +156,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 每天早上九点的定时任务沉淀成的技能：逐篇核对核心文档与代码现场，三种口径——结构性漂移（引用的文件/入口/计数已不存在）、行为描述漂移（断言与代码矛盾）、笔误过期。两条铁律：先机械核对再下结论（压误报）；判定依赖未提交代码的一律跳过进警示区，不猜。全程只读，报告完把决定权交回。
 
-### `alear030-pr-review`（105 行）
+### `alear030-pr-review`（129 行）
 
 和上一个同属只读汇报类，但对象不同：那个查文档与代码的日常漂移，这个查一批已开 PR 的改动在 merge 之前有没有真的收口。
 
@@ -169,11 +170,21 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 同一个理由也否掉了「给持久化入口统一打标记」这个更彻底的方案——那等于断言「持久化入口」已经是个稳定类别，可它现在还在这批改动里被反复挪动。给一份能随时重算的清单建缓存、再承担同步成本，正是这个项目自己的第二类靶子。所以清单改成每次 review 现列、并作为必交产物写进报告；等几次列出来的结果稳定一致了，再谈要不要固化。
 
+### `alear030-clear-logdata`（61 行）
+
+一次会话会在 session_detail、trace_log、log_data 各落一份以 session_id 命名的文件。忘开 memory pipeline、或者只是启动试一下连通，就会留下一组没有对话内容的记录。只有 session_detail 一处时手动删还应付得来，过程文件变多之后，一个目录一个目录地找很容易漏掉其中一份。
+
+所以清理的单位定成会话而不是文件：判断一次，整组处理。技能带一个脚本，按「单 session 过程数据以 session_id 为文件名」这条约定在所有被忽略的目录里找产物，不维护目录清单——以后新加的过程文件只要沿用这条约定，就不用回来改它。
+
+判断看用户原话有没有实质，不看轮数。最近还在写入的会话直接跳过；被 memory 引用的、只有其他产物而没有 detail 的（比如 plan 模式下线后留下的 session_plan）单列，不建议清。这些目录全被 git 忽略，删了从仓库找不回来，所以最后一步只清逐条确认过的 id，并且只是移进仓库外的隔离目录，可以按批还原。
+
+起初用的是系统回收站，merge 前审查时翻到了它的另一面：文件放不进回收站时 shell 会改为永久删除，而为了不弹窗压掉确认框，这一步就会静默发生。于是换成了一个不经过 shell 的隔离目录。
+
 ---
 
-## 它们不是十二个孤立的文件
+## 它们不是十三个孤立的文件
 
-这十二个技能之间有引用关系：
+这十三个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，`alear030-issue-pretodoHandle` 与 `alear030-pr-review` 都反向引用它——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
@@ -182,7 +193,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 - `alear030-style-notes` 指向 `.cursor/rules/coding-conventions.mdc`，写法纪律只在那里维护一份，技能本身不复述全文
 - `alear030-pr-review` 把这条反复述纪律用到了底：靶子分类指向 `docs/retrospective/`、机制事实指向 `docs/`、验证口径指向 `alear030-verify`、发现落盘指向 `alear030-issue-mark`，自己只留 review 时的提问顺序与退出标准。它卡在 `alear030-push-merge` 两段之间，与 `alear030-doc-drift-check` 声明分工：那个查文档漂移，这个查一批改动的机制收口
 
-所以真正被沉淀下来的不只是十二条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十三条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 
