@@ -20,7 +20,7 @@ def memory_prompt()->str:
         user_content = json.loads(user_json)
     else:
         return
-    # 语法/编码损坏不在此处吞：直接抛给 build_prompt 的中心化隔离统一捕获并记 log
+    # 语法/编码损坏不在此处吞：直接抛给 game_begin 的逐块隔离统一捕获并记 log
     # 结构层(形状)防御仍在下方,语法层防御已上移,避免双层防御各记各的
 
     # 空画像不注入(避免空标题污染 system prompt)
