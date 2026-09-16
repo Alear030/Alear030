@@ -211,7 +211,7 @@ def build() -> str:           # notification blocks take no agent argument
     return '#content that may change every round'
 ```
 
-Neither path accepts a block without `type` — `build_prompt` takes only `static`, and `game_begin` whitelists `notification` / `interrupt`, logging a `prompt_block_skip` and skipping anything omitted or misspelled rather than delivering it as a notification by default. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
+Neither path accepts a block without `type` — `build_prompt` takes only `static`, and `game_begin` whitelists `notification` / `interrupt`, logging a `prompt_block_skip` and skipping anything omitted or misspelled rather than delivering it as a notification by default. Both paths also isolate evaluation per block: a block that raises is skipped on its own (`build_prompt` logs `prompt_chunk_skip`, `game_begin` logs `prompt_block_error`) and the remaining blocks still take effect. Putting changing content in the system prompt does not cost "a few extra tokens"; it costs the entire tool schema behind it its prefix cache — the system prompt sits ahead of the tools schema, so "pinned to the end of the system prompt" is not the same as "last in the prefix".
 
 ### Current order layout
 

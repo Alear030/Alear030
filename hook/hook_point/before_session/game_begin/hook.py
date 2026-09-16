@@ -31,7 +31,15 @@ def game_begin(prompt=None,session=None,agents=None,**kwargs):
             continue
 
         # 求值一次：function 里有读盘和 tiktoken 编码，投递与 trace 两个消费者不该各调一次
-        prompt_content = prompt_block["function"]()
+        # 逐块隔离：单块求值失败只丢自己，不连坐排在其后的分块
+        try:
+            prompt_content = prompt_block["function"]()
+        except Exception as e:
+            Log.pending_record(level="high",source="game_begin",event="prompt_block_error",detail={
+                "prompt_name":prompt_block["name"],
+                "error":f"{type(e).__name__}: {e}"
+            })
+            continue
         if not prompt_content:
             continue
 

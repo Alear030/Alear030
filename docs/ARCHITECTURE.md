@@ -263,7 +263,7 @@ MCP 工具是唯一的例外：远端 server 自报的 `inputSchema` 本身就�
 
 `prompt/prompts/` 下每个分块用 `@prompt.register_prompt(order, condition, enabled, type, target)` 独立注册。`type` 决定分块走哪条路：`static` 由 `build_prompt(agent)` 按 order 排序、按 condition / enabled 过滤后拼接成 system prompt；`notification` 不进 system prompt，由 `before_session/game_begin` 钩子按 `target` 声明的 agent 投成 attachment。**投递只发生一次**——`game_begin` 挂在 `before_session` 上，一个进程只触发一次，节点在首轮渲染后走 `processing` → `finished` 被回收，不会每轮重投。所以 notification 分块拿到的是**进程启动时的快照**，session 内的后续变化感知不到。
 
-这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 两边都不收**——`build_prompt` 只认 `static`，`game_begin` 走白名单只认 `notification` / `interrupt`，漏写或拼错的会记一条 `prompt_block_skip` 后跳过，不再兜底投出。
+这条分流是缓存驱动的：system prompt 整体排在 tools schema 前面，所以会变的内容只要还留在 system prompt 里，哪怕压在最末尾，也仍然在 12.7K 工具 schema 的前面——它一变，排在它后面的工具 schema 整块失去前缀缓存。**分块忘了写 `type` 两边都不收**——`build_prompt` 只认 `static`，`game_begin` 走白名单只认 `notification` / `interrupt`，漏写或拼错的会记一条 `prompt_block_skip` 后跳过，不再兜底投出。**两边求值都逐块隔离**——某块抛异常只跳过它自己（`build_prompt` 记 `prompt_chunk_skip`，`game_begin` 记 `prompt_block_error`），其余分块照常生效。
 
 新增分块只需建目录写 `prompt.py`，自动发现注册，不改其他分块。
 

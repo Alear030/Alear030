@@ -211,7 +211,7 @@ def build() -> str:           # notification 类不收 agent 参数
     return '#每轮都可能变的内容'
 ```
 
-两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 走白名单只收 `notification` / `interrupt`，漏写或拼错的块会记一条 `prompt_block_skip` 后跳过，不会被当成 notification 兜底投出。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
+两条路都不认没写 `type` 的分块——`build_prompt` 只收 `static`，`game_begin` 走白名单只收 `notification` / `interrupt`，漏写或拼错的块会记一条 `prompt_block_skip` 后跳过，不会被当成 notification 兜底投出。两条路对分块求值都逐块隔离：某块抛异常只跳过它自己（`build_prompt` 记 `prompt_chunk_skip`，`game_begin` 记 `prompt_block_error`），其余分块照常生效。会变的内容放进 system prompt 的代价不是「多几个 token」，是排在它后面的整块工具 schema 失去前缀缓存——system prompt 排在 tools schema 前面，所以「压到 system prompt 最末尾」并不等于「排到整个前缀最后」。
 
 ### 当前 order 分布
 
