@@ -115,6 +115,7 @@ Alear030/
 │       ├── system_prompt/      # cognitive architecture (static, order 0, main only)
 │       ├── attachment_prompt/  # runtime notice/interrupt handling protocol (static, order 5, main only)
 │       ├── tool_prompt/        # tool-use principles + name and short desc of held tools (static, order 10)
+│       ├── file_sandbox_prompt/ # file write sandbox notice, empty and not delivered when FILE_EDIT_SANDBOX is off (notification, order 15, to main)
 │       ├── skill_prompt/       # skill principles + registered skill list (notification, order 20, to main)
 │       ├── session_recent/     # slice summaries of last 3 sessions (notification, order 30, to main, currently enabled=False)
 │       ├── timeline_prompt/    # cross-session timeline; reads timeline.json for near/far layering (notification, order 30, to main)
@@ -149,7 +150,7 @@ Alear030/
 │   ├── __init__.py             # import only first-level packages under tool/tools/
 │   └── tools/
 │       ├── command/            # command execution + security.py gate (see end of design decisions)
-│       ├── file_tool/          # file-tool cluster
+│       ├── file_tool/          # file-tool cluster + sandbox.py write-path gate (FILE_EDIT_SANDBOX)
 │       │   ├── file_read/      # read (with line numbers; triple output caps)
 │       │   ├── file_write/     # write/create (full overwrite)
 │       │   ├── file_edit/      # local edit (unique string replace)
@@ -281,7 +282,7 @@ Lower-level registry, types, config, and storage components may be imported dire
 
 ### On file_tool read/write asymmetry
 
-Write paths for `file_write` and `file_edit` are restricted to `workspace/` and skill directories by default (`FILE_EDIT_SANDBOX`; when off, any absolute path is writable. The model is told about the restriction through the `file_sandbox_prompt` attachment delivered to main — subagents granted write access do not receive it and only see the tool's error message), but `file_read`, `file_grep`, and `file_glob` **can read any absolute path on disk**. This is an intentional tradeoff (read and write have different risk levels); do not assume the entire file_tool cluster is sandboxed.
+Write paths for `file_write` and `file_edit` are restricted to `workspace/` and skill directories by default (`FILE_EDIT_SANDBOX`; when off, any absolute path is writable. The model is told about the restriction through the `file_sandbox_prompt` attachment delivered to main — after session compression, and for subagents granted write access, it is absent and only the tool's error message remains), but `file_read`, `file_grep`, and `file_glob` **can read any absolute path on disk**. This is an intentional tradeoff (read and write have different risk levels); do not assume the entire file_tool cluster is sandboxed.
 
 Separately, `web_fetch` hard-truncates output at 5000 characters and has **no continuation protocol** — it is the only tool that truncates without telling the model how to get the remainder, inconsistent with `file_read`'s offset continuation and `command`'s head-and-tail truncation. Known issue to fix.
 

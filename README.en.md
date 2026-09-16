@@ -259,7 +259,7 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ## Security
 
-It runs commands, reads and writes files, and accesses the network on your machine. The `command` gate is built to stop the model from slipping, not to sandbox an adversary, and `file_tool` is asymmetric — writes are confined to `workspace/` by default (`FILE_EDIT_SANDBOX`), reads are not. Worth a look before you run it: **[SECURITY.md](SECURITY.en.md)**.
+It runs commands, reads and writes files, and accesses the network on your machine. The `command` gate is built to stop the model from slipping, not to sandbox an adversary, and `file_tool` is asymmetric — writes are confined to `workspace/` and `skill/` by default (`FILE_EDIT_SANDBOX`), reads are not. Worth a look before you run it: **[SECURITY.md](SECURITY.en.md)**.
 
 ---
 

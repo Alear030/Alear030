@@ -259,7 +259,7 @@ Python ≥3.10 · openai · pyyaml · tiktoken · rich · textual · sentence-tr
 
 ## 安全边界
 
-它会在你的机器上执行命令、读写文件、访问网络。`command` 工具那层闸门的威胁模型是「防模型手滑」，不是沙箱；`file_tool` 的读写是不对称的（写默认受限于 `workspace/`，由 `FILE_EDIT_SANDBOX` 控制；读可达任意绝对路径）。跑之前值得看一眼 **[安全说明](SECURITY.md)**。
+它会在你的机器上执行命令、读写文件、访问网络。`command` 工具那层闸门的威胁模型是「防模型手滑」，不是沙箱；`file_tool` 的读写是不对称的（写默认受限于 `workspace/` 与 `skill/`，由 `FILE_EDIT_SANDBOX` 控制；读可达任意绝对路径）。跑之前值得看一眼 **[安全说明](SECURITY.md)**。
 
 ---
 
