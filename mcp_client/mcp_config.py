@@ -118,7 +118,8 @@ def build_params(server_key:str,entry:dict):
     if not command:
         raise McpConfigError(f'server {server_key} 是 stdio 类型但缺少 command')
     # cwd 与其它字段同一套 ${VAR} 展开；展开后锚到仓库根，不继承启动目录；绝对路径经 / 拼接保持原样
-    cwd = _expand_str(entry.get('cwd'),server_key,'cwd') if entry.get('cwd') else '.'
+    cwd = entry.get('cwd')
+    cwd = (_expand_str(cwd,server_key,'cwd') or '.') if cwd is not None else '.'
     return StdioServerParameters(
         command=_expand_str(command,server_key,'command'),
         args=_expand_str_list(entry.get('args') or [],server_key,'args'),
