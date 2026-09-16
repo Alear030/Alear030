@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1193 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1201 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -28,7 +28,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
-| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 49 | Clean up process files of sessions with no real conversation, per session, to the Recycle Bin after confirmation |
+| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 57 | Clean up process files of sessions with no real conversation, per session, to the Recycle Bin after confirmation |
 
 Every name carries the `alear030-` prefix. Early on only the project-specific ones did — format rules like `commit-message` did not — but those hold only inside this project too, so the presence or absence of a prefix marked no real distinction while implying one. They were unified afterwards, turning the convention into a rule with no exceptions.
 
@@ -170,7 +170,7 @@ Writing it nearly went wrong once. I was about to put a few concrete function na
 
 The same reasoning ruled out the more thorough option of tagging every persistence entry point with a marker. That would assert "persistence entry point" is already a settled category, while this very batch of changes keeps moving it. Caching a list that can be recomputed at any time, and paying the sync cost for it, is precisely this project's own second target category. So the list is derived fresh in each review and is a required deliverable of the report; once several independently derived lists agree, it's worth asking whether to freeze one.
 
-### `alear030-clear-logdata` (49 lines)
+### `alear030-clear-logdata` (57 lines)
 
 A single session leaves one file named by its session_id in each of session_detail, trace_log and log_data. Forgetting to turn on the memory pipeline, or starting up just to check connectivity, leaves behind a set of records with no conversation in them. Deleting by hand was manageable while session_detail was the only place; with more process files, going directory by directory makes it easy to miss one of them.
 

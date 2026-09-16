@@ -4,7 +4,7 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十三个技能，一共 1193 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十三个技能，一共 1201 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
@@ -28,7 +28,7 @@
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
-| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 49 | 按会话清理没有实际对话的过程文件，确认后送回收站 |
+| [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 57 | 按会话清理没有实际对话的过程文件，确认后送回收站 |
 
 名字全部带 `alear030-` 前缀。早期只有项目特有的几个带，`commit-message` 这类「格式规范」没带——但它们同样只在这个项目里成立，前缀的有无并不表示任何区别，反而会让人以为有。所以后来统一加上了，规则变成一条没有例外的规则。
 
@@ -170,7 +170,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 同一个理由也否掉了「给持久化入口统一打标记」这个更彻底的方案——那等于断言「持久化入口」已经是个稳定类别，可它现在还在这批改动里被反复挪动。给一份能随时重算的清单建缓存、再承担同步成本，正是这个项目自己的第二类靶子。所以清单改成每次 review 现列、并作为必交产物写进报告；等几次列出来的结果稳定一致了，再谈要不要固化。
 
-### `alear030-clear-logdata`（49 行）
+### `alear030-clear-logdata`（57 行）
 
 一次会话会在 session_detail、trace_log、log_data 各落一份以 session_id 命名的文件。忘开 memory pipeline、或者只是启动试一下连通，就会留下一组没有对话内容的记录。只有 session_detail 一处时手动删还应付得来，过程文件变多之后，一个目录一个目录地找很容易漏掉其中一份。
 
