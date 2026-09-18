@@ -446,7 +446,7 @@ class Session:
 
     def session_compress(self, agent):
         # 压缩:token 超阈值时,把更早 slice 的 summary 经 attachment 注入(解决失忆),message_list 重置为
-        # system + 最后一片原始消息(保留当前任务连续)。下一轮 before_loop 的 loop_run hook 按 target 渲染拼入,回合结束后由状态机回收
+        # system + 最后一片原始消息(保留当前任务连续)。下一轮 before_loop 的 loop_run hook 按 target 渲染拼入,正常结束由状态机回收;该轮报错则标 miss 滞留、不再重投(见 attachment_core)
         if self._session_count_tokens(agent) >= self.max_tokens:
             # 兜底:对没 summary_detail 的片补跑(_session_slice_summary 内置守卫跳过已摘要);
             # memory_pipeline 每轮后台已产 summary,通常空跑,仅防 memory_pipeline 未跑完的时序缺口

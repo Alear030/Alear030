@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1226 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1242 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -98,7 +98,7 @@ The taste for writing comments in my code: Chinese, minimal, verb- or action-ori
 
 There are three more about changing my code: keep my existing identifier naming, prefer helpers that already exist in the same file, and explain before changing. That last one matters most — I need to know what changed and why, otherwise that stretch of code goes from "mine" to "no idea whose."
 
-### `alear030-issue-mark` (86 lines)
+### `alear030-issue-mark` (100 lines)
 
 Conventions for tech-debt issues: always the `tech-debt` label (not GitHub's default bug/enhancement), severity as a title prefix `[高]`/`[中]`/`[低]`, and a three-part body — background (current state + risk) / what to do (goal + proposed approach) / checks (acceptance criteria). Evidence has to go down to `file:line`.
 
@@ -116,7 +116,7 @@ Claim an issue from the `pre-todo` column of the GitHub Projects board, then: br
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `alear030-issue-fix` (52 lines)
+### `alear030-issue-fix` (54 lines)
 
 Without an issue number it pulls the open tech-debt list (oldest first) for me to pick from; with a number it goes straight in: locate (read-only) → propose a plan (**stop and wait for sign-off**) → fix → test → dispatch a review subagent → commit, **stopping at the commit**.
 

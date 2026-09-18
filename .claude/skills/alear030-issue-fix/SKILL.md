@@ -1,6 +1,6 @@
 ---
 name: alear030-issue-fix
-description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线：定位问题→提出方案（拍板闸门）→修复→测试→code review→commit。与 alear030-issue-pretodoHandle 分工：那个从看板 pre-todo 认领、负责分支/PR/看板推进，本技能在当前 checkout 直接修、止于 commit，不 push 不合并。兼容模式：带 issue 号直接修（如 alear030-issue-fix 12），不带号则拉取 tech-debt 标签的 open issue 清单（时间正序）供挑选，要「能直接修的」时改拉 atomic 标签。当用户说'修一下这个issue'、'issue 流水线'、'处理 issue 12'、报 issue 号要求修复时使用；只要'看一下/分析'不修的不要用本技能。"
+description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线：定位问题→提出方案（拍板闸门）→修复→测试→code review→commit。与 alear030-issue-pretodoHandle 分工：那个从看板 pre-todo 认领、负责分支/PR/看板推进，本技能在当前 checkout 直接修、止于 commit，不 push 不合并。兼容模式：带 issue 号直接修（如 alear030-issue-fix 12），不带号则拉取 tech-debt 标签的 open issue 清单（时间正序）供挑选，要「能直接修的」时改拉 atomic 标签，并在定位阶段复核 atomic 判据。当用户说'修一下这个issue'、'issue 流水线'、'处理 issue 12'、报 issue 号要求修复时使用；只要'看一下/分析'不修的不要用本技能。"
 ---
 
 # Alear030 issue 修复流水线
@@ -12,13 +12,14 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
 1. **拉取 issue**
    - 带号：`gh issue view <n> --json number,title,body,labels,state`，读全文（背景/建议方案/验收标准三段）。
    - 不带号：`gh issue list --label tech-debt --state open --limit 100 --json number,title,state,createdAt`，按 createdAt 正序输出清单（编号/日期/严重度前缀/一句话总结）交用户挑选；挑定后回到上一条。
-   - 不带号且要的是「能直接修的」（用户说原子化、好修的、交给别的 agent 做的）：把 `--label tech-debt` 换成 `--label atomic`。`atomic` 的判据见 `$alear030-issue-mark`；第 2 步复核时发现不满足判据，摘掉标签并在 issue 里留一句原因，再按普通 issue 继续。
+   - 不带号且要的是「能直接修的」（用户说原子化、好修的）：把 `--label tech-debt` 换成 `--label atomic`。
    - 网络异常（GraphQL EOF 等）：原样重试一次，再失败停下报告，不无限重试。
 
 2. **定位问题**（只读，不改任何文件）
    - 拿 issue 的证据行号核对现场代码，扫同文件/同调用链的相邻风险，用只读探针核实数据现状（读真实数据文件可以，写不行）。
    - 影响面三问：生产者/消费者是谁、异常从哪逃出去、现有防御网（如 build_prompt 的分块隔离）罩不罩得住。
    - **复核 issue 前提是否仍成立**：立项时的结论可能被后续修复改变（先例：#8 的"无隔离"前提被 #5 合入改变）。前提已变时如实说，验收标准逐条标注"已满足/未满足"。
+   - **带 `atomic` 标签的 issue 复核判据**（不论带号还是从清单挑的）：按 `$alear030-issue-mark` 的三条逐条核，不满足的写进报告、指出是哪一条。摘标签、留原因是改 GitHub 状态，不在这一步做，经用户确认后再执行。
    - 输出：问题定性（属实/已变化/不成立）+ 根因 + 影响面。先报告，报告不等于方案。
 
 3. **提出方案**（拍板闸门）
