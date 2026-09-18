@@ -4,7 +4,7 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十三个技能，一共 1226 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十三个技能，一共 1243 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
@@ -22,11 +22,11 @@
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | 往我的代码里写注释的口味 |
-| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | issue 的标签体系与正文规范 |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 150 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
 
@@ -98,7 +98,7 @@
 
 还有三条是关于改我的代码的：保留我原有的标识符命名、优先用同文件里已有的 helper、先讲清楚再改。最后一条尤其重要——我需要知道改了什么、为什么改，不然这段代码就从「我的」变成「不知道谁的」了。
 
-### `alear030-issue-mark`（86 行）
+### `alear030-issue-mark`（100 行）
 
 技术债 issue 的规范：统一用 `tech-debt` 标签（不用 GitHub 默认的 bug/enhancement），严重度写成标题前缀 `[高]`/`[中]`/`[低]`，正文走三段式——issue背景（现状+风险）/ issue功能（目标+建议方案）/ issue检查（验收标准）。证据必须给到 `文件:行号`。
 
@@ -116,7 +116,7 @@
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
-### `alear030-issue-fix`（52 行）
+### `alear030-issue-fix`（54 行）
 
 不带号时拉取 tech-debt 的 open issue 清单（时间正序）供我挑，带号直接进：定位（只读）→ 提方案（**停下来等拍板**）→ 修 → 测 → 派 review subagent → commit，**止于 commit**。
 
@@ -156,7 +156,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 每天早上九点的定时任务沉淀成的技能：逐篇核对核心文档与代码现场，三种口径——结构性漂移（引用的文件/入口/计数已不存在）、行为描述漂移（断言与代码矛盾）、笔误过期。两条铁律：先机械核对再下结论（压误报）；判定依赖未提交代码的一律跳过进警示区，不猜。全程只读，报告完把决定权交回。
 
-### `alear030-pr-review`（150 行）
+### `alear030-pr-review`（151 行）
 
 和上一个同属只读汇报类，但对象不同：那个查文档与代码的日常漂移，这个查一批已开 PR 的改动在 merge 之前有没有真的收口。
 

@@ -42,7 +42,7 @@ ls memory/memory_storage/memory_storages/
 
 ### 两档共同的底线
 
-**不批量删除或清空 `session/session_detail/`。** 它已被 `.gitignore`,删了不可恢复;而且历史 session 是排查问题时唯一的现场证据——查某个工具的真实行为、复盘模型当时的决策链,全靠它。单个临时 session 文件可以删,整目录清场不行。
+**不批量删除或清空 `session/session_detail/`,同样适用于 `eval/trace/trace_log/` 与 `log/log_data/`。** 它们都已被 `.gitignore`,删了不可恢复;而且历史 session 是排查问题时唯一的现场证据——查某个工具的真实行为、复盘模型当时的决策链,全靠它。单个临时 session 文件可以删,整目录清场不行。
 
 ## 判断:要验证到什么程度
 
@@ -144,9 +144,9 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 
 ## 处理运行数据时的额外红线(主仓库适用)
 
-**先按判断 0 确认自己在主仓库。** 开发 worktree 里这一节整体不适用,只保留「不批量删 `session_detail`」那条共同底线。
+**先按判断 0 确认自己在主仓库。** 开发 worktree 里这一节整体不适用,只保留「不批量删 `session_detail`、`trace_log`、`log_data`」那条共同底线。
 
-如果验证过程需要读写 `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/`、`local_model/` 这几个目录:
+如果验证过程需要读写 `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/`、`eval/trace/trace_log/`、`log/log_data/`、`local_model/` 这几个目录:
 
 - 这些目录存的是真实运行数据,不是可随意重建的临时文件
 - 需要干净环境验证时用临时目录或临时 session id,不得清场式测试真实数据

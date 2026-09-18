@@ -214,8 +214,10 @@ memory_configs/
 |---|---|
 | `SESSION_MEMORTY_DETAIL_PATH` | `session/session_detail/` |
 | `MEMORY_STORAGE_PATH` | `memory/memory_storage/memory_storages/` |
+| `TRACE_LOG_FILE_PATH` | `eval/trace/trace_log/` |
+| `LOG_DATA_PATH` | `log/log_data/` |
 | `MCP_CONFIG_PATH` | `mcp_client/mcp.json` |
 | `LOCAL_EMBEDDING_MODEL` | `local_model/iic/nlp_gte_sentence-embedding_chinese-base` |
 | `WORK_SPACE` | `workspace/` |
 
-这些目录存的都是真实运行数据（会话记录、派生记忆、模型权重），已全部 gitignore。删之前先想清楚——它们不是可随意重建的缓存。
+这些目录存的都是真实运行数据（会话记录、trace 与诊断日志、派生记忆、模型权重）。除 `local_model/` 下已跟踪的代码与模型元数据外，表中路径均已 gitignore。但「当前被忽略」不等于「从未入库」，更不等于删了能从 git 找回——删之前用 `git ls-files` 与 `git log -- <路径>` 核实，默认按不可恢复对待。它们不是可随意重建的缓存。
