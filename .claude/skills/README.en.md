@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1242 lines in total, all under version control, and you can open any of them directly.
+This directory holds the thirteen skills I use when working with coding agents — 1243 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -156,7 +156,7 @@ Using a skill rather than letting the agent grep for itself is because self-grep
 
 Sedimented from the scheduled task that fires at nine every morning: it checks the core docs one by one against the live code, through three lenses — structural drift (referenced files/entry points/counts that no longer exist), behavioural drift (assertions contradicting the code), and typos or stale wording. Two iron rules: verify mechanically before concluding (to keep false positives down); any judgement that depends on uncommitted code is skipped into the warning section, no guessing. Strictly read-only throughout — once the report is out, the decision returns to me.
 
-### `alear030-pr-review` (150 lines)
+### `alear030-pr-review` (151 lines)
 
 Same read-only reporting family as the previous one, but pointed at a different object: that one checks docs against the code as routine hygiene, this one checks whether a batch of changes on an open PR has actually closed off before it gets merged.
 
