@@ -187,6 +187,15 @@ Alear030/
 ├── local_model/                # 本地中文嵌入模型（GTE）
 │                               # 权重不纳入版本控制，首次运行自动从 ModelScope 下载（约 195MB）
 │
+├── eval/                       # 观测设施
+│   └── trace/
+│       ├── trace_core.py       # Trace：按 session 追加 input / assistant_output / tool_call 等事件
+│       └── trace_log/          # <session_id>.jsonl，含模型输出与工具返回原文（不纳入版本控制）
+│
+├── log/                        # 进程级诊断日志，与 trace 同以 session_id 归属
+│   ├── log_core.py             # Log：构造期与异常路径的故障记录
+│   └── log_data/               # <session_id>.jsonl（不纳入版本控制）
+│
 ├── tui/                        # Textual TUI
 │   ├── tui_core.py             # 入口：App 装配、do_work 工作线程直调 run_loop
 │   ├── tui_style.tcss          # 全局样式
@@ -346,4 +355,5 @@ after_session / final_memory_pipeline（后台）
 
 - `session/session_detail/`、`session/session_plan/`（后者是 plan 模式下线前留下的历史数据，已无代码读写）
 - `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`
+- `eval/trace/trace_log/`、`log/log_data/`：按 session_id 落盘的 trace 事件流与诊断日志。trace 记的是真实模型输出与工具返回原文，不可重放、不可重建；两处从未入库，删除即永久丢失
 - `local_model/` 下的模型权重

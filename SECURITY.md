@@ -28,7 +28,7 @@ Alear030 是一个给本机单人使用的实验性 Agent Harness。它会在你
 ## 其他需要知道的边界
 
 - **运行时临时 subagent 默认只有只读授权**（`basic_tool` / `file_read_tool` / `memory_tool` / `web_tool`），但调用方可以通过 `tool_autho` 参数整个替换掉这份授权，包括授予 `command_tool` 与 `file_write_tool`
-- **跨会话记忆会把对话内容落盘**到 `session/session_detail/` 与 `memory/` 下。这些目录已在 `.gitignore` 里，但如果你要分享仓库或截图，注意里面是真实对话
+- **对话内容会落盘**到 `session/session_detail/`、`memory/` 与 `eval/trace/trace_log/` 下，其中 trace 还记着工具返回的原文（读过的文件、抓取的网页）。这些目录已在 `.gitignore` 里，但如果你要分享仓库或截图，注意里面是真实对话
 - **MCP 客户端会连接你在 `mcp_client/mcp.json` 里配置的外部 server**，并把远端工具注册进工具表。凭证在配置里只以 `${VAR}` 占位符出现，真值走 `.env`；请自行确认所连 server 的可信度
 - **不要在多租户环境、或者会接收不受信任输入的场景里跑这个项目。** 它没有为此设计
 

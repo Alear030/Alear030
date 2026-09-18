@@ -214,8 +214,10 @@ The model loads in a separate worker process and does not block TUI startup.
 |---|---|
 | `SESSION_MEMORTY_DETAIL_PATH` | `session/session_detail/` |
 | `MEMORY_STORAGE_PATH` | `memory/memory_storage/memory_storages/` |
+| `TRACE_LOG_FILE_PATH` | `eval/trace/trace_log/` |
+| `LOG_DATA_PATH` | `log/log_data/` |
 | `MCP_CONFIG_PATH` | `mcp_client/mcp.json` |
 | `LOCAL_EMBEDDING_MODEL` | `local_model/iic/nlp_gte_sentence-embedding_chinese-base` |
 | `WORK_SPACE` | `workspace/` |
 
-These directories hold real runtime data (session records, derived memory, model weights) and are all gitignored. Think before deleting — they are not casually rebuildable caches.
+These directories hold real runtime data (session records, traces and diagnostic logs, derived memory, model weights). Apart from the tracked code and model metadata under `local_model/`, every path in the table is gitignored — so none of it is in git history, and deleting it cannot be undone. Think before deleting — they are not casually rebuildable caches.

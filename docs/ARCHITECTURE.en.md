@@ -187,6 +187,15 @@ Alear030/
 ├── local_model/                # local Chinese embedding model (GTE)
 │                               # weights not version-controlled; first run auto-downloads from ModelScope (~195MB)
 │
+├── eval/                       # observability
+│   └── trace/
+│       ├── trace_core.py       # Trace: appends input / assistant_output / tool_call events per session
+│       └── trace_log/          # <session_id>.jsonl, contains raw model output and tool returns (not version-controlled)
+│
+├── log/                        # process-level diagnostic log, keyed by session_id like trace
+│   ├── log_core.py             # Log: failure records from construction time and error paths
+│   └── log_data/               # <session_id>.jsonl (not version-controlled)
+│
 ├── tui/                        # Textual TUI
 │   ├── tui_core.py             # entry: App assembly, do_work worker thread calls run_loop directly
 │   ├── tui_style.tcss          # global styles
@@ -346,4 +355,5 @@ The following directories are real runtime data, not disposable temporary files 
 
 - `session/session_detail/`, `session/session_plan/` (the latter is historical data left from before plan mode was retired; no code reads or writes it now)
 - `memory/memory_storage/memory_storages/`, `memory/memory_log/memory_logs/`
+- `eval/trace/trace_log/`, `log/log_data/`: trace event streams and diagnostic logs written per session_id. Trace records raw model output and tool returns, which cannot be replayed or rebuilt; neither directory has ever been committed, so deletion is permanent
 - Model weights under `local_model/`

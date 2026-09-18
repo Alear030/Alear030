@@ -79,7 +79,7 @@ Alear030 是一个 Python Agent Harness，负责工具编排、多 Agent 路由�
 - LLM 输出的 JSON 解析必须容忍代码块包裹、字段缺失和结构抖动，并在进入业务逻辑前校验响应形状。
 - 存量 typo 只允许兼容，不得扩散：`MEMORTY` 属于 config，`loker`、`slef` 属于 `memory_storage_core`。
 - 更完整的编码规则见 `.cursor/rules/coding-conventions.mdc`；若规则与现场实现冲突，先报告并确认，不自行扩大修改范围。
-- `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/` 和 `local_model/` 包含真实、敏感或昂贵数据。未经明确授权，不得删除、清场或批量覆盖；不确定路径归属时先询问用户。
+- `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/`、`eval/trace/trace_log/`、`log/log_data/` 和 `local_model/` 包含真实、敏感或昂贵数据。未经明确授权，不得删除、清场或批量覆盖；不确定路径归属时先询问用户。
 - 禁止提交 `.env`、API Key、会话原文、生成记忆、诊断日志和模型权重，包括 `pytorch_model.bin`、`model.safetensors`。
 
 ## 技能入口

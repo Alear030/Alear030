@@ -82,10 +82,11 @@ Alear030 — 从零自研的 Python Agent Harness。处理工具编排、多 Age
 
 - `session/session_detail/`、`session/session_plan/`：真实会话与计划运行数据
 - `memory/memory_storage/memory_storages/`、`memory/memory_log/memory_logs/`：派生记忆与运行时日志（均已 `.gitignore`）
+- `eval/trace/trace_log/`、`log/log_data/`：按 session_id 落盘的 trace 事件流（含模型输出与工具返回原文）与诊断日志，已 `.gitignore` 且从未入库——删了就没了，trace 也无法重放重建
 - `memory/memory_config/memory_configs/*.json`：会被管线改写并长出新维度的运行时配置真身，已 `.gitignore`；随仓库分发的是同名 `.example.json` 种子，首次运行由 `get_memory_config` 自动播种。**播种只在真身不存在时发生，绝不覆盖已有文件**——覆盖等于把用户积累的维度清零
 - `local_model/`：代码与模型元数据已跟踪；权重 `.gitignore`，运行时从 ModelScope 下载
 
-`.gitignore` 已忽略的数据路径：`session_detail/`、`session_plan/`、`test/`、memory 数据子目录、`.cc_file/`、`.agents/`、local_model 权重。**`AGENTS.md` 不在其中**——它已被 Git 跟踪、随公开仓库分发，往里写内部语境等于直接发布（`.agents/` 才是被忽略的那个，两者别混）。`.claude/` 走默认拒绝式——`.claude/*` 全忽略，只显式放行 `skills/` 与 `settings.local.json.example`。历史 session 文件可能在加入 ignore 规则前已被跟踪，ignore 不会取消跟踪，也不意味着删除后一定能完整恢复。
+`.gitignore` 已忽略的数据路径：`session_detail/`、`session_plan/`、`trace_log/`、`log_data/`、`test/`、memory 数据子目录、`.cc_file/`、`.agents/`、local_model 权重。**`AGENTS.md` 不在其中**——它已被 Git 跟踪、随公开仓库分发，往里写内部语境等于直接发布（`.agents/` 才是被忽略的那个，两者别混）。`.claude/` 走默认拒绝式——`.claude/*` 全忽略，只显式放行 `skills/` 与 `settings.local.json.example`。历史 session 文件可能在加入 ignore 规则前已被跟踪，ignore 不会取消跟踪，也不意味着删除后一定能完整恢复。
 
 - 未经用户明确授权，禁止删除、清空或批量覆盖上述目录
 - 操作前按需检查 `git status`、`git ls-files -- <path>` 和 `git log -- <path>`，**不要根据 `.gitignore` 猜测可恢复性**
