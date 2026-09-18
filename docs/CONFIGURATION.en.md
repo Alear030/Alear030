@@ -220,4 +220,4 @@ The model loads in a separate worker process and does not block TUI startup.
 | `LOCAL_EMBEDDING_MODEL` | `local_model/iic/nlp_gte_sentence-embedding_chinese-base` |
 | `WORK_SPACE` | `workspace/` |
 
-These directories hold real runtime data (session records, traces and diagnostic logs, derived memory, model weights). Apart from the tracked code and model metadata under `local_model/`, every path in the table is gitignored — so none of it is in git history, and deleting it cannot be undone. Think before deleting — they are not casually rebuildable caches.
+These directories hold real runtime data (session records, traces and diagnostic logs, derived memory, model weights). Apart from the tracked code and model metadata under `local_model/`, every path in the table is gitignored. But "ignored now" does not mean "never committed", let alone "recoverable from git" — check with `git ls-files` and `git log -- <path>` before deleting, and treat the data as unrecoverable by default. They are not casually rebuildable caches.

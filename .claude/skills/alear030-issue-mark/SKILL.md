@@ -62,7 +62,7 @@ gh issue create --repo Alear030/Alear030 --title "[高] <一句话描述>" --bod
 # 满足原子化三条判据时叠加 atomic
 gh issue create --repo Alear030/Alear030 --title "[低] <一句话描述>" --body-file <临时文件> --label tech-debt --label atomic
 
-# 给已有 issue 补打或摘掉 atomic
+# 给已有 issue 补打或摘掉 atomic（补打只对已带 tech-debt 的 issue，atomic 不单独存在）
 gh issue edit <号> --repo Alear030/Alear030 --add-label atomic
 gh issue edit <号> --repo Alear030/Alear030 --remove-label atomic
 

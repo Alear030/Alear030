@@ -22,11 +22,11 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | The taste for writing comments in my code |
-| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | Label taxonomy and body conventions for issues |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 150 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
 

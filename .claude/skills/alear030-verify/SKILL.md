@@ -144,7 +144,7 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 
 ## 处理运行数据时的额外红线(主仓库适用)
 
-**先按判断 0 确认自己在主仓库。** 开发 worktree 里这一节整体不适用,只保留「不批量删 `session_detail`」那条共同底线。
+**先按判断 0 确认自己在主仓库。** 开发 worktree 里这一节整体不适用,只保留「不批量删 `session_detail`、`trace_log`、`log_data`」那条共同底线。
 
 如果验证过程需要读写 `session/session_detail/`、`session/session_plan/`、`memory/memory_storage/`、`memory/memory_config/`、`memory/memory_log/`、`eval/trace/trace_log/`、`log/log_data/`、`local_model/` 这几个目录:
 

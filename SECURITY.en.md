@@ -28,7 +28,7 @@ In other words, with the sandbox on the model cannot write outside the workspace
 ## Other Boundaries Worth Knowing
 
 - **Runtime temporary subagents default to read-only authorization** (`basic_tool` / `file_read_tool` / `memory_tool` / `web_tool`), but the caller can replace that entire grant via the `tool_autho` parameter, including granting `command_tool` and `file_write_tool`
-- **Conversation content is persisted** under `session/session_detail/`, `memory/` and `eval/trace/trace_log/`; trace also keeps the raw text of tool returns (files read, pages fetched). Those directories are in `.gitignore`, but if you share the repo or take screenshots, remember they hold real dialogue
+- **Conversation content is persisted** under `session/session_detail/`, `memory/` and `eval/trace/trace_log/`; trace also keeps the raw text of tool returns (files read, pages fetched), and the diagnostic logs under `log/log_data/` can carry attachment content (profile, timeline, session summaries) on error paths. Those directories are in `.gitignore`, but if you share the repo or take screenshots, remember they hold real dialogue
 - **The MCP client connects to external servers configured in `mcp_client/mcp.json`** and registers remote tools into the tool table. Credentials appear in config only as `${VAR}` placeholders; real values live in `.env`. Confirm for yourself that any server you connect is trustworthy
 - **Do not run this project in multi-tenant environments, or in scenarios that accept untrusted input.** It was not designed for that
 

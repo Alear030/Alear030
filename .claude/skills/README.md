@@ -22,11 +22,11 @@
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | 往我的代码里写注释的口味 |
-| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 86 | issue 的标签体系与正文规范 |
+| [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
-| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 150 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
+| [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
 
