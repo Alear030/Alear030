@@ -23,22 +23,20 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
    - 输出：问题定性（属实/已变化/不成立）+ 根因 + 影响面。先报告，报告不等于方案。
 
 3. **提出方案**（拍板闸门）
-   - 按 AGENTS.md 机制改动四要素给出：生产者/消费者、生命周期、验证方式、取舍风险。
+   - 按 CLAUDE.md「机制演进与收口」给出：现有权威路径、生产者/消费者、生命周期、验证方式、取舍风险。
    - 明确改动文件清单 + 测试方案（镜像目录）+ **范围外**（明确提出但不做的，等拍板）。
    - **停下等用户确认。未拍板不写任何文件。**方案被拒就回第 2 步重做，不自行折中。
 
 4. **修复**
-   - 按拍板方案最小改动：先预览后落盘、不顺手重构；注释遵守 `$alear030-style-notes`（中文极简动作导向）。
-   - 生产代码落盘后走 `$alear030-worktree-change-guard` 回读核对改动落在目标 checkout。
-
+   - 按拍板方案改，范围按 CLAUDE.md「改动范围」界定，不顺手重构无关代码；注释遵守 `$alear030-style-notes`（中文极简动作导向）。
 5. **测试**
    - 走 `$alear030-verify`：AST/静态 → 目标单测 → 全量。测试放 `test/` 下镜像源码目录，探针用 case_* 裸函数 + `__main__` runner + 纯 ASCII PASS 行，`python -m test.xxx` 点号路径跑。
    - 涉真实数据的场景一律 tempfile 模拟（patch 路径或 reload），不碰 session/memory/local_model 真实文件。
-   - `python -m unittest discover` 基线必须保持绿；既有兄弟探针跑一遍防回归。
+   - `python -m unittest discover` 不引入新失败（历史遗留失败的判别见 `$alear030-verify`）；既有兄弟探针跑一遍防回归。
 
 6. **code review**
-   - 派恰好一个 review 子代理，前台跑（结论要当场接住，不能等）；执行者类型以当前会话实际提供的为准，不要写死——写死的类型名在它消失之后不报错，只静默失效。prompt 按四段形状——Full Repository Path / Diff: uncommitted changes / Custom Instructions。
-   - Custom Instructions 必须写清：评审范围（本任务文件清单）；**test/ 整体被 gitignore，diff 看不到，要求 subagent 直接读测试文件**；工作区他人未提交改动文件清单（排除，不产出 findings）；重点（正确性 + 与用户代码风格一致性：中文注释、`func(kw='v')` 等号无空格、探针惯例）。
+   - 派一个不继承会话上下文的 review 子代理，前台跑（结论要当场接住）。
+   - 派发指令写清：仓库路径与未提交 diff；评审范围（本任务文件清单）；**test/ 大部分被 gitignore，多数测试文件 diff 看不到，要求 subagent 直接读测试文件**；工作区他人未提交改动文件清单（排除，不产出 findings）；重点（正确性 + 与用户代码风格一致性：中文注释、`func(kw='v')` 等号无空格、探针惯例）。
    - findings 处置：机械性修正（测试补丁、词表对齐、坐标换算类）当场修掉并重跑测试；设计层面的只报告不动，交用户拍板。
 
 7. **commit**

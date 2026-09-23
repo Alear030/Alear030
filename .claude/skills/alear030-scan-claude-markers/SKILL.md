@@ -31,7 +31,7 @@ cd "$(git rev-parse --show-toplevel)" && grep -rniE "@claude(code)?\b" \
 ```
 
 - **只扫源码/文本**（py/md/yaml/yml/txt），排除 `session_detail`/`session_plan`/`local_model` 等数据目录——那些会话 JSON 里一旦出现 @claude 就会成堆误报。
-- **排除 `CLAUDE.md` 和 `.claude/` 目录**：这套 @claude 约定本身写在 CLAUDE.md 协作方式节和本 skill 里，扫到它们是在描述约定、不是真待办，会误报。
+- **排除 `CLAUDE.md` 和 `.claude/` 目录**：这套 @claude 约定本身写在 CLAUDE.md「反直觉陷阱」一节和本 skill 里，扫到它们是在描述约定、不是真待办，会误报。
 - 无匹配时输出"没有待处理的 @claude 标记"，直接如实告诉用户仓库干净，别硬编。
 
 ## 列给用户看

@@ -328,7 +328,7 @@ Back to the point: what's actually more worth saying here is that **not one of t
 
 Three examples.
 
-**"Surgical changes"** — the scope of a change is set by what the mechanism needs in order to close properly, not minimized to the literal wording of the task.
+**"Scope of change"** — the scope of a change is set by what the mechanism needs in order to close properly, not minimized to the literal wording of the task.
 
 This one runs backwards from intuition. At first I thought "minimal change" was a virtue, and then found it leaves a pile of half-finished states: the producer changed but not the consumer, a new path added but the old entry point not removed. So what's written now is: when a fix touches a call chain, actively widen the exploration and put the mechanism-level knock-on items into the plan; when the literal task isn't enough to achieve the goal, explicitly raise the out-of-scope items and let me decide — **raising something isn't overstepping; dodging it is.**
 
@@ -358,7 +358,7 @@ One is `.claude/skills/`, the skills I wrote for coding agents. The other is `sk
 
 **The difference is who does the distilling.**
 
-Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Thirteen skills, 1226 lines, all accumulated that way.
+Some are produced by actively creating a skill: step on a rake once, or repeat something once, and out comes one. Twelve skills, 1207 lines, all accumulated that way.
 
 The Alear030 side is automatic (only one so far has come out of an automatic proposal). When similar tasks accumulate past a threshold, the memory pipeline produces a skill candidate and interrupts the current conversation with an attachment: you've done this kind of thing several times, consider fixing it into a reusable skill. Then it goes through `create-skill` to draft, me to confirm, and landing on disk; finally `skill_finish` writes back to the task node and zeroes the accumulation counter, so it doesn't keep prompting for the same thing.
 
@@ -383,7 +383,7 @@ Once the project got bigger, a few more got layered on top:
 
 - **Sliced units of work** — big cross-module changes get cut into pieces that are independently committable and runnable, one closed loop per session, no half-finished work with known defects left behind
 - **Verification first** — for mechanism-level changes, say up front how it gets verified quickly, then start; probes get fixed into `test/` where possible rather than thrown away after use
-- **Parallel orchestration** — cross-module changes get several subagents exploring and reviewing in parallel; three gate levels: pure text goes straight through / single-module mechanism self-verified / cross-module runs the full flow
+- **Three gate levels** — pure text goes straight through / single-module mechanism self-verified / cross-module runs the full flow
 
 The division of responsibility is written into `CLAUDE.md`; roughly: direction, taste, north-star judgement, and the final call on "what counts as good enough" are mine; reading code, researching, laying out context, drafting approaches, implementing, and verifying are its. Proposing directions, surfacing mechanism-level root causes, and pointing out cross-module impact are part of its job — **proposing isn't overstepping; deciding is.**
 
