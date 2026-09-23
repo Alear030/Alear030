@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the twelve skills I use when working with coding agents — 1205 lines in total, all under version control, and you can open any of them directly.
+This directory holds the twelve skills I use when working with coding agents — 1207 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -24,7 +24,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 64 | The full flow from claiming an issue off the board to wrapping up |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
@@ -45,7 +45,7 @@ Verification in this project has several counterintuitive spots, and applying ge
 
 - `python main.py` in the main repo is **not** a side-effect-free smoke test — it writes session files and may call the model API. But in a development worktree with the memory pipeline turned off, you can run it freely. So step one is working out which checkout you're in, then deciding how tight to be.
 - Verification scripts have to be invoked with `python -m` dotted paths; running `python test/xxx/script.py` directly raises `ModuleNotFoundError`.
-- `unittest discover` must not be given `-s test`, or `test/loop/__init__.py` shadows the top-level `loop` package and it raises `ImportError`.
+- `unittest discover` must not be given `-s test`, or any subpackage under `test/` that shares a name with a top-level package (such as `test/mcp_client/`) shadows it and it raises `ImportError`.
 
 There's also a Windows-specific one, written like this in the original:
 
@@ -107,7 +107,7 @@ It got used five times while writing this very collaboration document, all for t
 
 This group is process orchestration: many steps, ordering dependencies, and gates in the middle where I have to make the call.
 
-### `alear030-issue-pretodoHandle` (64 lines)
+### `alear030-issue-pretodoHandle` (66 lines)
 
 Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → merge (handed to `alear030-push-merge`) → push the board to done → ask me whether to take the next one.
 

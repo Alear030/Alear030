@@ -4,7 +4,7 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十二个技能，一共 1205 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十二个技能，一共 1207 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
@@ -24,7 +24,7 @@
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 64 | 从看板认领一个 issue 到收尾的完整流程 |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
 | [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
@@ -45,7 +45,7 @@
 
 - `python main.py` 在主仓库**不是**无副作用的冒烟测试——它会写 session 文件、可能调模型 API。但在关掉了 memory pipeline 的开发 worktree 里可以放开跑。所以第一步是先分清自己在哪个 checkout，再决定松紧。
 - 验证脚本必须用 `python -m` 的点号路径调用，直接 `python test/xxx/script.py` 会报 `ModuleNotFoundError`。
-- `unittest discover` 不能带 `-s test` 参数，否则 `test/loop/__init__.py` 会遮蔽顶层的 `loop` 包，报 `ImportError`。
+- `unittest discover` 不能带 `-s test` 参数，否则 `test/` 下与顶层同名的子包（比如 `test/mcp_client/`）会遮蔽顶层包，报 `ImportError`。
 
 还有一条 Windows 特有的，原文是这么写的：
 
@@ -107,7 +107,7 @@
 
 这一组是流程编排：步骤多、有先后依赖、中间有需要我拍板的闸门。
 
-### `alear030-issue-pretodoHandle`（64 行）
+### `alear030-issue-pretodoHandle`（66 行）
 
 从 GitHub Projects 看板的 `pre-todo` 列认领一个 issue，然后：开分支 → 规划（**停下来等我确认**）→ 开发 → 验证 → 自检 → 合并（交给 `alear030-push-merge`）→ 把看板推到 done → 问我要不要接下一个。
 

@@ -28,7 +28,7 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
    - **停下等用户确认。未拍板不写任何文件。**方案被拒就回第 2 步重做，不自行折中。
 
 4. **修复**
-   - 按拍板方案改，范围按 CLAUDE.md「外科手术式改动」界定，不顺手重构无关代码；注释遵守 `$alear030-style-notes`（中文极简动作导向）。
+   - 按拍板方案改，范围按 CLAUDE.md「改动范围」界定，不顺手重构无关代码；注释遵守 `$alear030-style-notes`（中文极简动作导向）。
 5. **测试**
    - 走 `$alear030-verify`：AST/静态 → 目标单测 → 全量。测试放 `test/` 下镜像源码目录，探针用 case_* 裸函数 + `__main__` runner + 纯 ASCII PASS 行，`python -m test.xxx` 点号路径跑。
    - 涉真实数据的场景一律 tempfile 模拟（patch 路径或 reload），不碰 session/memory/local_model 真实文件。
