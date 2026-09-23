@@ -64,11 +64,11 @@ Alear030 — 从零自研的 Python Agent Harness：工具编排、多 Agent 路
 
 **文档对账**：改机制、触发点、数据流或 `config.py` 常量时，同次核对 `docs/` 下的 `ARCHITECTURE.md` / `CONFIGURATION.md` / `EXTENDING.md` 及相关模块文档，有漂移同次修正。
 
-**三套 Agent 概念不混用**：`agent/agents.yaml` 里进程内的 4 个常驻 Agent（main/slice/summary/memory）；`subagent_create` 运行时临时构造、随机唯一名 `subagent_{uuid8}` 的 Subagent；以及 Claude Code 层面派出的子代理——它与项目代码无关，也不继承会话，派发指令必须自包含。
+**三套 Agent 概念不混用**：`agent/agents.yaml` 里进程内的 4 个常驻 Agent（main/slice/summary/memory）；`subagent_create` 运行时临时构造、随机唯一名 `subagent_{uuid8}` 的 Subagent；以及 Claude Code 层面派出的子代理——它与项目代码无关；除 fork 外都不继承会话，派发指令必须自包含。
 
 ## 收口 / 运维
 
-commit、changelog、issue、PR 都有项目格式，走对应的 `alear030-*` 技能，不套通用 git/GitHub 习惯。两条硬边界：push + 开 PR 后停下交回用户，合并等他放行；`master` 与 `Alear030_dev` 永不删除。
+commit、changelog、issue、PR 都有项目格式，走对应的 `alear030-*` 技能，不套通用 git/GitHub 习惯。三条硬边界：仓库公开，commit 之后推到远端就是对外发布，等他开口再 push；push + 开 PR 后停下交回用户，合并等他放行；`master` 与 `Alear030_dev` 永不删除。
 
 ## 反直觉陷阱
 

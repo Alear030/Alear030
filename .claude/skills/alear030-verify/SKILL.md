@@ -32,7 +32,7 @@ ls memory/memory_storage/memory_storages/
 - `python main.py` 可以直接跑,不用先纠结值不值得
 - 可以随便写 session 文件、反复跑到底
 - **不需要**在测试前后算 MD5 比对
-- 探针脚本不必跑完即删,想留在 `test/` 下就留着
+- 探针的输出文件也可以留着,不必跑完就清
 
 想怎么测就怎么测——这个 checkout 就是拿来试的。
 
@@ -74,7 +74,7 @@ python -m test.interaction.test_ask_user_question
 
 直接 `python test/xxx/script.py` 即使 cwd 在根目录也会报 `ModuleNotFoundError`,因为 Python 会把脚本自身所在目录塞进 `sys.path[0]`,不是 cwd。
 
-**前置:`test/` 必须有 `__init__.py` 才能用 `python -m test.xxx`**。项目 `test/` 无 `__init__.py` 时是命名空间包,会被 stdlib 自带的 `test` 包(如 `Python311\Lib\test`)抢先,`python -m test.xxx` 报 `No module named 'test.xxx'`。在 `test/` 下放一个空的 `__init__.py` 让项目 `test` 成常规包(cwd 在 sys.path[0],优先于 stdlib)即可。注意 `test/` 已整体纳入 `.gitignore`,这个 `__init__.py` 不进版本控制,每个 worktree/checkout 要本地确保存在(没有就建一个空的)。
+**前置:`test/` 必须有 `__init__.py` 才能用 `python -m test.xxx`**。项目 `test/` 无 `__init__.py` 时是命名空间包,会被 stdlib 自带的 `test` 包(如 `Python311\Lib\test`)抢先,`python -m test.xxx` 报 `No module named 'test.xxx'`。在 `test/` 下放一个空的 `__init__.py` 让项目 `test` 成常规包(cwd 在 sys.path[0],优先于 stdlib)即可。`test/` 大部分被 `.gitignore`,但这个 `__init__.py` 已被强制跟踪,正常 checkout 都会有;缺了就建一个空的。
 
 跑全部单测时**不要带 `-s test`**:
 
@@ -134,7 +134,7 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 
 ## 5. 排查失败与编码坑点
 
-`unittest discover` 跑出失败时，拿改动前的代码重跑一次作对照：`git worktree add <临时目录> HEAD`，把本地的 `test/` 拷进去（它被 gitignore，新 worktree 里没有），在那边跑完再 `git worktree remove`。不要用 `git stash`——stash 栈由所有 worktree 共享，别的会话可能同时在压栈出栈。对照里失败照样复现的，是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只在当前改动下失败的，才是本次引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
+`unittest discover` 跑出失败时，拿改动前的代码重跑一次作对照：`git worktree add <临时目录> HEAD`，把本地的 `test/` 拷进去（它大部分被 gitignore，新 worktree 里只有少数被跟踪的文件），在那边跑完再 `git worktree remove --force`（拷进去的文件会让它看起来是脏的）。不要用 `git stash`——stash 栈由所有 worktree 共享，别的会话可能同时在压栈出栈。对照里失败照样复现的，是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只在当前改动下失败的，才是本次引入的问题。对照环境没有 `.env`、本地模型权重和 memory 配置真身，所以要比对两边的失败信息，不能只看失败与否；对照里因缺环境而失败的，按「存疑」上报，不判成历史遗留。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
 
 在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
 

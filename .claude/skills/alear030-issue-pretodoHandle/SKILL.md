@@ -24,7 +24,7 @@ pre-todo → Planning → inprogress → done
 1. `gh auth status` 确认已登录（需 `repo` scope）。
 2. `git status --short` 必须为空；当前需基于 `master`。脏工作区直接中止并报告，不自动 stash。
 3. 找到看板：`gh project list --owner Alear030` 取 project number，`gh project view <number>` 确认 status 字段含 pre-todo/Planning/inprogress/done/blocked。
-4. 确认合并目标：默认 `origin/master`（走 PR，见第 7 步）。
+4. 确认合并目标：默认 `origin/master`（走 PR，见「合并」一步）。
 
 ## 流程
 

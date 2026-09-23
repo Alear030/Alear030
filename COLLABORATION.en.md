@@ -383,7 +383,7 @@ Once the project got bigger, a few more got layered on top:
 
 - **Sliced units of work** — big cross-module changes get cut into pieces that are independently committable and runnable, one closed loop per session, no half-finished work with known defects left behind
 - **Verification first** — for mechanism-level changes, say up front how it gets verified quickly, then start; probes get fixed into `test/` where possible rather than thrown away after use
-- **Parallel orchestration** — cross-module changes get several subagents exploring and reviewing in parallel; three gate levels: pure text goes straight through / single-module mechanism self-verified / cross-module runs the full flow
+- **Three gate levels** — pure text goes straight through / single-module mechanism self-verified / cross-module runs the full flow
 
 The division of responsibility is written into `CLAUDE.md`; roughly: direction, taste, north-star judgement, and the final call on "what counts as good enough" are mine; reading code, researching, laying out context, drafting approaches, implementing, and verifying are its. Proposing directions, surfacing mechanism-level root causes, and pointing out cross-module impact are part of its job — **proposing isn't overstepping; deciding is.**
 
