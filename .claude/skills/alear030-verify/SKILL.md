@@ -98,7 +98,7 @@ agents.agents['main'].agent_ai.chat.completions.create(
 )
 ```
 
-只看第一个 `tool_call` 是否符合预期就行。以后还用得上的探针脚本留在 `test/` 下;它产生的输出文件跑完清理。
+只看第一个 `tool_call` 是否符合预期就行。以后还用得上的探针脚本留在 `test/` 下;在主仓库,它产生的输出文件跑完清理(开发 worktree 见判断 0)。
 
 ## 4. 端到端跑 `python main.py`
 
@@ -134,7 +134,7 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 
 ## 5. 排查失败与编码坑点
 
-`unittest discover` 跑出失败时，拿改动前的代码重跑一次作对照：`git worktree add <临时目录> HEAD`，把本地的 `test/` 拷进去（它大部分被 gitignore，新 worktree 里只有少数被跟踪的文件），在那边跑完再 `git worktree remove --force`（拷进去的文件会让它看起来是脏的）。不要用 `git stash`——stash 栈由所有 worktree 共享，别的会话可能同时在压栈出栈。对照里失败照样复现的，是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只在当前改动下失败的，才是本次引入的问题。对照环境没有 `.env`、本地模型权重和 memory 配置真身，所以要比对两边的失败信息，不能只看失败与否；对照里因缺环境而失败的，按「存疑」上报，不判成历史遗留。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
+`unittest discover` 跑出失败时，拿改动前的代码重跑一次作对照：`git worktree add <临时目录> <基线>`——改动还没提交时基线是 `HEAD`，已经提交在分支上时基线是 `git merge-base HEAD origin/master`，把本地的 `test/` 拷进去（它大部分被 gitignore，新 worktree 里只有少数被跟踪的文件），在那边跑完再 `git worktree remove --force`（拷进去的文件会让它看起来是脏的）。不要用 `git stash`——stash 栈由所有 worktree 共享，别的会话可能同时在压栈出栈。对照里失败照样复现的，是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只在当前改动下失败的，才是本次引入的问题。对照环境没有 `.env`、本地模型权重和 memory 配置真身，所以要比对两边的失败信息，不能只看失败与否；对照里因缺环境而失败的，按「存疑」上报，不判成历史遗留。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
 
 在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
 
