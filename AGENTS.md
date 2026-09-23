@@ -2,7 +2,7 @@
 
 > 权威关系：本文件派生自 `CLAUDE.md`，供 Codex/Cursor 等宿主工具读取，不单独维护第二套说法；协作、安全、写入和验证约束以 `CLAUDE.md` 为源，两者出现分歧时以 `CLAUDE.md` 为准并需要同步修订本文件。运行行为与架构事实始终以现场代码、注册器和配置为准，不以任何文档（包括 `CLAUDE.md`）为准。
 >
-> 例外：本文件可以比 `CLAUDE.md` 更具体，因为读它的工具和人没有那层关系积累——潜移默化要靠积累才起作用，对陌生读者不成立。「技能入口」一节逐项列出技能名与触发时机（`CLAUDE.md` 那边靠 `.claude/skills/` 的 `description` 自动触发，不需要列名；Codex/Cursor 没有这套机制）；「协作与写入」一节保留了 `CLAUDE.md` 已收缩为方向陈述的那些具体条目。两者都不算独立判断，只要不引入 `CLAUDE.md` 未认可的新规则。
+> 例外：本文件可以比 `CLAUDE.md` 更具体，因为读它的工具和人没有那层关系积累——潜移默化要靠积累才起作用，对陌生读者不成立。「技能入口」一节逐项列出技能名与触发时机（`CLAUDE.md` 那边靠 `.claude/skills/` 的 `description` 自动触发，不需要列名；Codex/Cursor 没有这套机制）；「协作与写入」一节保留了 `CLAUDE.md` 已收缩为方向陈述的那些具体条目。两者都不算独立判断，只要不引入 `CLAUDE.md` 未认可的新规则。与 `CLAUDE.md` 出现实质冲突时再修，不必每次机制改动都同步核对。
 >
 > 维护原则：这里只保留无法通过常规探索自发现的长期规则、稳定不变量和源码入口。工具、Hook、Prompt、Widget 等易变清单以目录现状为准，不在本文件逐项枚举。
 
@@ -88,7 +88,6 @@ Alear030 是一个 Python Agent Harness，负责工具编排、多 Agent 路由�
 
 - `$alear030-verify`：按项目约束验证代码改动。
 - `$alear030-style-notes`：编写或修改用户代码及注释时遵守中文、极简、动作导向的注释风格。
-- `$alear030-worktree-change-guard`：在 worktree 修改非 `test/` 生产代码后核对改动确实落在目标 checkout。
 - `$alear030-scan-claude-markers`：扫描和处理源码中的 `@claude` 标记。完成后回写 `# done(@claude): <做了什么>`；`@claude(ignore)` 是用户备注，不得改动。
 - `$alear030-issue-pretodoHandle`：从 GitHub Projects 的 pre-todo 列处理下一个 issue。
 - `$alear030-issue-fix`：把单个 issue 从拉取、定位、方案拍板到修复、测试、review、commit 的流水线；止于 commit，关 issue 与 push 另行指令，分支/PR 场景仍走 pretodoHandle。

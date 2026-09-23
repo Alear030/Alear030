@@ -1,6 +1,6 @@
 ---
 name: alear030-verify
-description: "Alear030 项目里验证代码改动是否可用时使用。这个项目的验证方式有几个反直觉的坑:python main.py 在主仓库不是无副作用的冒烟测试(会写 session 文件、可能调模型 API),但在关闭了 memory pipeline 的开发 worktree 里可以放开跑——先分清自己在哪个 checkout 再决定松紧;验证脚本必须用 python -m 点号路径调用,直接 python test/xxx/script.py 会报 ModuleNotFoundError;unittest discover 不能带 -s test 参数,否则 test/loop/__init__.py 会遮蔽顶层 loop 包报 ImportError。当准备验证改动、跑测试、或纠结要不要真跑 main.py 时用这个 skill,别凭经验直接跑通用 Python 项目的验证套路。"
+description: "Alear030 项目里验证代码改动是否可用时使用。这个项目的验证方式有几个反直觉的坑:python main.py 在主仓库不是无副作用的冒烟测试(会写 session 文件、可能调模型 API),但在关闭了 memory pipeline 的开发 worktree 里可以放开跑——先分清自己在哪个 checkout 再决定松紧;验证脚本必须用 python -m 点号路径调用,直接 python test/xxx/script.py 会报 ModuleNotFoundError;unittest discover 不能带 -s test 参数,否则 test/ 下与顶层同名的子包会遮蔽顶层包报 ImportError。当准备验证改动、跑测试、或纠结要不要真跑 main.py 时用这个 skill,别凭经验直接跑通用 Python 项目的验证套路。"
 ---
 
 # Alear030 验证方式
@@ -57,7 +57,7 @@ ls memory/memory_storage/memory_storages/
 不会导入项目、不会调用模型 API、不会生成 `.pyc`,只证明源码能被解析:
 
 ```bash
-python -c "import ast,pathlib; excluded={'workspace','z_ccstudy','z_old_code','.venv'}; files=[p for p in pathlib.Path('.').rglob('*.py') if not any(part in excluded for part in p.parts)]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in files]; print(f'AST OK: {len(files)} files')"
+python -c "import ast,pathlib; excluded={'workspace','.venv'}; files=[p for p in pathlib.Path('.').rglob('*.py') if not any(part in excluded for part in p.parts)]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in files]; print(f'AST OK: {len(files)} files')"
 ```
 
 这只证明源码可解析,**不等价于依赖、模块注册或端到端行为验证**。改完就下结论"语法没问题"之前,想清楚这次改动是不是真的只需要语法层验证。
@@ -82,7 +82,7 @@ python -m test.interaction.test_ask_user_question
 python -m unittest discover
 ```
 
-`python -m unittest discover -s test` 会因为 `test/loop/__init__.py` 遮蔽顶层 `loop` 包而报 `ImportError: cannot import name 'Loop'`。
+`python -m unittest discover -s test` 会把 `test/` 当成导入根，`test/` 下与顶层同名的子包（如 `test/mcp_client/`）就会遮蔽顶层包，报 `ImportError`。
 
 ## 3. 低成本探测模型决策点(不想承受 main.py 副作用时)
 
@@ -98,7 +98,7 @@ agents.agents['main'].agent_ai.chat.completions.create(
 )
 ```
 
-只看第一个 `tool_call` 是否符合预期就行。**在主仓库,这类探针脚本连同输出文件跑完即删,不要留在 `test/` 下**;开发 worktree 里不必,想留就留(见判断 0)。
+只看第一个 `tool_call` 是否符合预期就行。以后还用得上的探针脚本留在 `test/` 下;它产生的输出文件跑完清理。
 
 ## 4. 端到端跑 `python main.py`
 
@@ -134,7 +134,7 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 
 ## 5. 排查失败与编码坑点
 
-`unittest discover` 跑出失败时，先用 `git stash` 回退到改动前的代码重跑一次：如果失败照样复现，说明是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只有 stash 前不失败、stash 后（=当前改动下）才失败的才是本次改动引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
+`unittest discover` 跑出失败时，拿改动前的代码重跑一次作对照：`git worktree add <临时目录> HEAD`，把本地的 `test/` 拷进去（它被 gitignore，新 worktree 里没有），在那边跑完再 `git worktree remove`。不要用 `git stash`——stash 栈由所有 worktree 共享，别的会话可能同时在压栈出栈。对照里失败照样复现的，是历史遗留的断言漂移（测试没跟上生产代码的既有行为变更），与本次改动无关，不必现场修复；只在当前改动下失败的，才是本次引入的问题。项目里已有若干这类历史遗留失败（测试断言停留在生产代码演进前的旧行为）。
 
 在 Windows 上用 `Path.read_text()`/`write_text()` 读写项目里的中文 JSON/文本文件时必须显式传 `encoding='utf-8'`；不传会走系统默认 GBK 码页，遇到中文内容直接 `UnicodeDecodeError`。这个坑在 prompt/memory 相关模块的文件读写点上出现过不止一次。
 
@@ -151,4 +151,4 @@ log_core.LOG_DATA_PATH = PROBE_ROOT/'log_data'
 - 这些目录存的是真实运行数据,不是可随意重建的临时文件
 - 需要干净环境验证时用临时目录或临时 session id,不得清场式测试真实数据
 - 用真实历史数据重放验证改动(比如测试新版 prompt)时,测试前后对相关文件计算 MD5 并比对,证明测试脚本没有意外写入
-- 测试脚本本身及其输出落在 `test/` 下的临时文件,跑完清理掉,不落进正式 `memory_storage`/`session_detail`
+- 测试脚本及其输出落在 `test/` 下,不落进正式 `memory_storage`/`session_detail`;输出跑完清理,可复用的脚本留着

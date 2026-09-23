@@ -4,11 +4,11 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十三个技能，一共 1243 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十二个技能，一共 1205 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
-技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十三个里有十二个的 frontmatter 就这两个字段，只有 `alear030-worktree-change-guard` 多一个 `user-invocable`。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
+技能本身的格式很简单：一个目录一个 `SKILL.md`，YAML frontmatter 里写 `name` 和 `description`，后面跟正文。这十二个的 frontmatter 都只有这两个字段。触发主要靠 `description`——agent 读到它自己判断这次该不该用；我也可以直接点名让它用哪个。这套设计和 Alear030 自己的运行时技能系统是同一套，那部分写在[协作说明](../../COLLABORATION.md)里。
 
 ---
 
@@ -17,7 +17,6 @@
 | 技能 | 行数 | 一句话 |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 154 | 这个项目的验证方式和常规 Python 项目不一样 |
-| [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | 在 worktree 改完生产代码必须回读确认 |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
@@ -25,8 +24,8 @@
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | issue 的标签体系与正文规范 |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 64 | 从看板认领一个 issue 到收尾的完整流程 |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
 
@@ -56,15 +55,13 @@
 
 凡是走到「验证」这一步的技能都指向它——`alear030-issue-pretodoHandle` 和 `alear030-pr-review` 都不自己再写一套。
 
-### `alear030-worktree-change-guard`（34 行）
+### 删掉的 `alear030-worktree-change-guard`
 
-最短的一个，也是唯一一个标了 `user-invocable: false` 的——意思是它不出现在我的手动菜单里，指望 agent 改完代码之后自己想起来用。
+这一组原本还有一个技能：在 worktree 里改完生产代码，回读目标 worktree 的绝对路径核对 diff。它防的现象是 Edit 的改动落到了主仓库、worktree 没变，测试一直崩，而根因一直没追出来。
 
-这里得说清楚一件事：**没有任何东西强制它执行。** 仓库里没有配 hook 给它托底，所以它是一条强建议，不是一道闸门。「写进技能」和「机制上保证」是两回事，这个区别我以前没分清楚。
+后来它被删掉了，原因有两层。一是没有任何东西强制它执行——仓库里没有 hook 托底，「写进技能」和「机制上保证」是两回事。二是它的补救步骤是用 Python 把整个文件覆盖写回 worktree，这一步出错的代价比它想防的问题更大。那次现象最可能的解释是改文件时用了主仓库的路径，所以换成了一条更便宜的约定：在 worktree 里改文件，用 worktree 自己的路径。
 
-它防的现象是这样的：在 worktree 里用 Edit 改生产代码，改动落到了主仓库，worktree 那边没变。测试跑的是 worktree 的代码（没改），于是一直崩，而代码看起来明明改了——排查很久。真实的例子是 `memory_core.py` 那次。
-
-**根因没追出来。** 当时没留下足够证据，不清楚是路径解析、工作目录还是别的原因。所以这条规矩干脆不解释原因，只要求结果：在 worktree 改完非 `test/` 的文件，回读一遍目标 worktree 的绝对路径，核对 diff。
+它和更早下线的两个技能一起葬在[技能墓园](graveyard/README.md)。
 
 ---
 
@@ -110,13 +107,13 @@
 
 这一组是流程编排：步骤多、有先后依赖、中间有需要我拍板的闸门。
 
-### `alear030-issue-pretodoHandle`（66 行）
+### `alear030-issue-pretodoHandle`（64 行）
 
 从 GitHub Projects 看板的 `pre-todo` 列认领一个 issue，然后：开分支 → 规划（**停下来等我确认**）→ 开发 → 验证 → 自检 → 合并（交给 `alear030-push-merge`）→ 把看板推到 done → 问我要不要接下一个。
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
-### `alear030-issue-fix`（54 行）
+### `alear030-issue-fix`（52 行）
 
 不带号时拉取 tech-debt 的 open issue 清单（时间正序）供我挑，带号直接进：定位（只读）→ 提方案（**停下来等拍板**）→ 修 → 测 → 派 review subagent → commit，**止于 commit**。
 
@@ -184,9 +181,9 @@ commit 之后的收尾，**分两段，中间必须停**：
 
 ---
 
-## 它们不是十三个孤立的文件
+## 它们不是十二个孤立的文件
 
-这十三个技能之间有引用关系：
+这十二个技能之间有引用关系：
 
 - `alear030-verify` 是基础层，`alear030-issue-pretodoHandle` 与 `alear030-pr-review` 都反向引用它——凡是走到「验证」这一步的都指向它
 - `alear030-commit-message` 和 `alear030-changelog-refresh` 互相衔接，因为一个管单次提交、一个把一批提交归纳成版本块，边界必须对齐
@@ -195,7 +192,7 @@ commit 之后的收尾，**分两段，中间必须停**：
 - `alear030-style-notes` 指向 `.cursor/rules/coding-conventions.mdc`，写法纪律只在那里维护一份，技能本身不复述全文
 - `alear030-pr-review` 把这条反复述纪律用到了底：靶子分类指向 `docs/retrospective/`、机制事实指向 `docs/`、验证口径指向 `alear030-verify`、发现落盘指向 `alear030-issue-mark`，自己只留 review 时的提问顺序与退出标准。它卡在 `alear030-push-merge` 两段之间，与 `alear030-doc-drift-check` 声明分工：那个查文档漂移，这个查一批改动的机制收口
 
-所以真正被沉淀下来的不只是十三条规矩，还有它们之间怎么分工——这本身也是一次收口。
+所以真正被沉淀下来的不只是十二条规矩，还有它们之间怎么分工——这本身也是一次收口。
 
 ---
 

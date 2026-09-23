@@ -4,11 +4,11 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the thirteen skills I use when working with coding agents — 1243 lines in total, all under version control, and you can open any of them directly.
+This directory holds the twelve skills I use when working with coding agents — 1205 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
-The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. Twelve of these thirteen have exactly those two fields in frontmatter; only `alear030-worktree-change-guard` has one extra, `user-invocable`. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
+The format of a skill is simple: one directory holding one `SKILL.md`, with `name` and `description` in YAML frontmatter and the body underneath. All twelve have exactly those two fields in frontmatter. Triggering is mainly by `description` — the agent reads it and decides for itself whether this is the moment to use it; I can also name one directly and tell it to use that. This design is the same one Alear030's own runtime skill system uses, and that part is written up in the [collaboration notes](../../COLLABORATION.en.md).
 
 ---
 
@@ -17,7 +17,6 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | Skill | Lines | In one line |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 154 | This project's verification doesn't work like a normal Python project's |
-| [`alear030-worktree-change-guard`](alear030-worktree-change-guard/SKILL.md) | 34 | After changing production code in a worktree, you must read it back and confirm |
 | [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
@@ -25,8 +24,8 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-issue-mark`](alear030-issue-mark/SKILL.md) | 100 | Label taxonomy and body conventions for issues |
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
-| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
+| [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 64 | The full flow from claiming an issue off the board to wrapping up |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
 
@@ -56,15 +55,13 @@ There's also a Windows-specific one, written like this in the original:
 
 Anything that reaches a "verification" step points at it — neither `alear030-issue-pretodoHandle` nor `alear030-pr-review` writes its own.
 
-### `alear030-worktree-change-guard` (34 lines)
+### The removed `alear030-worktree-change-guard`
 
-The shortest one, and the only one marked `user-invocable: false` — meaning it doesn't show up in my manual menu, and the hope is that the agent remembers to use it after changing code.
+This group used to hold one more skill: after changing production code in a worktree, read back the target worktree's absolute path and check the diff. It guarded against Edit changes landing in the main repo while the worktree stayed unchanged, so tests kept failing — and the root cause was never traced.
 
-One thing has to be said plainly here: **nothing forces it to run.** There's no hook configured in the repo to back it up, so it's a strong recommendation, not a gate. "Written into a skill" and "guaranteed by the mechanism" are two different things, and that's a distinction I hadn't drawn clearly before.
+It was later removed, for two reasons. First, nothing forced it to run — there was no hook backing it, and "written into a skill" is not the same as "guaranteed by the mechanism". Second, its recovery step overwrote the whole file in the worktree from Python, and getting that step wrong costs more than the problem it guarded against. The most likely explanation for the original incident is editing through the main repo's path, so it was replaced by a cheaper convention: when editing inside a worktree, use the worktree's own path.
 
-The phenomenon it guards against goes like this: you use Edit to change production code inside a worktree, the change lands in the main repo, and the worktree copy doesn't change. The tests run the worktree code (unchanged), so they keep failing, while the code visibly looks changed — and you spend a long time hunting it. The real instance was that `memory_core.py` occasion.
-
-**The root cause never got traced.** Not enough evidence was kept at the time, so it's unclear whether it was path resolution, working directory, or something else. So the rule simply doesn't explain the cause and only demands the outcome: after changing a non-`test/` file in a worktree, read back the target worktree's absolute path and check the diff.
+It rests alongside two earlier-retired skills in the [skill graveyard](graveyard/README.en.md).
 
 ---
 
@@ -110,13 +107,13 @@ It got used five times while writing this very collaboration document, all for t
 
 This group is process orchestration: many steps, ordering dependencies, and gates in the middle where I have to make the call.
 
-### `alear030-issue-pretodoHandle` (66 lines)
+### `alear030-issue-pretodoHandle` (64 lines)
 
 Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → merge (handed to `alear030-push-merge`) → push the board to done → ask me whether to take the next one.
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `alear030-issue-fix` (54 lines)
+### `alear030-issue-fix` (52 lines)
 
 Without an issue number it pulls the open tech-debt list (oldest first) for me to pick from; with a number it goes straight in: locate (read-only) → propose a plan (**stop and wait for sign-off**) → fix → test → dispatch a review subagent → commit, **stopping at the commit**.
 
@@ -184,9 +181,9 @@ It originally used the system Recycle Bin, until the pre-merge review turned up 
 
 ---
 
-## They Aren't Thirteen Isolated Files
+## They Aren't Twelve Isolated Files
 
-There are reference relationships among these thirteen skills:
+There are reference relationships among these twelve skills:
 
 - `alear030-verify` is the base layer, referenced back by `alear030-issue-pretodoHandle` and `alear030-pr-review` — anything that reaches a "verification" step points at it
 - `alear030-commit-message` and `alear030-changelog-refresh` hand off to each other, because one governs a single commit and the other summarizes a batch of commits into a version block, so the boundary has to line up
@@ -195,7 +192,7 @@ There are reference relationships among these thirteen skills:
 - `alear030-style-notes` points at `.cursor/rules/coding-conventions.mdc`, so the writing discipline is maintained in exactly one place and the skill itself doesn't restate it
 - `alear030-pr-review` takes that don't-restate discipline all the way: target categories point at `docs/retrospective/`, mechanism facts at `docs/`, verification at `alear030-verify`, and where findings land at `alear030-issue-mark`, keeping only the order of questions and the exit criterion for itself. It sits between the two stages of `alear030-push-merge`, and declares its division of work with `alear030-doc-drift-check`: that one checks doc drift, this one checks whether a batch of changes closed off
 
-So what actually got distilled isn't just thirteen rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
+So what actually got distilled isn't just twelve rules, it's how they divide the work among themselves — which is itself a piece of closing-off.
 
 ---
 

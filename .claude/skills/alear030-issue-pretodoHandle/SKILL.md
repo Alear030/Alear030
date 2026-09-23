@@ -40,20 +40,18 @@ pre-todo → Planning → inprogress → done
    - **闸门**：等用户确认才继续；被否 → 移卡回 pre-todo（或 blocked），删分支，恢复工作区。
 4. **开发**
    - 移卡 Planning → inprogress。
-   - 按项目惯例实现（会话内先展示 diff 再落盘）。
+   - 按拍板的方案实现。
 5. **验证**
    - 按 `alear030-verify` 的规则：先 AST/静态检查，再目标单测，最后才端到端。
    - `python -m unittest discover` 必须从仓库根目录跑，不带 `-s test`。
 6. **自检**
-   - 逐条对照 issue 的「issue检查」验收清单；测试全绿才允许合并。
+   - 逐条对照 issue 的「issue检查」验收清单；本次改动不引入新失败才进合并（历史遗留失败的判别见 `alear030-verify`）。
 7. **合并**
    - 走 `alear030-push-merge`：第一段 push + 开 PR 后停下交回用户，放行后第二段合并并清理分支/worktree、同步本地 master。
      不在本技能里另写一套合并流程——两段闸门、常驻分支名单、删除边界与清理项以那个技能为准。
    - `feat/issue-<n>-<slug>` 属于临时分支，合并后按那边的规则询问再删。
    - 移卡 inprogress → done；`gh issue close <n>`。
-8. **收尾**
-   - 按 `alear030-changelog-refresh` 更新 CHANGELOG，按 `alear030-commit-message` 规范提交。
-9. **询问**
+8. **询问**
    - 是否继续处理下一个 pre-todo。
 
 ## 边界情况
