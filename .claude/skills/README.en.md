@@ -109,7 +109,7 @@ This group is process orchestration: many steps, ordering dependencies, and gate
 
 ### `alear030-issue-pretodoHandle` (66 lines)
 
-Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → merge (handed to `alear030-push-merge`) → push the board to done → ask me whether to take the next one.
+Claim an issue from the `pre-todo` column of the GitHub Projects board, then: branch → plan (**stop and wait for my confirmation**) → develop → verify → self-check → commit → merge (handed to `alear030-push-merge`) → push the board to done → ask me whether to take the next one.
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 

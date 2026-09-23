@@ -32,7 +32,7 @@ description: "把一个 GitHub issue 从拉取到 commit 走完修复流水线�
 5. **测试**
    - 走 `$alear030-verify`：AST/静态 → 目标单测 → 全量。测试放 `test/` 下镜像源码目录，探针用 case_* 裸函数 + `__main__` runner + 纯 ASCII PASS 行，`python -m test.xxx` 点号路径跑。
    - 涉真实数据的场景一律 tempfile 模拟（patch 路径或 reload），不碰 session/memory/local_model 真实文件。
-   - `python -m unittest discover` 基线必须保持绿；既有兄弟探针跑一遍防回归。
+   - `python -m unittest discover` 不引入新失败（历史遗留失败的判别见 `$alear030-verify`）；既有兄弟探针跑一遍防回归。
 
 6. **code review**
    - 派一个不继承会话上下文的 review 子代理，前台跑（结论要当场接住）。
