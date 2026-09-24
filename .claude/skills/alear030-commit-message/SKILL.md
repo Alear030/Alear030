@@ -81,7 +81,6 @@ commit 的作者署名是项目作者本人,不是 AI。message 里不要出现�
 当前进度:
 - README 目录结构与设计决策描述同步 hook 解耦(plan_hook 替换为
   pre_toolUse/inject_import_args)
-- CLAUDE.md 不纳入版本控制,已在工作区同步但不提交
 
 后续计划:继续优化整体架构代码,推进 memory 系统主线
 ```
