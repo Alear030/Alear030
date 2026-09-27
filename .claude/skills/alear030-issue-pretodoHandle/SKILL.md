@@ -49,6 +49,7 @@ pre-todo → Planning → inprogress → done
 7. **提交**
    - 走 `alear030-commit-message`，只 add 本 issue 相关的文件。
 8. **合并**
+   - 用户触发本工作流即授权第一段的 push 与开 PR；合并不在授权内，须等用户在 PR 开出后明确放行。
    - 走 `alear030-push-merge`：第一段 push + 开 PR 后停下交回用户，放行后第二段合并并清理分支/worktree、同步本地 master。
      不在本技能里另写一套合并流程——两段闸门、常驻分支名单、删除边界与清理项以那个技能为准。
    - `feat/issue-<n>-<slug>` 属于临时分支，合并后按那边的规则询问再删。
