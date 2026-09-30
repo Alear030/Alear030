@@ -4,7 +4,7 @@
 
 ← [Collaboration notes](../../COLLABORATION.en.md) · [Back to README](../../README.en.md)
 
-This directory holds the twelve skills I use when working with coding agents — 1207 lines in total, all under version control, and you can open any of them directly.
+This directory holds the twelve skills I use when working with coding agents — 1208 lines in total, all under version control, and you can open any of them directly.
 
 They aren't configuration, they're **sediment**. Behind every one of them is an occasion when it got something wrong, or when I failed to explain something clearly — step on a rake once, write down a rule. So this catalog is less a feature list than an incident log for this project.
 
@@ -17,7 +17,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | Skill | Lines | In one line |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 154 | This project's verification doesn't work like a normal Python project's |
-| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | The fixed format for commit messages |
+| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 130 | The fixed format for commit messages |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | After a commit: push and open a PR, stop for review, merge only after approval |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | The fixed format for CHANGELOG version blocks |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | The taste for writing comments in my code |
@@ -25,7 +25,7 @@ The format of a skill is simple: one directory holding one `SKILL.md`, with `nam
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | Read-only drift check of docs against the code, reporting without fixing |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | Read-only pre-merge review of an open PR, run by an executor with no session history: three reconciliation passes, an adversarial-input pass, and one exit criterion |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | The full flow from claiming an issue off the board to wrapping up |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | The pipeline from pulling an issue through locating, plan sign-off, fixing, testing, review to commit |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | Scan the @claude to-do markers I leave in the code |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | Clean up process files of sessions with no real conversation, per session, into a quarantine directory after confirmation |
 
@@ -69,7 +69,7 @@ It rests alongside two earlier-retired skills in the [skill graveyard](graveyard
 
 This group constrains what the output looks like. They all exist for the same reason: **the general approach loses something I need in this project.**
 
-### `alear030-commit-message` (131 lines)
+### `alear030-commit-message` (130 lines)
 
 The format is `YYYYMMDD_HHMMSS <one-line subject>` + blank line + body, with the body split into "current progress / next steps." The subject is capped at 50 characters.
 
@@ -113,9 +113,9 @@ Claim an issue from the `pre-todo` column of the GitHub Projects board, then: br
 
 Two design points: first, **the board state is the source of truth**, rather than judging from conversational memory how far along we are; second, single-slot — one at a time, no concurrent claiming.
 
-### `alear030-issue-fix` (52 lines)
+### `alear030-issue-fix` (54 lines)
 
-Without an issue number it pulls the open tech-debt list (oldest first) for me to pick from; with a number it goes straight in: locate (read-only) → propose a plan (**stop and wait for sign-off**) → fix → test → dispatch a review subagent → commit, **stopping at the commit**.
+Without an issue number it pulls the open tech-debt list (oldest first) for me to pick from; with a number it goes straight in: locate (read-only) → propose a plan (**stop and wait for sign-off**) → fix → test → review (self-review in the main loop for atomic issues, a review subagent for changes that touch mechanisms) → commit, **stopping at the commit**.
 
 It divides work explicitly with pretodoHandle: board claiming, branching and PR merging belong to that one; this one fixes directly in the current checkout, no branch, no push. One lesson from #8 made it into the body: **issues go stale** — the "no isolation" premise at filing time had been changed by #5 landing, and it nearly got "fixed" again against the stale premise; so the locate step mandates re-checking whether the premise still holds.
 

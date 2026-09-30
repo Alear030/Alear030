@@ -4,7 +4,7 @@
 
 ← [协作说明](../../COLLABORATION.md) · [返回 README](../../README.md)
 
-这个目录下是我和 coding agent 协作时用的十二个技能，一共 1207 行，全部进了版本控制，可以直接点开看。
+这个目录下是我和 coding agent 协作时用的十二个技能，一共 1208 行，全部进了版本控制，可以直接点开看。
 
 它们不是配置，是**沉淀**。每一个背后都有一次它做错了、或者我讲不清楚的经历——踩一次坑，写一条规矩。所以这份目录与其说是功能清单，不如说是这个项目的事故记录。
 
@@ -17,7 +17,7 @@
 | 技能 | 行数 | 一句话 |
 |------|------|--------|
 | [`alear030-verify`](alear030-verify/SKILL.md) | 154 | 这个项目的验证方式和常规 Python 项目不一样 |
-| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 131 | commit message 的固定格式 |
+| [`alear030-commit-message`](alear030-commit-message/SKILL.md) | 130 | commit message 的固定格式 |
 | [`alear030-push-merge`](alear030-push-merge/SKILL.md) | 203 | commit 之后 push、开 PR，停下评审，放行后才合并 |
 | [`alear030-changelog-refresh`](alear030-changelog-refresh/SKILL.md) | 120 | CHANGELOG 版本块的固定格式 |
 | [`alear030-style-notes`](alear030-style-notes/SKILL.md) | 74 | 往我的代码里写注释的口味 |
@@ -25,7 +25,7 @@
 | [`alear030-doc-drift-check`](alear030-doc-drift-check/SKILL.md) | 43 | 文档与代码现场的只读漂移体检，只汇报不修复 |
 | [`alear030-pr-review`](alear030-pr-review/SKILL.md) | 151 | 已开 PR 的 merge 前只读审查，由不带会话历史的执行者跑三道对账与对抗式输入审视，加一条退出标准 |
 | [`alear030-issue-pretodoHandle`](alear030-issue-pretodoHandle/SKILL.md) | 66 | 从看板认领一个 issue 到收尾的完整流程 |
-| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 52 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
+| [`alear030-issue-fix`](alear030-issue-fix/SKILL.md) | 54 | issue 从拉取定位到方案拍板、修复、测试、review、commit 的流水线 |
 | [`alear030-scan-claude-markers`](alear030-scan-claude-markers/SKILL.md) | 52 | 扫描我留在代码里的 @claude 待办标记 |
 | [`alear030-clear-logdata`](alear030-clear-logdata/SKILL.md) | 61 | 按会话清理没有实际对话的过程文件，确认后移入隔离目录 |
 
@@ -69,7 +69,7 @@
 
 这一组约束的是产出物长什么样。它们存在的理由都一样：**通用做法在这个项目里会丢掉某种我需要的东西。**
 
-### `alear030-commit-message`（131 行）
+### `alear030-commit-message`（130 行）
 
 格式是 `YYYYMMDD_HHMMSS <一句话主题>` + 空行 + 正文，正文分「当前进度 / 后续计划」。标题限 50 字内。
 
@@ -113,9 +113,9 @@
 
 两个设计点：一是**看板状态就是事实源**，不靠对话记忆判断做到哪一步了；二是单槽——一次只处理一个，不并发认领。
 
-### `alear030-issue-fix`（52 行）
+### `alear030-issue-fix`（54 行）
 
-不带号时拉取 tech-debt 的 open issue 清单（时间正序）供我挑，带号直接进：定位（只读）→ 提方案（**停下来等拍板**）→ 修 → 测 → 派 review subagent → commit，**止于 commit**。
+不带号时拉取 tech-debt 的 open issue 清单（时间正序）供我挑，带号直接进：定位（只读）→ 提方案（**停下来等拍板**）→ 修 → 测 → review（atomic issue 在主循环自查，触及机制的改动派 review subagent）→ commit，**止于 commit**。
 
 它和 pretodoHandle 是显式分工：看板认领、开分支、PR 合并归那个，这个在当前 checkout 直接修、不开分支不 push。里面有一条从 #8 学来的教训进了正文：**issue 会过时**——立项时"无隔离"的前提被 #5 合入改变，差点照着过时前提再修一遍；所以定位步骤强制先复核前提还成不成立。
 

@@ -28,11 +28,11 @@ Alear030 是一个 Python Agent Harness，负责工具编排、多 Agent 路由�
 - 写盘前确认当前目录是仓库根，并检查 `git status --short`。只修改任务直接需要的内容，不顺手重构、格式化或清理历史代码，保留用户已有改动。
 - 不要让多个 Agent 同时编辑同一 checkout。
 - 临时截断或禁用路径时，只增加入口 `return` 或等价 guard，禁止删除或清空原函数体；移除 guard 后必须能够原样恢复。
-- 任务收尾时检查是否产生了无法从源码自发现的长期规则。确有必要沉淀时再修改本文件，不强制调用未加载的技能。
+- 任务收尾时检查是否产生了无法从源码自发现的长期规则。确有必要沉淀时，按 `CLAUDE.md`「规约载体」一节裁决落点；本文件只同步 `CLAUDE.md` 已认可的规则，不强制调用未加载的技能。
 
 ## 验证
 
-- `python main.py` 不是无副作用的冒烟测试：构造 Session 会写文件，交互可能调用模型 API、下载权重或更新记忆。未经单独批准，不运行真实模型、embedding 下载、benchmark 或生产数据写入。
+- `python main.py` 在主仓库不是无副作用的冒烟测试：构造 Session 会写文件，交互可能调用模型 API、下载权重或更新记忆。在主仓库未经单独批准，不运行真实模型、embedding 下载、benchmark 或生产数据写入。关闭了 memory pipeline 的开发 worktree 可以放开跑；属于哪种 checkout 按 `$alear030-verify`「判断 0」的配置判据确定，不看路径名。
 - 按“AST/静态检查 → 目标单测或无模型探针 → 端到端”逐层验证；涉及项目代码验证时使用 `$alear030-verify`，具体注意事项以该技能为准。
 - 从仓库根运行全量单测：`python -m unittest discover`，不要追加 `-s test`。
 - 单个测试模块使用 `python -m test.<package>.<module>`，不要直接运行 `python test/...py`。

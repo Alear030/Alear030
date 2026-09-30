@@ -16,9 +16,9 @@ description: "生成 Alear030 项目的 git commit message。当用户要求提�
 ## Message 格式
 
 **标题一行,空行,然后正文。** 这一点是硬要求:git 把第一行当 subject,其余当 body。
-早期这个项目把全部内容挤在一行,结果整条两千字的 message 都成了标题——
+全部挤在一行时,整条 message 都会成为标题——
 `git log --oneline` 撑满终端没法扫,GitHub 提交列表和 blame 悬浮提示全是截断的一坨,
-恰好把时间戳前缀本该提供的「按时间线回溯」能力废掉了。信息密度不用降,分开排就行。
+恰好把时间戳前缀本该提供的「按时间线回溯」能力废掉。信息密度不用降,分开排就行。
 
 ```
 YYYYMMDD_HHMMSS <一句话主题>
@@ -81,7 +81,6 @@ commit 的作者署名是项目作者本人,不是 AI。message 里不要出现�
 当前进度:
 - README 目录结构与设计决策描述同步 hook 解耦(plan_hook 替换为
   pre_toolUse/inject_import_args)
-- CLAUDE.md 不纳入版本控制,已在工作区同步但不提交
 
 后续计划:继续优化整体架构代码,推进 memory 系统主线
 ```

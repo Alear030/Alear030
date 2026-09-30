@@ -19,6 +19,13 @@ class ExtraInfoHandler:
             "Vertical":self._update_vertical,
             "default":self._update_default
         }
+
+    # 未知或非字符串类型统一走 default
+    def _resolve_type(self,content:dict)->str:
+        extra_info_type = content.get("type")
+        if isinstance(extra_info_type,str) and extra_info_type in self.ExtraInfoBuilder:
+            return extra_info_type
+        return "default"
     
     # 处理extra_info，根据extra_info_id构建或更新extra_info
     def extra_info_handler(self,ToolCallWidget:Widget,content:dict):
@@ -30,8 +37,7 @@ class ExtraInfoHandler:
         if not extra_info_id:
             return
         
-        # 获取extra_info_type，如果extra_info_type不存在，则设置为default
-        extra_info_type = content.get("type",None) if content.get("type",None) else "default"
+        extra_info_type = self._resolve_type(content)
 
         # 如果extra_info_id不存在，则构建新的extra_info
         if extra_info_id not in self.widget_list.keys():
@@ -44,10 +50,17 @@ class ExtraInfoHandler:
                 self.ExtraInfoUpdater[exist_widget_info["type"]](exist_widget_info["widget"],content)
             else:
                 # type 变了 → 先移除旧的，再按新 type 重建，确保 widget_list 指向新实例
-                exist_widget_info["widget"].remove()
+                removed = exist_widget_info["widget"].remove()
                 new_widget = self.ExtraInfoBuilder[extra_info_type](content)
-                ToolCallWidget.extra_body.mount(new_widget)
-                self._update_widget_list(new_widget,content)
+                widget_list = self.widget_list
+
+                # 等旧节点移除再挂同 ID；连续切换时跳过过时实例
+                async def mount_replacement():
+                    await removed
+                    if widget_list[extra_info_id]["widget"] is new_widget:
+                        await ToolCallWidget.extra_body.mount(new_widget)
+
+                ToolCallWidget.extra_body.call_later(mount_replacement)
                 self._change_extrabody_display(True)
         return
     
@@ -84,7 +97,7 @@ class ExtraInfoHandler:
         if widget_id:
             self.widget_list[widget_id] = {
                 "widget":new_widget,
-                "type":content.get("type",None) if content.get("type",None) else "default",
+                "type":self._resolve_type(content),
                 "content":content.get("content",None)
             }
         return
@@ -105,7 +118,7 @@ class ExtraInfoHandler:
     def _build_horizontal(self,content:dict):
         widget_list = []
         for item in content.get("content",[]):
-            widget_list.append(self.ExtraInfoBuilder[item.get("type","default")](item))
+            widget_list.append(self.ExtraInfoBuilder[self._resolve_type(item)](item))
         new_widget = Horizontal(id=content.get("id",None),*widget_list) 
         self._widget_css_handler(new_widget,content)
         self._update_widget_list(new_widget,content)
@@ -115,7 +128,7 @@ class ExtraInfoHandler:
     def _build_vertical(self,content:dict):
         widget_list = []
         for item in content.get("content",[]):
-            widget_list.append(self.ExtraInfoBuilder[item.get("type","default")](item))
+            widget_list.append(self.ExtraInfoBuilder[self._resolve_type(item)](item))
         new_widget = Vertical(id=content.get("id",None),*widget_list)
         self._widget_css_handler(new_widget,content)
         self._update_widget_list(new_widget,content)
@@ -142,7 +155,7 @@ class ExtraInfoHandler:
     # 更新Horizontal类型的extra_info
     def _update_horizontal(self,widget:Horizontal,content:dict):
         for item in content.get("content",[]):
-            self.ExtraInfoUpdater[item.get("type","default")](widget.get_child_by_id(item.get("id",None)),item)
+            self.ExtraInfoUpdater[self._resolve_type(item)](widget.get_child_by_id(item.get("id",None)),item)
         self._widget_css_handler(widget,content)
         self._update_widget_list(widget,content)
         return
@@ -150,7 +163,7 @@ class ExtraInfoHandler:
     # 更新Vertical类型的extra_info
     def _update_vertical(self,widget:Vertical,content:dict):
         for item in content.get("content",[]):
-            self.ExtraInfoUpdater[item.get("type","default")](widget.get_child_by_id(item.get("id",None)),item)
+            self.ExtraInfoUpdater[self._resolve_type(item)](widget.get_child_by_id(item.get("id",None)),item)
         self._widget_css_handler(widget,content)
         self._update_widget_list(widget,content)
         return
