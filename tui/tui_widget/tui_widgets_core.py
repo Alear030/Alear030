@@ -3,6 +3,15 @@ from textual.widgets import Static
 from textual.widget import Widget
 
 
+class _FallbackWidget(Static):
+    # 保留占位提示，兼容流式更新和收尾
+    def update_widget(self,widget_content:dict):
+        return
+
+    def finalize(self):
+        return
+
+
 class TuiWidgets:
 
     # 初始化创建，负载上widget list
@@ -43,7 +52,7 @@ class TuiWidgets:
 
         # 未注册或未启用的widget，用默认Static兜底渲染
         if not widget_cls or not widget_cls['widget_enable']:
-            return Static(content=f"this {widget_type} message is not enabled",classes='default_css')
+            return _FallbackWidget(content=f"this {widget_type} message is not enabled",classes='default_css')
 
         # 已注册且启用的widget，构造时自己从dict取内容
         return widget_cls['widget_cls'](widget_content,widget_id=widget_id)

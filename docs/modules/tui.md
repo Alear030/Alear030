@@ -101,7 +101,9 @@ class AssistantContentWidget(...):
 
 注册时同时收集该 widget 的 `.tcss` 文件路径进 `css_files`；`tui_core.py` 在 import 期把它和全局 `tui_style.tcss` 拼成 `css_path` 传给 `App.__init__`。
 
-**未注册或 `widget_enable=False` 的类型不会炸**，`build_widget` 用一个默认 `Static` 兜底渲染，把类型名显示出来。
+**未注册或 `widget_enable=False` 的类型**，`build_widget` 用内部 `Static` 子类兜底渲染，把类型名显示出来。它提供空操作的 `update_widget` 和幂等 `finalize`：后续更新保留占位提示，`StreamEnd` 沿用 channel 的既有流程清除流缓存，提示仍留在消息区。高度继承 `Static` 的默认 `auto`。
+
+`ExtraInfoHandler` 的顶层与嵌套分发共用类型解析：只认可 `Static`、`Horizontal`、`Vertical`、`default`，缺失、空值、未知或非字符串类型都按 `default` 构建和更新。缓存保存解析后的类型，原始输入不变，兜底文案仍显示原始类型与内容。顶层同一 ID 的已知与未知类型切换沿用移除、重建路径：缓存先指向新实例，UI 回调等待旧节点移除后再挂载同 ID 节点，连续切换时不挂载过时实例。嵌套更新要求子节点结构与解析后的类型保持稳定，不负责子树重组、缺失子节点或非法 CSS 的容错。
 
 ## 事件分发注册表
 
