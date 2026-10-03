@@ -4,7 +4,7 @@
 
 Alear030 — 从零自研的 Python Agent Harness：工具编排、多 Agent 路由、会话生命周期、事件驱动 Hook、跨会话记忆召回。
 
-**仓库已公开（MIT）。** 代码、注释、文档、commit message、`AGENTS.md`、`.claude/skills/` 与 `.cursor/rules/` 都会被陌生人读到，落笔时按「这会被公开」来写：不留本机绝对路径、内部语境或协作过程叙述。
+**仓库已公开（MIT）。** 代码、注释、文档、commit message、`AGENTS.md`、`.claude/` 下的 `skills/`、`agents/`、`hooks/` 与 `settings.json`，以及 `.cursor/rules/` 都会被陌生人读到，落笔时按「这会被公开」来写：不留本机绝对路径、内部语境或协作过程叙述。
 
 架构事实以 [docs/](docs/index.md) 为权威源，最终以代码为准；本文件不复述架构。想知道进度读 `git log -1`——「当前进度 / 后续计划」写在提交正文里，启动上下文里的提交列表只有标题。
 
