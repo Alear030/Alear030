@@ -1387,6 +1387,20 @@ def _strip_quotes(arg: str) -> str:
 _RECURSIVE_FLAGS = ("--recursive", "--force")
 
 
+_POWERSHELL_DELETE_COMMANDS = {"remove-item", "ri", "rm", "del", "erase", "rd", "rmdir"}
+_POWERSHELL_RECURSE_FLAGS = {"-r", "-re", "-rec", "-recu", "-recur", "-recurs", "-recurse"}
+
+
+def _check_powershell_delete_scope(base_cmd: str, args: list[str]) -> Optional[str]:
+    if base_cmd not in _POWERSHELL_DELETE_COMMANDS:
+        return None
+    for arg in args:
+        # 按完整参数识别缩写与开关赋值，保留引号内的文件名
+        if arg.lower().split(":", 1)[0] in _POWERSHELL_RECURSE_FLAGS:
+            return "PowerShell -Recurse 递归删除文件或目录"
+    return None
+
+
 def _check_delete_scope(base_cmd: str, args: list[str], positional: list[str]) -> Optional[str]:
     """rm 与 git rm 的递归/强制/通配删除判定，返回拦截原因。
 
@@ -1489,8 +1503,8 @@ _nest_state = threading.local()
 
 
 def _check_nested_command(inner: str, flag: str) -> Optional[str]:
-    """把 -c/-e 的取值当成一条普通命令重新过闸,内层被拒则整条拒。"""
-    inner = _strip_quotes(inner).strip()
+    """校验已剥除传输层引号的载荷，保留内部字符串引号。"""
+    inner = inner.strip()
     if not inner:
         return None
 
@@ -1511,6 +1525,8 @@ def _check_nested_command(inner: str, flag: str) -> Optional[str]:
 
 def _check_interpreter_payload(base_cmd: str, args: list[str]) -> Optional[str]:
     """解释器的 -c/-e 载荷递归过闸。不是解释器则直接放过。"""
+    if base_cmd in ("powershell.exe", "pwsh.exe"):
+        base_cmd = base_cmd[:-4]
     flags = INTERPRETER_PAYLOAD_FLAGS.get(base_cmd)
     if not flags:
         return None
@@ -1523,10 +1539,15 @@ def _check_interpreter_payload(base_cmd: str, args: list[str]) -> Optional[str]:
             continue
         if name in _OPAQUE_PAYLOAD_FLAGS:
             return f"{name} 的载荷是 base64 编码,无法校验其内容,不予放行"
+        # PowerShell 会把 -Command 后的剩余参数交给内层命令
+        if base_cmd in ("powershell", "pwsh"):
+            payload = arg.partition("=")[2] if sep else args[index + 1] if index + 1 < len(args) else ""
+            tail = args[index + 1:] if sep else args[index + 2:]
+            return _check_nested_command(" ".join([_strip_quotes(payload), *tail]), name)
         if sep:
-            return _check_nested_command(arg.partition("=")[2], name)
+            return _check_nested_command(_strip_quotes(arg.partition("=")[2]), name)
         if index + 1 < len(args):
-            return _check_nested_command(args[index + 1], name)
+            return _check_nested_command(_strip_quotes(args[index + 1]), name)
         return None
     return None
 
@@ -1583,6 +1604,11 @@ def _validate_segment(tokens: list[str]) -> tuple[bool, str, str]:
     nested_err = _check_interpreter_payload(base_cmd, args)
     if nested_err:
         return (False, nested_err, "destructive")
+
+    # 先拦 PowerShell 递归删除，避免未知命令提前放行
+    delete_err = _check_powershell_delete_scope(base_cmd, args)
+    if delete_err:
+        return (False, delete_err, "destructive")
 
     # 第2层: 分类。命中白名单沿用其类别；未命中标 unknown 但照常放行——
     # 闸门已翻转，白名单从"准入条件"降级为"分类表"
