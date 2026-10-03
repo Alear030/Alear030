@@ -1503,8 +1503,8 @@ _nest_state = threading.local()
 
 
 def _check_nested_command(inner: str, flag: str) -> Optional[str]:
-    """把 -c/-e 的取值当成一条普通命令重新过闸,内层被拒则整条拒。"""
-    inner = _strip_quotes(inner).strip()
+    """校验已剥除传输层引号的载荷，保留内部字符串引号。"""
+    inner = inner.strip()
     if not inner:
         return None
 
@@ -1545,9 +1545,9 @@ def _check_interpreter_payload(base_cmd: str, args: list[str]) -> Optional[str]:
             tail = args[index + 1:] if sep else args[index + 2:]
             return _check_nested_command(" ".join([_strip_quotes(payload), *tail]), name)
         if sep:
-            return _check_nested_command(arg.partition("=")[2], name)
+            return _check_nested_command(_strip_quotes(arg.partition("=")[2]), name)
         if index + 1 < len(args):
-            return _check_nested_command(args[index + 1], name)
+            return _check_nested_command(_strip_quotes(args[index + 1]), name)
         return None
     return None
 
