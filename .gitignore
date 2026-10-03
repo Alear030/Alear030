@@ -28,7 +28,8 @@ session/session_detail/
 session/session_plan/
 
 # 测试数据与代码(含真实 session slice / 用户画像语料 / 一次性验证脚本,不进版本控制)
-test/
+test/*
+!test/test_command_security.py
 
 # memory 运行时记忆数据(真实画像/节点/时间线,不进版本控制)
 memory/memory_storage/memory_storages/
