@@ -100,7 +100,10 @@ class BacktickGuardTest(unittest.TestCase):
                     'git commit -m "fix `foo`"',
                     'cat <<EOF > a.md\nuse `foo`\nEOF',
                     'cat <<-EOF\n\t`x`\n\tEOF',
-                    'cat <<EOF\nline\n  EOF\n`x`\nEOF']:  # 缩进的 EOF 不是 <<EOF 的结束符
+                    'cat <<EOF\nline\n  EOF\n`x`\nEOF',  # 缩进的 EOF 不是 <<EOF 的结束符
+                    'echo $\'it\\\'s\' "`x`"',  # $'...' 里的 \' 不结束串
+                    'echo hi;# it\'s\necho "`x`"',  # ;# 开始的是注释
+                    'x="$(echo "`y`")"']:  # $(...) 里的双引号串照样要查
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.decide(cmd), 'deny')
 
@@ -113,7 +116,10 @@ class BacktickGuardTest(unittest.TestCase):
                     'python -c "print(1)" && echo \'a `b`\'',
                     'echo "escaped \\`x\\`"',
                     'cat <<EOF\nplain\nEOF\necho `date`',
-                    'echo hi # "`x`"']:
+                    'echo hi # "`x`"',
+                    'git commit -m "$(cat <<\'EOF\'\nuse `foo`\nEOF\n)"',
+                    'y="$(echo \'`x`\')"',
+                    'gh pr create --body "$(cat <<\'EOF\'\n(a) `b` (c)\nEOF\n)" --title t']:
             with self.subTest(cmd=cmd):
                 self.assertIsNone(self.decide(cmd))
 
@@ -128,7 +134,10 @@ class DataGuardTest(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.repo = make_repo(Path(tmp.name) / 'repo')
+        # 真仓库：git 类判据要靠 ls-files 查受保护目录里有没有被跟踪的文件
+        self.repo = Path(tmp.name) / 'repo'
+        self.repo.mkdir()
+        subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
         self.outside = Path(tmp.name) / 'scratch'
         self.outside.mkdir()
 
@@ -152,7 +161,6 @@ class DataGuardTest(unittest.TestCase):
             'cp a.json memory/memory_config/memory_configs/x.json 2>/dev/null',
             'cp -t memory/memory_config/memory_configs a.json',
             'echo {} > memory/memory_config/memory_configs/user_info.json',
-            'git checkout -- session/session_detail',
             'git clean -fdx',
             'git -C . clean -fdX',
             'git stash push --all',
@@ -165,16 +173,31 @@ class DataGuardTest(unittest.TestCase):
             'bash -c "rm -rf log/log_data"',
             'rsync -a --delete empty/ log/log_data/',
             'sed -i s/a/b/ memory/memory_config/memory_configs/user_info.json',
+            'sed --in-place s/a/b/ memory/memory_config/memory_configs/user_info.json',
             'rm -rf .',
+            'find log/log_data -print0 | xargs -0 rm -f',
+            'ls log/log_data | xargs -n1 rm',
+            'ls log/log_data/*.log | sort | head | xargs rm',
+            'bash -lc "rm -rf log/log_data"',
+            'sh -ec "rm -rf log/log_data"',
+            'nice rm -rf log/log_data',
+            'timeout 10 rm -rf log/log_data',
+            'sudo -u root rm -rf log/log_data',
+            'env -i X=1 rm -rf log/log_data',
+            'rsync -a empty/ memory/memory_config/memory_configs/',
         ]
         ps_cases = [
             'Remove-Item -Recurse session\\session_plan',
             *(['Remove-Item -Recurse Session\\Session_Detail'] if os.name == 'nt' else []),  # 大小写不敏感只在 Windows 成立
-            'Get-ChildItem memory\\memory_log | Remove-Item',
+            'Get-ChildItem memory\\memory_log\\memory_logs | Remove-Item',
             'Get-ChildItem log\\log_data | ForEach-Object { Remove-Item $_ }',
+            'gci log\\log_data | ? { $_.Length -gt 0 } | ri',
             'Copy-Item a.json memory\\memory_config\\memory_configs\\x.json -Force',
             'Set-Location session; Remove-Item -Recurse session_detail',
+            'Push-Location session; Remove-Item -Recurse session_detail',
+            'Remove-Item -Path:log\\log_data -Recurse',
             'cmd /c rd /s /q session\\session_detail',
+            'cmd /c "rd /s /q log\\log_data"',
             'robocopy empty log\\log_data /MIR',
             'Rename-Item log\\log_data old',
         ]
@@ -207,11 +230,26 @@ class DataGuardTest(unittest.TestCase):
             'rm -rf test/*',
             'find test -name "*.pyc" -delete',
             'rsync -a log/log_data/ backup/',
+            # 受保护目录的上一级里是被跟踪的源码，不是运行数据
+            'git checkout -- memory/memory_storage/memory_storage_core.py',
+            'sed -i s/a/b/ memory/memory_log/memory_log_core.py',
+            'echo x > memory/memory_log/__init__.py',
+            'rm -rf memory/memory_storage/__pycache__',
+            # 受保护目录里没有被跟踪的文件时，只动被跟踪文件的 git 命令碰不到它
+            'git checkout -- session/session_detail',
+            'git reset --hard',
+            'git restore .',
+            # heredoc 正文是数据
+            "python - <<'X'\nsession = 1\ndel session\nX",
+            "cat > notes.md <<'X'\nrm -rf log/log_data is what we must never do\nX",
+            "git commit -F - <<'X'\nmv memory notes into docs\nX",
+            'cat session/session_detail/a.json | tee',
         ]
         ps_cases = [
             'Get-ChildItem session\\session_detail -Filter *.json | Select-Object Name | Out-File test\\list.txt',
             'Get-Content session\\session_detail\\a.json | Set-Content test\\copy.json',
             'Copy-Item session\\session_detail\\a.json test\\a.json',
+            'New-Item -ItemType Directory -Force log\\log_data',
         ]
         for cmd in cases:
             with self.subTest(cmd=cmd):
@@ -221,6 +259,16 @@ class DataGuardTest(unittest.TestCase):
                 self.assertIsNone(self.decide(cmd, tool='PowerShell'))
         # 不在任何仓库里、也没有会话起点时不判断
         self.assertIsNone(self.decide('rm -rf log/log_data', cwd=self.outside))
+
+    def test_git_counts_tracked_data(self):
+        # 历史上被跟踪进来的数据文件：checkout / reset --hard 会改写它们
+        tracked = self.repo / 'session/session_detail/old.json'
+        tracked.parent.mkdir(parents=True)
+        tracked.write_text('{}', encoding='utf-8')
+        subprocess.run(['git', '-C', str(self.repo), 'add', '-f', str(tracked)], check=True)
+        self.assertEqual(self.decide('git checkout -- session/session_detail'), 'ask')
+        self.assertEqual(self.decide('git reset --hard'), 'ask')
+        self.assertIsNone(self.decide('git checkout -- log/log_data'))
 
     def test_project_dir_extends_protection(self):
         # cwd 在仓库外（比如 scratchpad）时，靠会话起点定位仓库：绝对路径与相对路径都能认出
