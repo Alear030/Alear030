@@ -72,6 +72,22 @@ class CommandSecurityTests(unittest.TestCase):
                     self.assert_allowed(f'{interpreter} {flag} "Remove-Item foo.txt"')
                     self.assert_allowed(f'{interpreter} {flag} Remove-Item foo.txt')
 
+    def test_powershell_literal_payloads(self):
+        for interpreter in ('powershell', 'pwsh', 'PowerShell.exe', 'PWSH.EXE'):
+            for flag in ('-Command', '-c'):
+                for literal in ("'shutdown /s'", "'Remove-Item x -Recurse'"):
+                    for separator in (' ', '='):
+                        command = f'{interpreter} {flag}{separator}"{literal}"'
+                        with self.subTest(command=command):
+                            self.assert_allowed(command)
+
+    def test_other_interpreter_payloads(self):
+        for interpreter, flag in (('bash', '-c'), ('python', '-c'), ('node', '-e')):
+            for separator in (' ', '='):
+                with self.subTest(interpreter=interpreter, separator=separator):
+                    self.assert_allowed(f'{interpreter} {flag}{separator}"echo ok"')
+                    self.assert_blocked(f'{interpreter} {flag}{separator}"rm -rf x"')
+
     def test_non_recursive_and_literal_arguments(self):
         commands = (
             'Remove-Item foo.txt', 'Remove-Item "folder name/foo.txt"',
