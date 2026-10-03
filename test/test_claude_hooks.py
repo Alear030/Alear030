@@ -260,6 +260,15 @@ class DataGuardTest(unittest.TestCase):
         # 不在任何仓库里、也没有会话起点时不判断
         self.assertIsNone(self.decide('rm -rf log/log_data', cwd=self.outside))
 
+    def test_git_ignores_tracked_seeds(self):
+        # 真实仓库的 memory_configs 下跟踪着 .example.json 种子；还原它们不算动运行数据
+        seed = self.repo / 'memory/memory_config/memory_configs/user_info.example.json'
+        seed.parent.mkdir(parents=True)
+        seed.write_text('{}', encoding='utf-8')
+        subprocess.run(['git', '-C', str(self.repo), 'add', '-f', str(seed)], check=True)
+        self.assertIsNone(self.decide('git reset --hard'))
+        self.assertIsNone(self.decide('git checkout -- .'))
+
     def test_git_counts_tracked_data(self):
         # 历史上被跟踪进来的数据文件：checkout / reset --hard 会改写它们
         tracked = self.repo / 'session/session_detail/old.json'

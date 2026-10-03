@@ -93,11 +93,16 @@ def _protected(cwd):
 
 
 def _has_tracked(root, rel):
+    # 随仓库分发的 .example 种子是被跟踪的正式内容，git 还原它们不算动运行数据。
+    # 在 Python 侧过滤而不用 :(exclude) pathspec：后者在嵌套于主仓库目录内的 worktree 里实测不生效
     try:
         out = subprocess.run(["git", "-C", root, "ls-files", "--", rel], capture_output=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return True  # 查不了就按有算，宁可多问一次
-    return out.returncode != 0 or bool(out.stdout.strip())
+    if out.returncode != 0:
+        return True
+    files = out.stdout.decode("utf-8", "replace").splitlines()
+    return any(not f.endswith(".example.json") for f in files)
 
 
 def _resolve(arg, cur):
