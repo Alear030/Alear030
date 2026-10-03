@@ -44,9 +44,13 @@ memory/memory_config/memory_configs/*.json
 
 # 本地 IDE 与协作配置。CLAUDE.md、.cursor/rules/ 与 .claude/skills/ 已纳入版本控制
 # ——它们记录这个项目实际是怎么被开发的,不含本机信息。默认忽略 .claude/ 下其余内容,
-# 只显式放行 skills/:settings.local.json 含本机绝对路径,worktrees/ 是完整 checkout。
+# 只显式放行 skills/、agents/(子代理定义)、hooks/ 与挂载它们的 settings.json(只用相对判据,不含本机路径):
+# settings.local.json 含本机绝对路径,worktrees/ 是完整 checkout。
 .claude/*
 !.claude/skills/
+!.claude/agents/
+!.claude/hooks/
+!.claude/settings.json
 !.claude/settings.local.json.example
 .agents/
 .opencode/
