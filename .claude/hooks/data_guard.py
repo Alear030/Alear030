@@ -9,8 +9,11 @@ memory_configs 下的真身 JSON 会被管线长出新维度，覆盖等于清�
 cp / rsync 一类只看目的地；heredoc 正文是数据，不当命令解析。
 git 分两类：clean -x / stash -a 作用于 ignored 文件，视为波及全部；checkout / restore / rm / mv / reset --hard
 只动被跟踪的文件，只在受保护目录里确实有被跟踪文件时才算命中。只读命令不触发。
-这是防手误的启发式，不是沙箱：变量间接、脚本内部的删除（python 里的 shutil.rmtree 等）、
-Write / Edit 工具的整体覆盖都不在视野内。
+定位是绊线：防的是常见写法下的手误，不是沙箱，也不追全 shell 语法——对不可恢复数据的真正兜底是备份。
+已知看不到的：变量间接与 eval / iex、脚本内部的删除（python 里的 shutil.rmtree、[IO.Directory]::Delete 等）、
+Write / Edit 工具的整体覆盖、反斜杠或反引号续行把路径折到下一行、PowerShell 以 \\" 结尾的路径、
+花括号展开、|& 与 ! 前缀、管道中间带参数的过滤命令（grep、Where-Object 简化语法）截断上游、
+会删源的 rsync --remove-source-files 与 robocopy /MOVE、tar -C 解包。
 隔离与还原走 alear030-clear-logdata 的 logdata.py，它只收 session id，不会命中这里。
 """
 
@@ -213,8 +216,8 @@ def _targets(verb, args):
         if not any(f.startswith("-i") or f.startswith("--in-place") for f in flags):
             return None
         return _path_args(args)[1:]  # 第一个非选项参数是 sed 脚本
-    if verb == "tee":
-        return _path_args(args) or None  # 不带文件参数时只写 stdout
+    if verb in ("tee", "out-file", "set-content", "sc"):
+        return _path_args(args) or None  # 写的是管道传来的内容，目标只来自自己的参数；不带参数时不写文件
     if verb in WRITE_ALL:
         return _path_args(args, cmd_style=verb in ("rd", "del", "erase", "move")) or "PIPE"
     if verb in COPY:

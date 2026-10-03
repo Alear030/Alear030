@@ -4,12 +4,36 @@ worktree 与主仓库的目录结构完全一致，同名路径极易写错；�
 本 worktree 纹丝不动，症状只在测试或 diff 里滞后出现。这里在落盘前按路径归属拦截：
 目标所在 checkout 与当前 checkout 共享同一个 .git、却不是同一个工作树，就拒绝，并回给模型本 worktree 的对应路径。
 当前在主仓库 checkout 里工作时不做任何判断。
+
+例外：主 checkout 专属的 ignored 内容（.local/ 记录页、.cc_file/ 等）放行——目标在主 checkout 里被 gitignore、
+本 worktree 里又没有同名文件时，写到主 checkout 才是对的，按提示改写进 worktree 反而会把内容分裂成两处。
+data_guard 列出的运行数据目录不在例外内：那些被 ignore 是因为它们是不可恢复的数据，不是因为它们只属于主 checkout。
 """
 
 import json
 import os
 import re
+import subprocess
 import sys
+
+sys.dont_write_bytecode = True  # 下面从同目录 import，不在 .claude/hooks/ 里留 __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from data_guard import PROTECTED  # noqa: E402  运行数据目录清单只在 data_guard 维护一处
+
+
+def _main_only_ignored(main_root, rel, worktree):
+    """rel 在主 checkout 里被 gitignore、不在运行数据目录里、且本 worktree 没有同名文件。"""
+    rel_posix = rel.replace("\\", "/")
+    if any(rel_posix.lower() == p or rel_posix.lower().startswith(p + "/") for p in PROTECTED):
+        return False
+    if os.path.exists(os.path.join(worktree, rel)):
+        return False
+    try:
+        out = subprocess.run(["git", "-C", main_root, "check-ignore", "-q", "--", rel_posix],
+                             capture_output=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False  # 查不了就按没有例外处理，照常拦
+    return out.returncode == 0
 
 
 def _abs(path, base):
@@ -70,6 +94,8 @@ def main():
         hint = "目标在仓库的 .git 内部，worktree 里没有对应路径。确实要改的话，请用户来做。"
     elif there[2]:
         hint = "目标在同一仓库的另一个 worktree 里。确实要跨 checkout 写入的话，请用户来做。"
+    elif _main_only_ignored(there[0], rel, worktree):
+        return
     else:
         suggested = os.path.join(worktree, rel).replace("\\", "/")
         hint = f"当前在 worktree 里工作，这个路径指向主仓库 checkout。本 worktree 里对应的路径是：{suggested}"

@@ -89,6 +89,84 @@ class WorktreeGuardTest(unittest.TestCase):
         self.assertTrue(stderr)
 
 
+class WorktreeMainOnlyIgnoredTest(unittest.TestCase):
+    # 真仓库 + git worktree add：例外判据要靠 git check-ignore
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.main = Path(tmp.name) / 'repo'
+        self.main.mkdir()
+        git = lambda *a: subprocess.run(['git', '-C', str(self.main), *a], check=True, capture_output=True)
+        git('init', '-q')
+        (self.main / '.gitignore').write_text('.local/\n.env\nlog/log_data/\n', encoding='utf-8')
+        (self.main / 'config.py').write_text('', encoding='utf-8')
+        git('add', '.')
+        git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init')
+        self.wt = self.main / '.claude/worktrees/dev'
+        git('worktree', 'add', '-q', str(self.wt))
+        self.addCleanup(lambda: subprocess.run(['git', '-C', str(self.main), 'worktree', 'remove', '--force', str(self.wt)],
+                                               capture_output=True))
+
+    def decide(self, target):
+        return run_hook('worktree_guard.py', {'tool_name': 'Write', 'tool_input': {'file_path': str(target)},
+                                              'cwd': str(self.wt)})[0]
+
+    def test_allows_main_only_ignored(self):
+        self.assertIsNone(self.decide(self.main / '.local/note.html'))
+
+    def test_still_blocks(self):
+        (self.main / '.env').write_text('', encoding='utf-8')
+        (self.wt / '.env').write_text('', encoding='utf-8')
+        self.assertEqual(self.decide(self.main / '.env'), 'deny')  # 两边都有：多半是写错了 checkout
+        self.assertEqual(self.decide(self.main / 'log/log_data/a.log'), 'deny')  # 运行数据目录不在例外内
+        self.assertEqual(self.decide(self.main / 'config.py'), 'deny')  # 被跟踪的文件
+
+
+class ReadonlyGuardTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name) / 'repo'
+        self.repo.mkdir()
+        subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
+        self.outside = (Path(tmp.name) / 'scratch').as_posix()
+
+    def decide(self, cmd, tool='Bash'):
+        return run_hook('readonly_guard.py', {'tool_name': tool, 'tool_input': {'command': cmd},
+                                              'cwd': str(self.repo)})[0]
+
+    def test_blocks(self):
+        for cmd in ['git commit -m x', 'git add -A', 'git stash', 'git checkout master', 'git push',
+                    'git branch feature', 'git branch -D old', 'git tag v1', 'git config user.name x',
+                    'git -C . reset --hard', 'git worktree add ../x',
+                    'gh pr comment 179 -b hi', 'gh pr merge 179', 'gh api repos/a/b/issues -f title=x',
+                    'gh api -X DELETE repos/a/b/issues/comments/1',
+                    'echo x > notes.md', 'rm config.py', 'mv a.py b.py', 'cp /tmp/x.py tool/x.py',
+                    'bash -c "git commit -m x"', 'git status && git commit -m x']:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.decide(cmd), 'deny')
+        self.assertEqual(self.decide('Set-Content -Path notes.md -Value x', tool='PowerShell'), 'deny')
+
+    def test_allows(self):
+        for cmd in ['git status', 'git log --oneline -3', 'git diff origin/master...HEAD',
+                    'git show HEAD:config.py', 'git fetch origin', 'git merge-base origin/master HEAD',
+                    'git branch', 'git branch -a', 'git branch --contains HEAD', 'git stash list',
+                    'git worktree list', 'git config --get user.name', 'git ls-files -- session',
+                    'gh pr view 179', 'gh pr diff 179', 'gh api repos/a/b/pulls/179',
+                    f'mkdir -p {self.outside} && echo x > {self.outside}/probe.json',
+                    f'python tool.py < {self.outside}/probe.json',
+                    'git diff | tee', 'python -m unittest test.test_x']:
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(self.decide(cmd))
+        self.assertIsNone(self.decide('git diff | Out-File $env:TEMP\\d.txt', tool='PowerShell'))
+
+    def test_fails_open(self):
+        decision, _, stderr, code = run_hook('readonly_guard.py', b'not json')
+        self.assertIsNone(decision)
+        self.assertEqual(code, 0)
+        self.assertTrue(stderr)
+
+
 class BacktickGuardTest(unittest.TestCase):
     def decide(self, cmd):
         return run_hook('backtick_guard.py', {'tool_name': 'Bash', 'tool_input': {'command': cmd}, 'cwd': os.getcwd()})[0]
@@ -122,6 +200,24 @@ class BacktickGuardTest(unittest.TestCase):
                     'gh pr create --body "$(cat <<\'EOF\'\n(a) `b` (c)\nEOF\n)" --title t']:
             with self.subTest(cmd=cmd):
                 self.assertIsNone(self.decide(cmd))
+
+    def test_powershell(self):
+        def ps(cmd):
+            return run_hook('backtick_guard.py', {'tool_name': 'PowerShell', 'tool_input': {'command': cmd},
+                                                  'cwd': os.getcwd()})[0]
+        for cmd in ['git commit -m "use `name` here"',
+                    'python -c "print(1)" "x `vy` z"',
+                    '$m = @"\nuse `tag`\n"@']:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(ps(cmd), 'deny')
+        for cmd in ["git commit -m 'use `name` here'",
+                    "$m = @'\nuse `tag`\n'@",
+                    "Write-Output 'it''s `x`'",
+                    'Get-ChildItem `\n  -Recurse',  # 引号外的行尾续行
+                    'echo hi # "`x`"',
+                    'echo "plain"']:
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(ps(cmd))
 
     def test_fails_open(self):
         decision, _, stderr, code = run_hook('backtick_guard.py', b'not json')
